@@ -64,12 +64,19 @@ extension RealityTableController {
     }
 
     /// Friction/restitution pairs — named because they're the dials a device
-    /// tuning pass would reach for first (TD-6).
+    /// tuning pass would reach for first (TD-6). Restitution sits higher than
+    /// SceneKit's implicit defaults: real-time gravity gives each bounce less
+    /// airtime than `speed = 3` physics, so the energy has to come back at
+    /// contact rather than hang in the air.
     private enum PhysicsTune {
         static let tableFriction: Float = 0.6
-        static let tableRestitution: Float = 0.3
+        static let tableRestitution: Float = 0.45
         static let dieFriction: Float = 0.4
-        static let dieRestitution: Float = 0.55
+        static let dieRestitution: Float = 0.6
+        /// Below SceneKit's implicit 0.1s — heavy damping reads as
+        /// mid-air molasses at meter scale; felt friction does the stopping.
+        static let linearDamping: Float = 0.05
+        static let angularDamping: Float = 0.05
     }
 
     /// Physics material shared by table and dice — the SceneKit scene's
@@ -180,6 +187,8 @@ extension RealityTableController {
         // exact API SceneKit withholds. The walls' thickness is still a
         // margin, but CCD is the guarantee the SceneKit scene can't buy.
         body.isContinuousCollisionDetectionEnabled = true
+        body.linearDamping = PhysicsTune.linearDamping
+        body.angularDamping = PhysicsTune.angularDamping
         die.components.set(body)
         die.components.set(CollisionComponent(shapes: [shape]))
         // Velocity lives on the motion component — added so `update` can

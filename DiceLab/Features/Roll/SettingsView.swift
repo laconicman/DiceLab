@@ -34,11 +34,12 @@ struct SettingsView<Table: DiceTable>: View {
                         }
                     }
                 }
-                Section("Feel") {
-                    // One feedback channel: the toggle gates haptics *and*
-                    // the audio knock (they're events in the same pattern),
-                    // so the label says what it actually silences.
-                    Toggle("Haptics & sound", isOn: $table.hapticsEnabled)
+                Section("Feedback") {
+                    // Two channels, two toggles: hardware without a Taptic
+                    // Engine can still play the knock, and a user may want
+                    // sound without taps (or vice versa).
+                    Toggle("Haptics", isOn: $table.hapticsEnabled)
+                    Toggle("Sound", isOn: $table.soundEnabled)
                 }
                 Section("Debug") {
                     Toggle("Camera control", isOn: $table.cameraControlEnabled)
