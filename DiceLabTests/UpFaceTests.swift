@@ -92,7 +92,7 @@ struct HapticsTests {
         #expect(HapticsController.normalizedIntensity(for: 0) == 0)
         #expect(HapticsController.normalizedIntensity(for: -5) == 0)
         #expect(HapticsController.normalizedIntensity(for: 100) == 1)
-        #expect(HapticsController.normalizedIntensity(for: HapticsController.maxImpulse / 2) == 0.5)
+        #expect(HapticsController.normalizedIntensity(for: 12.5) == 0.5)
     }
 }
 

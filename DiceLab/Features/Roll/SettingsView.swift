@@ -3,13 +3,28 @@ import SwiftUI
 /// The settings sheet. Bindings write straight into the `@Observable`
 /// controller — `@Bindable` is the bridge, and each write triggers the
 /// controller's `didSet` (persist + apply), so the view holds no state.
-struct SettingsView: View {
-    @Environment(DiceTableController.self) private var table
+///
+/// The engine is the exception: it selects *which* controller exists, so it
+/// can't live on a controller. It reads/writes the same `settings.engine`
+/// key the app root reads — `@AppStorage` is the shared slot.
+struct SettingsView<Table: DiceTable>: View {
+    @Bindable var table: Table
+    @AppStorage("settings.engine") private var engine: DiceEngine = .sceneKit
 
     var body: some View {
-        @Bindable var table = table
         NavigationStack {
             Form {
+                Section {
+                    Picker("Renderer", selection: $engine) {
+                        ForEach(DiceEngine.allCases) {
+                            Text($0.title).tag($0)
+                        }
+                    }
+                } header: {
+                    Text("Engine")
+                } footer: {
+                    Text("SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures.")
+                }
                 Section("Dice") {
                     Stepper("Count: \(table.dieCount)",
                             value: $table.dieCount, in: 1...6)

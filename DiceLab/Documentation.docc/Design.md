@@ -6,12 +6,14 @@ alternative rejected. Authoritative over code comments when they disagree.
 ## Architecture: four-layer MVC
 
 `App/` composes (`DiceLabApp`, `@main`, injects shared objects), `Features/Roll/`
-holds the dice-table screen (`RollView` root view + `DiceTableController`, the
-screen's dedicated controller), `Model/` holds domain value types.
+holds the dice-table screen (`RollScreen` — engine-agnostic chrome — plus one
+thin view per engine and the two controllers), `Model/` holds domain value
+types.
 
-No `RootView` exists yet — there is no top-level branch to put in it (YAGNI).
-`Model/` holds `DieFace` (pure face-up math on `simd` quaternions) and
-`RollResult` since M3 — kept SceneKit-free so the M7 port keeps them.
+No `RootView` exists yet — the engine `switch` in `DiceLabApp` is the whole
+top-level branch (YAGNI). `Model/` holds `DieFace` (pure face-up math on
+`simd` quaternions), `RollResult`, `DiceTable` (the engine contract) and
+`DiceEngine` — engine-free, which is what let M7 be a controller-level swap.
 
 ## The scene lives in the controller
 
@@ -36,15 +38,18 @@ need: scene injection, renderer delegate, antialiasing, camera control.
   hatch for `SCNView`-only APIs (custom gestures, overlays). If a milestone needs
   one, only `RollView` changes.
 
-## SceneKit first, RealityKit later
+## SceneKit first, RealityKit later — then both
 
-- *Why:* we inherit working physics tuning (impulse values, rest detection,
-  face-up reading) and SceneKit's scene-graph API is the gentler on-ramp. The M7
-  port then teaches ECS-vs-scene-graph by contrast — the strongest single lesson
-  in the project.
-- *Cost:* SceneKit is soft-deprecated since iOS 26 (security patches only). See
-  `TD-1` in <doc:TechDebt>. Nothing in Model or the view layer may assume
-  SceneKit internals, so the port stays a controller-internals swap.
+- *Why:* we inherited working physics tuning (impulse values, rest detection,
+  face-up reading) and SceneKit's scene-graph API was the gentler on-ramp. The
+  M7 port then taught ECS-vs-scene-graph by contrast — the strongest single
+  lesson in the project, see "Two engines, one table" below.
+- *Resolution:* M7 landed — both engines ship side by side behind `DiceTable`,
+  SceneKit remains the default. `TD-1` discharged: the deprecation risk is now
+  a user-selectable switch, not a rewrite hanging over the project.
+- *Deployment floor moved to iOS 18:* `RealityView` is iOS 18+ on iOS (the
+  iOS 17 alternative — `UIViewRepresentable` around `ARView` — is a dead-end
+  API). The floor rose for exactly this reason.
 
 ## Port, don't copy — what the ancestors got wrong
 
@@ -94,10 +99,11 @@ M6 adds dice count, skin, haptics, and camera-control toggles. They live on
 scene, which is controller state (same argument as scene ownership). Each
 is a stored property with `didSet`: persist to `UserDefaults`, apply to the
 world (`respawnDice`, `applySkin`, `haptics.isEnabled`). `SettingsView`
-binds through `@Bindable` and holds zero state itself. Two `@State`s exist,
-deliberately distinct kinds: `DiceLabApp.table` — app-root object ownership,
-Apple's documented pattern for keeping a reference type alive — and
-`RollView.showingSettings`, the textbook transient-UI case.
+binds through `@Bindable` and holds zero state itself. State lives in
+deliberately distinct kinds: `DiceLabApp`'s `@State` controllers — app-root
+object ownership, Apple's documented pattern for keeping a reference type
+alive — `DiceLabApp.engine` (`@AppStorage`, picks which controller exists),
+and `RollScreen.showingSettings`, the textbook transient-UI `@State`.
 
 - *Consequence:* changing `dieCount` rebuilds the dice. `respawnDice` bumps
   `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
@@ -117,9 +123,66 @@ motion events walk the responder chain (object graph, not hit-testing), so
 zero size and no visuals are fine. This is the one place the
 `UIViewRepresentable` escape hatch earns its keep.
 
+## Two engines, one table — what the port actually taught
+
+M7 put both engines behind `DiceTable` (`Model/DiceTable.swift`): one protocol
+for everything a view may observe or toggle. `RollScreen<Table: DiceTable>`
+holds all chrome; `SceneKitRollView`/`RealityRollView` are ~20-line shims that
+only differ in the scene widget. The engine picker lives in Settings, written
+to `settings.engine` — the one piece of app-level state, because it selects
+which controller *exists*. Both controllers read the same `settings.*` keys,
+so dice count/skin/haptics survive an engine switch.
+
+The port's real findings, SceneKit → RealityKit:
+
+- **Ownership inverts.** `DiceTableController` owns the `SCNScene` and views
+  render it. RealityKit owns the container: `RealityView`'s content closure
+  runs once, receives `content.camera = .virtual` (the iOS default is
+  world-tracking AR), the entity graph, and the two event subscriptions.
+  The controller keeps mutating entities imperatively afterward.
+- **Rest is a definition, not a flag.** SceneKit hands you
+  `physicsBody.isResting`; RealityKit exposes only velocity, read through
+  `PhysicsMotionComponent` on a per-frame `SceneEvents.Update`. Ours:
+  |v| < 2 cm/s and |ω| < 0.3 rad/s sustained 15 frames. Honest bookkeeping —
+  and it survives an engine swap.
+- **CCD exists on RealityKit.** `isContinuousCollisionDetectionEnabled` is
+  the per-body tunneling guard SceneKit withholds (Bullet has it, the API
+  doesn't surface it). The walls' thickness becomes a formality; on SceneKit
+  it was the whole defense.
+- **Physics tuning never ports.** Meters vs SceneKit units (÷100), real-time
+  gravity vs `physicsWorld.speed = 3`, gram-scale masses vs mass 1.0. The
+  impulse *shape* ported; every constant was re-tuned. Haptics needed a
+  per-engine `maxImpulse` (25 vs 0.3) — same normalization, different scale.
+- **Impulses need `ModelEntity`.** `applyLinearImpulse`/`applyAngularImpulse`
+  hang off `HasPhysicsBody` — bare `Entity` doesn't conform. In SceneKit any
+  node takes a body; in ECS the *capability* is a type-level fact.
+- **Isolation flipped.** The SceneKit controller is an `NSObject` defending
+  `@Observable` state from the render thread with `Task { @MainActor }`
+  hops. The RealityKit controller is `@MainActor` throughout — RealityKit
+  itself is (`MeshResource` included); there is no foreign thread to defend.
+- **The measured-mapping rule held.** `generateBox(splitFaces: true)` gives
+  one `MeshResource.Part` per face; each part's vertex centroid is its face
+  normal — the same centroid trick that decoded `SCNBox`'s index buffer in
+  M5. Pips still can't disagree with `DieFace.up`.
+- **Invisible bounds got simpler.** No `isHidden` — an entity without a
+  `ModelComponent` renders nothing. Physics is a component, not a node type.
+
+*Verified end to end:* a `-autoroll` launch argument drives
+throw→settle→publish without manual tapping — on both engines the banner and
+history agree with the pips on the felt.
+
 ## Roll history is a session record, not a log
 
 `history` holds the last 20 `RollResult`s (cleared when `dieCount` changes —
 a result from a different dice set is meaningless). The strip shows the last
 five, newest first; `RollResult` gained `Identifiable` so rows key by event
 identity — identical totals are still distinct rolls.
+
+## Where state lives, after M7
+
+- `DiceLabApp.engine` — `@AppStorage("settings.engine")`, the app-level
+  choice of which controller exists. Plus two `@State` controllers — the
+  documented Apple pattern for root-owned reference objects.
+- Per-controller settings (`dieCount`, `skin`, `haptics`, `camera`) —
+  controller `didSet` → `UserDefaults`, shared keys across engines.
+- `RollScreen.showingSettings` — `@State`, the textbook transient case.
