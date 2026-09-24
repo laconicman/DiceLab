@@ -9,7 +9,13 @@ import SwiftUI
 /// key the app root reads — `@AppStorage` is the shared slot.
 struct SettingsView<Table: DiceTable>: View {
     @Bindable var table: Table
+    /// The live die preview — engine views build it (`SceneView` or
+    /// `RealityView`); the settings sheet just hosts it.
+    let preview: AnyView
     @AppStorage(TableSettings.engine) private var engine: DiceEngine = .sceneKit
+    /// Speech is view-layer feedback, so its toggle is `@AppStorage` like
+    /// `engine` — see `TableSettings.speech`.
+    @AppStorage(TableSettings.speech) private var speechEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -28,14 +34,10 @@ struct SettingsView<Table: DiceTable>: View {
                 Section("Dice") {
                     Stepper("Count: \(table.dieCount)",
                             value: $table.dieCount, in: 1...6)
-                    Picker("Theme", selection: $table.theme) {
-                        Text("Ivory").tag(Theme.ivory)
-                        Text("Onyx").tag(Theme.onyx)
-                        // The editor (M8c) writes `.custom` — keep the row
-                        // selectable so a custom theme survives a sheet visit.
-                        if case .custom = table.theme {
-                            Text("Custom").tag(table.theme)
-                        }
+                    NavigationLink {
+                        AppearanceEditor(table: table, preview: preview)
+                    } label: {
+                        Label("Appearance", systemImage: "paintpalette")
                     }
                 }
                 Section("Feedback") {
@@ -44,6 +46,7 @@ struct SettingsView<Table: DiceTable>: View {
                     // sound without taps (or vice versa).
                     Toggle("Haptics", isOn: $table.hapticsEnabled)
                     Toggle("Sound", isOn: $table.soundEnabled)
+                    Toggle("Speak results", isOn: $speechEnabled)
                 }
                 Section("Debug") {
                     Toggle("Camera control", isOn: $table.cameraControlEnabled)

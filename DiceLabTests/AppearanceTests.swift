@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UIKit
 @testable import DiceLab
 
 /// Model-layer pins for the appearance system: persistence round-trips,
@@ -87,5 +88,45 @@ struct AppearanceTests {
         #expect(Theme.ivory.appearance == .ivory)
         #expect(Theme.onyx.appearance == .onyx)
         #expect(LightingPreset.allCases.count == 3)
+    }
+
+    /// The speech format is user-facing prose — pin it so a refactor can't
+    /// quietly turn "3 plus 3 plus 1 equals 7" into "sum 7".
+    @Test("speech text reads faces and total")
+    func speechText() {
+        #expect(SpeechController.text(for: RollResult(faces: [3, 3, 1]))
+                == "3 plus 3 plus 1 equals 7")
+        #expect(SpeechController.text(for: RollResult(faces: [6])) == "6 equals 6")
+    }
+
+    /// The wire format is synthesized enum Codable — `{"custom":{"_0":…}}`.
+    /// Pin the literal shape: a hand-written payload (e.g. injected via
+    /// `defaults write -data` for QA) must decode through the real type.
+    @Test("hand-written custom theme JSON decodes")
+    func literalCustomJSON() throws {
+        let json = #"{"custom":{"_0":{"die":{"faceColor":{"red":0.1,"green":0.5,"blue":0.9,"alpha":1},"pipColor":{"red":1,"green":0.9,"blue":0,"alpha":1},"roughness":0.15,"metalness":0.9,"clearcoat":0.8},"felt":{"color":{"red":0.35,"green":0.05,"blue":0.08,"alpha":1},"usesImage":false},"lighting":"dramatic"}}}"#
+        let theme = try JSONDecoder().decode(Theme.self, from: Data(json.utf8))
+        guard case .custom(let appearance) = theme else {
+            Issue.record("expected .custom, got \(theme)")
+            return
+        }
+        #expect(appearance.die.metalness == 0.9)
+        #expect(appearance.lighting == .dramatic)
+    }
+
+    /// The felt photo store round-trips through Documents — save → load →
+    /// clear — and a cleared store must actually report empty.
+    @Test("felt image store round-trips and clears")
+    func feltStoreRoundTrip() {
+        FeltImageStore.clear()
+        #expect(FeltImageStore.load() == nil)
+        let pixel = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
+            UIColor.red.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        }
+        FeltImageStore.save(pixel)
+        #expect(FeltImageStore.load() != nil)
+        FeltImageStore.clear()
+        #expect(FeltImageStore.load() == nil)
     }
 }

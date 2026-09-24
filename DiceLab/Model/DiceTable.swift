@@ -54,6 +54,10 @@ enum TableSettings {
     static let cameraControl = "settings.cameraControl"
     static let haptics = "settings.haptics"
     static let sound = "settings.sound"
+    /// Speech is view-layer feedback (it observes `lastRoll`), so it lives
+    /// as `@AppStorage` like `engine` — not on the controllers, which hold
+    /// only settings that shape the scene.
+    static let speech = "settings.speech"
     static let skin = "settings.skin"
     static let theme = "settings.theme"
     static let engine = "settings.engine"

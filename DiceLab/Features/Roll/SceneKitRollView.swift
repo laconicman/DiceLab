@@ -13,6 +13,12 @@ struct SceneKitRollView: View {
             options: table.cameraControlEnabled ? [.allowsCameraControl] : [],
             antialiasingMode: .multisampling4X,
             delegate: table
-        ))
+        ), preview: AnyView(SceneView(
+            scene: table.previewScene,
+            // The preview's spin is an SCNAction — continuous rendering
+            // keeps it animating inside the settings sheet.
+            options: [.rendersContinuously],
+            antialiasingMode: .multisampling4X
+        )))
     }
 }

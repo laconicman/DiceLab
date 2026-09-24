@@ -13,6 +13,15 @@ final class DiceTableController: NSObject {
     /// recreated on every render pass.
     let scene = SCNScene()
 
+    /// A one-die mini-scene for the appearance editor's live preview —
+    /// separate world, re-materialized alongside the table by
+    /// `applyAppearance`.
+    let previewScene = SCNScene()
+
+    /// The preview's die — `applyAppearance` re-materials it with the rest.
+    /// Internal so `+Scene` can populate it during construction.
+    var previewDie: SCNNode?
+
     /// True from a throw until the physics settle. `private(set)`: views
     /// observe, only the controller mutates.
     private(set) var isRolling = false

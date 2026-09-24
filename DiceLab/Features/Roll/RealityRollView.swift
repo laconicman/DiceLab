@@ -9,7 +9,31 @@ struct RealityRollView: View {
     @Environment(RealityTableController.self) private var table
 
     var body: some View {
-        RollScreen(table: table, scene: realityScene)
+        RollScreen(table: table, scene: realityScene,
+                   preview: AnyView(DiePreview(root: table.previewRoot,
+                                               die: table.previewDie)))
+    }
+
+    /// The appearance editor's live preview: the controller-owned preview
+    /// world rendered by a second, smaller `RealityView`. The spin runs on
+    /// `SceneEvents.Update` — the ECS analog of the SceneKit preview's
+    /// `SCNAction`, scoped to this view's lifetime via `@State`.
+    private struct DiePreview: View {
+        let root: Entity
+        let die: ModelEntity?
+        @State private var spinSub: EventSubscription?
+
+        var body: some View {
+            RealityView { content in
+                content.camera = .virtual
+                content.add(root)
+                spinSub = content.subscribe(to: SceneEvents.Update.self) { event in
+                    die?.transform.rotation *= simd_quatf(
+                        angle: Float(event.deltaTime) * 1.4,
+                        axis: simd_normalize(SIMD3<Float>(0.6, 0.8, 0)))
+                }
+            }
+        }
     }
 
     @ViewBuilder
