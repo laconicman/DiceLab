@@ -5,22 +5,27 @@ import SceneKit
 /// physics world reports back. Views bind to this controller; they never touch
 /// SceneKit themselves.
 @Observable
-final class DiceTableController {
+final class DiceTableController: NSObject {
     /// The rendered world. A `let` reference owned here because a scene must
     /// outlive any view that displays it — view structs are ephemeral values,
     /// recreated on every render pass.
     let scene = SCNScene()
 
-    /// True from a throw until the physics settle (M3 detects rest and
-    /// publishes the result). `private(set)`: views observe, only the
-    /// controller mutates.
+    /// True from a throw until the physics settle. `private(set)`: views
+    /// observe, only the controller mutates.
     private(set) var isRolling = false
+
+    /// The last settled throw's outcome — `nil` until the first roll rests.
+    private(set) var lastRoll: RollResult?
 
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
 
-    init() {
+    /// NSObject, because `SCNSceneRendererDelegate` is an `NSObjectProtocol` —
+    /// the price of the controller doubling as the renderer delegate.
+    override init() {
+        super.init()
         setUpScene()
     }
 
@@ -60,5 +65,19 @@ final class DiceTableController {
             y: .random(in: 20...28),
             z: .random(in: -4...4)
         )
+    }
+}
+
+extension DiceTableController: SCNSceneRendererDelegate {
+    /// Per-frame hook: publishes the result once every die is asleep.
+    /// `isResting` is SceneKit's own settle signal — the ancestors polled
+    /// velocity magnitudes by hand; Bullet already tracks that.
+    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+        guard isRolling else { return }
+        guard dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
+        lastRoll = RollResult(
+            faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) }
+        )
+        isRolling = false
     }
 }
