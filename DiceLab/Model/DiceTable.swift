@@ -16,8 +16,11 @@ protocol DiceTable: AnyObject, Observable {
     var dieCount: Int { get set }
     /// Free camera orbiting, exposed to the user.
     var cameraControlEnabled: Bool { get set }
-    /// Gates the haptic/audio knock — the engine exists either way.
+    /// Gates haptic taps — independent of sound since the two are
+    /// separate user choices about feedback, not one feature.
     var hapticsEnabled: Bool { get set }
+    /// Gates the synthesized collision knock — independent of haptics.
+    var soundEnabled: Bool { get set }
     /// Dice skin.
     var skin: DieSkin { get set }
     /// Throws every die.
@@ -36,6 +39,7 @@ extension DiceTable {
         dieCount = TableSettings.storedDieCount()
         cameraControlEnabled = defaults.object(forKey: TableSettings.cameraControl) as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
+        soundEnabled = defaults.object(forKey: TableSettings.sound) as? Bool ?? true
         skin = DieSkin(rawValue: defaults.string(forKey: TableSettings.skin) ?? "") ?? .ivory
     }
 }
@@ -47,6 +51,7 @@ enum TableSettings {
     static let dieCount = "settings.dieCount"
     static let cameraControl = "settings.cameraControl"
     static let haptics = "settings.haptics"
+    static let sound = "settings.sound"
     static let skin = "settings.skin"
     static let engine = "settings.engine"
 

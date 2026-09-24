@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import SceneKit
 
@@ -28,7 +29,14 @@ final class DiceTableController: NSObject {
     private var rollID = 0
 
     /// Collision feel — owned here so views never hear about Core Haptics.
-    private let haptics = HapticsController()
+    /// `maxImpulse` 15 from `-impulseLog`: the estimate's observed ceiling
+    /// is ~15 N·s, so the hardest felt-slam lands at full intensity.
+    private let haptics = HapticsController(maxImpulse: 15)
+
+    /// `-impulseLog` bookkeeping: impulses gathered during a roll, then
+    /// summarized at settle — the data a `maxImpulse` recalibration needs.
+    private var rollImpulses: [Float] = []
+    private var rollStartedAt: Date?
 
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
@@ -52,11 +60,20 @@ final class DiceTableController: NSObject {
         didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: TableSettings.cameraControl) }
     }
 
-    /// Gates the haptic/audio knock — the engine exists either way.
+    /// Gates haptic taps — the engine exists either way.
     var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(hapticsEnabled, forKey: TableSettings.haptics)
-            haptics.isEnabled = hapticsEnabled
+            haptics.isHapticsEnabled = hapticsEnabled
+        }
+    }
+
+    /// Gates the synthesized collision knock — a separate user choice from
+    /// haptics, and the only channel on hardware without a Taptic Engine.
+    var soundEnabled = UserDefaults.standard.object(forKey: TableSettings.sound) as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(soundEnabled, forKey: TableSettings.sound)
+            haptics.isSoundEnabled = soundEnabled
         }
     }
 
@@ -74,7 +91,8 @@ final class DiceTableController: NSObject {
     /// renderer/physics delegate.
     override init() {
         super.init()
-        haptics.isEnabled = hapticsEnabled
+        haptics.isHapticsEnabled = hapticsEnabled
+        haptics.isSoundEnabled = soundEnabled
         setUpScene()
     }
 
@@ -108,6 +126,10 @@ final class DiceTableController: NSObject {
     func roll() {
         rollID += 1
         isRolling = true
+        if DevFlags.impulseLog {
+            rollImpulses = []
+            rollStartedAt = Date()
+        }
         for die in dice {
             // Clear momentum first: a re-throw is a fresh throw, not a
             // compounding of whatever the die was doing — and bounding the
@@ -168,17 +190,45 @@ extension DiceTableController: SCNSceneRendererDelegate {
             history.append(result)
             if history.count > 20 { history.removeFirst() }
             isRolling = false
+            if let started = rollStartedAt { logImpulseSummary(since: started) }
         }
+    }
+
+    /// The `-impulseLog` summary: one line per settled roll — enough to
+    /// pick `maxImpulse` from the observed ceiling instead of guessing.
+    private func logImpulseSummary(since start: Date) {
+        let elapsed = Date().timeIntervalSince(start)
+        let maxImpulse = rollImpulses.max() ?? 0
+        let mean = rollImpulses.isEmpty ? 0 : rollImpulses.reduce(0, +) / Float(rollImpulses.count)
+        print(String(format: "[DiceLab] settled %.2fs — %d contacts, impulse max %.3f mean %.3f N·s",
+                     elapsed, rollImpulses.count, maxImpulse, mean))
     }
 }
 
 extension DiceTableController: SCNPhysicsContactDelegate {
+    /// Closing speed → impulse estimate: mass-1 dice at ~0.5 restitution.
+    private static let impulseScale: Float = 1.5
+
+
     /// Fires on SceneKit's physics queue, not main — the only thing done here
     /// is read the impulse and hop; all mutation happens on the main actor.
     /// (That's REVIEW.md's rule, kept.)
     func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
-        let impulse = Float(contact.collisionImpulse)
+        // `collisionImpulse` is deprecated and returns 0 on current SDKs —
+        // measured via `-impulseLog`: 121 contacts, all 0.000. The impulse
+        // is estimated instead as the closing speed along the contact
+        // normal (the delegate fires inside the solver step, before the
+        // response resolves, so velocities still read approach speeds) —
+        // m·Δv, the same physics the deprecated property reported.
+        let n = contact.contactNormal
+        let a = contact.nodeA.physicsBody?.velocity ?? SCNVector3Zero
+        let b = contact.nodeB.physicsBody?.velocity ?? SCNVector3Zero
+        let closing = abs(Float(a.x - b.x) * Float(n.x)
+                          + Float(a.y - b.y) * Float(n.y)
+                          + Float(a.z - b.z) * Float(n.z))
+        let impulse = closing * Self.impulseScale
         Task { @MainActor [haptics] in
+            if DevFlags.impulseLog { rollImpulses.append(impulse) }
             haptics.collision(impulse: impulse)
         }
     }
