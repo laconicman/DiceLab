@@ -28,9 +28,13 @@ struct SettingsView<Table: DiceTable>: View {
                 Section("Dice") {
                     Stepper("Count: \(table.dieCount)",
                             value: $table.dieCount, in: 1...6)
-                    Picker("Skin", selection: $table.skin) {
-                        ForEach(DieSkin.allCases, id: \.self) {
-                            Text($0.rawValue.capitalized).tag($0)
+                    Picker("Theme", selection: $table.theme) {
+                        Text("Ivory").tag(Theme.ivory)
+                        Text("Onyx").tag(Theme.onyx)
+                        // The editor (M8c) writes `.custom` — keep the row
+                        // selectable so a custom theme survives a sheet visit.
+                        if case .custom = table.theme {
+                            Text("Custom").tag(table.theme)
                         }
                     }
                 }

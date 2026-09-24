@@ -20,6 +20,9 @@ extension RealityTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
+        // The stored theme is the look at launch — setup defaults assume
+        // studio lighting only until this runs.
+        applyLighting(theme.appearance.lighting)
     }
 
     private func setUpCamera() {
@@ -32,10 +35,20 @@ extension RealityTableController {
         root.addChild(camera)
     }
 
+    /// Entities the appearance pass reaches for by name — the alternative
+    /// is stored refs on the main class, and a name is honest enough for
+    /// three fixed entities.
+    private enum EntityName {
+        static let felt = "felt"
+        static let keyLight = "keyLight"
+        static let fillLight = "fillLight"
+    }
+
     private func setUpLighting() {
         // Key light: the `DirectionalLight` entity type — the bare component
         // exposes no shadow on iOS, the entity does.
         let light = DirectionalLight()
+        light.name = EntityName.keyLight
         light.light.intensity = 2500
         light.shadow = DirectionalLightComponent.Shadow(
             maximumDistance: 1.0, depthBias: 4.0)
@@ -45,6 +58,7 @@ extension RealityTableController {
         // Fill: a dim point light above the table so shadow sides aren't
         // pitch black — iOS RealityKit has no ambient-light component.
         let fill = PointLight()
+        fill.name = EntityName.fillLight
         fill.light.intensity = 500
         fill.light.attenuationRadius = 2
         fill.position = [0, 0.5, 0.3]
@@ -90,15 +104,12 @@ extension RealityTableController {
         // Visible felt: a thin box whose top face sits on floorY. SCNFloor's
         // infinite plane has no direct RK analog; a box is honest geometry.
         let felt = Entity()
-        var feltMaterial = PhysicallyBasedMaterial()
-        feltMaterial.baseColor = .init(tint: UIColor(red: 0.05, green: 0.30,
-                                                   blue: 0.15, alpha: 1))
-        feltMaterial.roughness = 1.0
+        felt.name = EntityName.felt
         let feltShape = ShapeResource.generateBox(
             size: [Bounds.span, Bounds.thickness, Bounds.span])
         felt.components.set(ModelComponent(
             mesh: .generateBox(size: [Bounds.span, Bounds.thickness, Bounds.span]),
-            materials: [feltMaterial]))
+            materials: [Self.feltMaterial(for: theme.appearance.felt)]))
         felt.components.set(CollisionComponent(shapes: [feltShape]))
         felt.components.set(PhysicsBodyComponent(
             shapes: [feltShape], density: 1,
@@ -150,19 +161,52 @@ extension RealityTableController {
 
     func spawnDice(_ count: Int) {
         for position in Self.spawnPositions(count: count) {
-            let die = Self.makeDie(at: position, skin: skin)
+            let die = Self.makeDie(at: position, appearance: theme.appearance.die)
             dice.append(die)
             root.addChild(die)
         }
     }
 
-    /// Re-skins existing dice in place — materials are just a component
-    /// property, so the swap is a straight reassignment.
-    func applySkin() {
-        let materials = Self.materials(skin: skin)
+    /// Re-skins the whole table in place — dice, felt, and lighting preset.
+    /// Materials are just a component property, so the swap is a straight
+    /// reassignment; felt and lights are found by name.
+    func applyAppearance() {
+        let appearance = theme.appearance
+        let materials = Self.materials(appearance: appearance.die)
         for die in dice {
             die.components[ModelComponent.self]?.materials = materials
         }
+        if let felt = root.findEntity(named: EntityName.felt) {
+            felt.components[ModelComponent.self]?.materials =
+                [Self.feltMaterial(for: appearance.felt)]
+        }
+        applyLighting(appearance.lighting)
+    }
+
+    /// One mood per preset — RealityKit's mapping is key/fill intensity.
+    private func applyLighting(_ preset: LightingPreset) {
+        let key = root.findEntity(named: EntityName.keyLight) as? DirectionalLight
+        let fill = root.findEntity(named: EntityName.fillLight) as? PointLight
+        switch preset {
+        case .studio:   key?.light.intensity = 2500; fill?.light.intensity = 500
+        case .soft:     key?.light.intensity = 1800; fill?.light.intensity = 800
+        case .dramatic: key?.light.intensity = 3400; fill?.light.intensity = 200
+        }
+    }
+
+    /// Color felt or the user's photo — `usesImage` without a loadable file
+    /// falls back to the flat color rather than a broken texture.
+    private static func feltMaterial(for felt: FeltAppearance) -> PhysicallyBasedMaterial {
+        var material = PhysicallyBasedMaterial()
+        if felt.usesImage, let cgImage = FeltImageStore.load()?.cgImage,
+           let texture = try? TextureResource.generate(
+               from: cgImage, options: .init(semantic: .color)) {
+            material.baseColor = .init(tint: .white, texture: .init(texture))
+        } else {
+            material.baseColor = .init(tint: felt.color.uiColor)
+        }
+        material.roughness = 1.0
+        return material
     }
 
     /// The die mesh is shared across all dice — generated once, the same
@@ -171,11 +215,12 @@ extension RealityTableController {
         width: Bounds.dieEdge, height: Bounds.dieEdge, depth: Bounds.dieEdge,
         cornerRadius: Bounds.dieEdge * 0.06, splitFaces: true)
 
-    private static func makeDie(at position: SIMD3<Float>, skin: DieSkin) -> ModelEntity {
+    private static func makeDie(at position: SIMD3<Float>,
+                                appearance: DieAppearance) -> ModelEntity {
         // `ModelEntity`, not bare `Entity`: the impulse methods
         // (`applyLinearImpulse`/`applyAngularImpulse`) hang off
         // `HasPhysicsBody`, which only the model-entity subclass conforms to.
-        let die = ModelEntity(mesh: dieMesh, materials: materials(skin: skin))
+        let die = ModelEntity(mesh: dieMesh, materials: materials(appearance: appearance))
         die.position = position
 
         let shape = ShapeResource.generateBox(
@@ -202,7 +247,7 @@ extension RealityTableController {
     /// face; each part's bounding-box center *is* the face normal, quantized
     /// to the dominant axis via `DieFace.axes` — the same authority the
     /// reported face-up value uses.
-    static func materials(skin: DieSkin) -> [any RealityKit.Material] {
+    static func materials(appearance: DieAppearance) -> [any RealityKit.Material] {
         var slots: [any RealityKit.Material] = (0..<dieMesh.expectedMaterialCount)
             .map { _ in PhysicallyBasedMaterial() }
         for model in dieMesh.contents.models {
@@ -210,26 +255,28 @@ extension RealityTableController {
                 guard part.materialIndex < slots.count else { continue }
                 let axis = dominantAxis(of: centroid(of: part))
                 slots[part.materialIndex] = faceMaterial(
-                    DieFaceTexture.value(on: axis), skin: skin)
+                    DieFaceTexture.value(on: axis), appearance: appearance)
             }
         }
         return slots
     }
 
     private static func faceMaterial(_ value: Int,
-                                     skin: DieSkin) -> PhysicallyBasedMaterial {
+                                     appearance: DieAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
-        if let image = DieFaceTexture.images(for: skin)[value - 1].cgImage,
+        if let image = DieFaceTexture.images(for: appearance)[value - 1].cgImage,
            let texture = try? TextureResource.generate(
                from: image, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white,
                                        texture: .init(texture))
         } else {
             // Texture generation shouldn't sink the die — fall back to the
-            // skin's flat color; the die is still playable.
-            material.baseColor = .init(tint: skin.faceColor)
+            // flat face color; the die is still playable.
+            material.baseColor = .init(tint: appearance.faceColor.uiColor)
         }
-        material.roughness = 0.4
+        material.roughness = .init(floatLiteral: Float(appearance.roughness))
+        material.metallic = .init(floatLiteral: Float(appearance.metalness))
+        material.clearcoat = .init(floatLiteral: Float(appearance.clearcoat))
         return material
     }
 
