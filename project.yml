@@ -18,3 +18,24 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+  DiceLabTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: DiceLabTests
+        fileSystem: synchronized
+    dependencies:
+      - target: DiceLab
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mrteller.DiceLabTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  DiceLab:
+    build:
+      targets:
+        DiceLab: all
+        DiceLabTests: [test]
+    test:
+      targets:
+        - DiceLabTests
