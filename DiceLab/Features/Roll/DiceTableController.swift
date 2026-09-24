@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SceneKit
+import Synchronization
 
 /// Owns the dice table: the SceneKit scene, the dice on it, and the state the
 /// physics world reports back. Views bind to this controller; they never touch
@@ -25,8 +26,10 @@ final class DiceTableController: NSObject {
     private(set) var history: [RollResult] = []
 
     /// Bumped per throw; the settle task compares against it so a re-roll
-    /// can't be completed by the previous roll's queued publish.
-    private var rollID = 0
+    /// can't be completed by the previous roll's queued publish. Behind a
+    /// `Mutex` because two readers live off-main — the physics contact
+    /// delegate and the renderer callback both run on the render thread.
+    private let rollID = Mutex(0)
 
     /// Collision feel — owned here so views never hear about Core Haptics.
     /// `maxImpulse` 15 from `-impulseLog`: the estimate's observed ceiling
@@ -112,7 +115,7 @@ final class DiceTableController: NSObject {
     private func respawnDice() {
         for die in dice { die.removeFromParentNode() }
         dice = []
-        rollID += 1 // a settle queued for the old dice must not publish
+        _ = rollID.withLock { $0 += 1 } // a settle queued for the old dice must not publish
         isRolling = false
         lastRoll = nil
         history = []
@@ -126,7 +129,7 @@ final class DiceTableController: NSObject {
     /// `(1, 24, 2)` to every die — correlated, repeatable rolls. Randomizing
     /// per die is what makes consecutive rolls differ.
     func roll() {
-        rollID += 1
+        _ = rollID.withLock { $0 += 1 }
         isRolling = true
         if DevFlags.impulseLog {
             rollImpulses = []
@@ -176,7 +179,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
     /// published state on main — so publishing hops to `MainActor`.
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
         guard isRolling else { return }
-        let generation = rollID
+        let generation = rollID.withLock { $0 }
         Task { @MainActor in
             // Everything dice-related happens here, not on the render
             // thread: `respawnDice` mutates the array on main, so iterating
@@ -185,7 +188,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
             // or clear the new roll's flag — the generation guard covers
             // invalidation, the isResting re-check covers an impulse that
             // landed after it.
-            guard isRolling, rollID == generation,
+            guard isRolling, rollID.withLock({ $0 == generation }),
                   dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
             let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
             lastRoll = result
@@ -229,14 +232,15 @@ extension DiceTableController: SCNPhysicsContactDelegate {
                           + Float(a.y - b.y) * Float(n.y)
                           + Float(a.z - b.z) * Float(n.z))
         let impulse = closing * Self.impulseScale
-        // Render-thread read of an Int — atomic in practice, and a stale
-        // value only fails safe (the generation check drops the sample).
-        let generation = rollID
+        // Render-thread capture — `rollID` is a Mutex precisely because
+        // this delegate and `roll()` don't share a thread.
+        let generation = rollID.withLock { $0 }
         Task { @MainActor [haptics] in
             // Generation pins the sample to its roll — a contact queued
             // before settle but run after the next `roll()` would pass an
             // `isRolling`-only gate and contaminate the new stats.
-            if DevFlags.impulseLog, isRolling, rollID == generation {
+            if DevFlags.impulseLog, isRolling,
+               rollID.withLock({ $0 == generation }) {
                 rollImpulses.append(impulse)
             }
             haptics.collision(impulse: impulse)
