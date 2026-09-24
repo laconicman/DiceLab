@@ -56,9 +56,12 @@ extension DiceTableController {
         scene.rootNode.addChildNode(floor)
 
         // Play volume: x −10…10, z −15…15, y −8…12.
-        // Thin boxes, not the ancestors' oriented planes: a collider wants
-        // thickness, and an axis-aligned box needs no orientation math at all —
-        // `reposition`'s arbitrary-normal matrix dance earns nothing here.
+        // Thin boxes, not the ancestors' oriented planes: an axis-aligned box
+        // needs no orientation math at all — `reposition`'s arbitrary-normal
+        // matrix dance earns nothing here. But a box collider is *finite*, so
+        // thickness matters: a die takes ~24 units/s of impulse (mass 1), and
+        // a fast step can carry it ~1 unit — 4-unit bounds keep tunneling
+        // impossible even if the timestep subdivision ever degrades.
         let wallMaterial = SCNMaterial()
         wallMaterial.diffuse.contents = UIColor.systemGray.withAlphaComponent(0.15)
 
@@ -73,11 +76,13 @@ extension DiceTableController {
             scene.rootNode.addChildNode(node)
         }
 
-        bound(SCNVector3(50, 1, 50), at: SCNVector3(0, 12, 0), hidden: true) // ceiling
-        bound(SCNVector3(1, 40, 50), at: SCNVector3(10, 0, 0))              // +x wall
-        bound(SCNVector3(1, 40, 50), at: SCNVector3(-10, 0, 0))             // −x wall
-        bound(SCNVector3(50, 40, 1), at: SCNVector3(0, 0, 15))              // +z wall
-        bound(SCNVector3(50, 40, 1), at: SCNVector3(0, 0, -15))             // −z wall
+        // Inner faces land on the same planes as before; the extra size pads
+        // outward so walls seal the corners and the ceiling's top face too.
+        bound(SCNVector3(60, 4, 60), at: SCNVector3(0, 14, 0), hidden: true) // ceiling
+        bound(SCNVector3(4, 60, 60), at: SCNVector3(12, 5, 0))              // +x wall
+        bound(SCNVector3(4, 60, 60), at: SCNVector3(-12, 5, 0))             // −x wall
+        bound(SCNVector3(60, 60, 4), at: SCNVector3(0, 5, 17))              // +z wall
+        bound(SCNVector3(60, 60, 4), at: SCNVector3(0, 5, -17))             // −z wall
     }
 
     private func spawnDice(_ count: Int) {
