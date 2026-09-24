@@ -4,8 +4,9 @@ import SceneKit
 /// applied to the six material slots of an `SCNBox`.
 ///
 /// Apple never documents which `materials` index covers which box face, so
-/// instead of hardcoding an order we *derive* it: each geometry element's
-/// mean vertex position is its outward normal. `DieFace.axes` stays the
+/// instead of hardcoding an order we *derive* it: the box's single geometry
+/// element groups triangles contiguously per face, and each group's mean
+/// vertex position is its outward normal. `DieFace.axes` stays the
 /// value↔axis authority; this file maps axis→material slot, so visible
 /// pips can never disagree with the reported face-up value.
 enum DieFaceTexture {
@@ -24,13 +25,18 @@ enum DieFaceTexture {
         }
     }
 
-    /// A face texture: rounded ivory square with black pips.
+    /// The six face images, drawn once — identical for every die, so
+    /// `materials(for:)` reuses them instead of re-rendering per spawn.
+    private static let faceImages: [UIImage] = (1...6).map { image(for: $0) }
+
+    /// Runtime-drawn face: opaque ivory + pips. The fill must be opaque —
+    /// transparent texture corners render as holes in the die face (the
+    /// geometry's chamfer already provides the rounded look).
     static func image(for value: Int, side: CGFloat = 256) -> UIImage {
         let size = CGSize(width: side, height: side)
         return UIGraphicsImageRenderer(size: size).image { _ in
             UIColor(white: 0.96, alpha: 1).setFill()
-            UIBezierPath(roundedRect: CGRect(origin: .zero, size: size),
-                         cornerRadius: side * 0.12).fill()
+            UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
             UIColor.black.setFill()
             let margin = side * 0.24
@@ -51,7 +57,7 @@ enum DieFaceTexture {
         materialAxes(of: box).map { axis in
             let material = SCNMaterial()
             material.lightingModel = .physicallyBased
-            material.diffuse.contents = image(for: value(on: axis))
+            material.diffuse.contents = faceImages[value(on: axis) - 1]
             material.roughness.contents = NSNumber(0.35)
             material.metalness.contents = NSNumber(0)
             return material
