@@ -26,12 +26,15 @@ struct RealityTableTests {
         #expect(Set(seen.values) == Set(1...6))
     }
 
-    /// Every material slot ends up with a real pip texture, not the empty
-    /// fallback — the mapping loop must hit every slot.
-    @Test("materials fills every slot the mesh expects")
+    /// Every material slot ends up with a real pip texture — count alone
+    /// would pass on the blank pre-allocated fallback.
+    @Test("materials fills every slot the mesh expects, all textured")
     func materialsFillEverySlot() {
         let materials = RealityTableController.materials(skin: .ivory)
         #expect(materials.count == RealityTableController.dieMesh.expectedMaterialCount)
+        #expect(materials.allSatisfy {
+            ($0 as? PhysicallyBasedMaterial)?.baseColor.texture != nil
+        })
     }
 
     /// Meter-scale mirror of `SpawnPositionTests`: centered, symmetric, and

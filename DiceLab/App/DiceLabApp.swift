@@ -5,7 +5,7 @@ struct DiceLabApp: App {
     /// Engine choice is app-level state — it decides which controller
     /// instance exists, so it can't live inside one. Same persistence
     /// mechanism (`settings.engine`) the controllers use for their settings.
-    @AppStorage("settings.engine") private var engine: DiceEngine = .sceneKit
+    @AppStorage(TableSettings.engine) private var engine: DiceEngine = .sceneKit
 
     /// Both tables are constructed eagerly — an entity graph and an SCNScene
     /// are cheap until rendered, and keeping both alive preserves per-engine

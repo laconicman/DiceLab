@@ -26,6 +26,38 @@ protocol DiceTable: AnyObject, Observable {
     func sceneActivated()
 }
 
+extension DiceTable {
+    /// Re-reads the shared settings keys. The other engine may have written
+    /// them while this controller sat inactive — controllers are constructed
+    /// once at app start, so nothing else would refresh them. `didSet`
+    /// guards make no-op writes cheap; only real changes respawn or re-skin.
+    func reloadSettings() {
+        let defaults = UserDefaults.standard
+        dieCount = TableSettings.storedDieCount()
+        cameraControlEnabled = defaults.object(forKey: TableSettings.cameraControl) as? Bool ?? true
+        hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
+        skin = DieSkin(rawValue: defaults.string(forKey: TableSettings.skin) ?? "") ?? .ivory
+    }
+}
+
+/// UserDefaults keys, shared by both controllers and the app root — a setting
+/// is the user's choice about the *table*, not the engine rendering it, so
+/// both controllers must read and write the same slots.
+enum TableSettings {
+    static let dieCount = "settings.dieCount"
+    static let cameraControl = "settings.cameraControl"
+    static let haptics = "settings.haptics"
+    static let skin = "settings.skin"
+    static let engine = "settings.engine"
+
+    /// UserDefaults returns 0 for a missing Int — distinguish "never set"
+    /// (default 3) from a stored value, then clamp into the supported range.
+    static func storedDieCount() -> Int {
+        let raw = UserDefaults.standard.integer(forKey: dieCount)
+        return raw == 0 ? 3 : min(max(raw, 1), 6)
+    }
+}
+
 /// Which renderer drives the table. App-level state, not controller state:
 /// the engine decides which controller instance exists at all.
 enum DiceEngine: String, CaseIterable, Identifiable {
