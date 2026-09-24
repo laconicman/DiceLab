@@ -25,22 +25,24 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   velocity-defined rest, per-body CCD; engine picker in settings.
   Deployment floor moved to iOS 18 (`RealityView`); discharges `TD-1`.
 
-## In flight
-
 - **M8a — Feel parity + feedback split.** RealityKit `Toss` retuned ~3×
   (real-time gravity needs velocity-carrying impulses), explicit damping,
   livelier restitution; SceneKit's deprecated `collisionImpulse` (always 0
   on current SDKs) replaced by a closing-speed estimate; haptics and sound
-  become two toggles; `-impulseLog` dev flag measures rolls. (PR #8)
+  become two toggles; `-impulseLog` dev flag measures rolls.
 - **M8b — Appearance model.** `Appearance`/`Theme`/`CodableColor` in
   `Model/` — the `CubeMaterialSettings` surface generalized (die/felt
   colors, finish channels, felt photo via `FeltImageStore`, lighting
   presets); per-engine translation incl. clearcoat; `settings.skin`
-  migrates. (PR #9)
+  migrates; `rollID` hardened to `Mutex` (contact/renderer read it
+  off-main).
+
+## In flight
+
 - **M8c — Appearance editor.** `AppearanceEditor` with live per-engine die
   preview (controller-owned preview worlds), edit-flips-to-custom binding,
   felt `PhotosPicker`, lighting presets; `AVSpeechSynthesizer` speaks
-  settled results; `-appearanceeditor` dev flag for preview QA.
+  settled results; `-appearanceeditor` dev flag for preview QA. (PR #10)
 
 ## Next
 
