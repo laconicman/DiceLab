@@ -25,18 +25,29 @@ enum DieFaceTexture {
         }
     }
 
-    /// Six face images per appearance, drawn lazily and cached — identical
-    /// for every die, so `materials(for:)` reuses them instead of
-    /// re-rendering per spawn. Keyed by the appearance value itself, so a
-    /// custom theme can't collide with a preset's slots.
-    private static var faceImageCache: [DieAppearance: [UIImage]] = [:]
+    /// Cache key: only the two ink colors reach the pixels — finish
+    /// channels shape the material, not the texture, so keying by them
+    /// would duplicate identical images on every slider edit.
+    private struct Ink: Hashable {
+        let face: CodableColor
+        let pip: CodableColor
+    }
+
+    /// Six face images per ink, drawn lazily and cached — identical for
+    /// every die, so `materials(for:)` reuses them instead of re-rendering
+    /// per spawn.
+    private static var faceImageCache: [Ink: [UIImage]] = [:]
 
     /// The cached six faces, 1…6 — the RealityKit path binds the same images
     /// through `TextureResource`; generation stays in one place.
     static func images(for appearance: DieAppearance) -> [UIImage] {
-        if let cached = faceImageCache[appearance] { return cached }
+        let key = Ink(face: appearance.faceColor, pip: appearance.pipColor)
+        if let cached = faceImageCache[key] { return cached }
+        // Color sliders mint a key per sampled value — a long edit session
+        // could grow the map without limit, so it resets past 16 entries.
+        if faceImageCache.count >= 16 { faceImageCache.removeAll(keepingCapacity: false) }
         let drawn = (1...6).map { image(for: $0, appearance: appearance) }
-        faceImageCache[appearance] = drawn
+        faceImageCache[key] = drawn
         return drawn
     }
 

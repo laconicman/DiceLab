@@ -18,8 +18,8 @@ extension DiceTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
-        // The stored theme is the look at launch — setup defaults assume
-        // studio/ivory only until this runs.
+        // Dice and felt already read the stored appearance at build —
+        // the lighting rig is the one piece that waits for this pass.
         applyLighting(theme.appearance.lighting)
     }
 

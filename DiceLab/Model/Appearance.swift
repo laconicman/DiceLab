@@ -29,6 +29,25 @@ struct DieAppearance: Codable, Equatable, Hashable {
 struct FeltAppearance: Codable, Equatable, Hashable {
     var color: CodableColor
     var usesImage = false
+    /// Bumped after every photo save. `theme`'s change guard skips
+    /// re-materialing on equal values — same `usesImage` with a *new* file
+    /// must still differ, or a replaced photo would never reach the felt.
+    var revision = 0
+
+    init(color: CodableColor, usesImage: Bool = false, revision: Int = 0) {
+        self.color = color
+        self.usesImage = usesImage
+        self.revision = revision
+    }
+
+    /// `revision`/`usesImage` decode leniently — payloads written before a
+    /// field existed shouldn't bounce a stored theme back to the default.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        color = try container.decode(CodableColor.self, forKey: .color)
+        usesImage = try container.decodeIfPresent(Bool.self, forKey: .usesImage) ?? false
+        revision = try container.decodeIfPresent(Int.self, forKey: .revision) ?? 0
+    }
 }
 
 /// Named lighting rigs. Each engine maps a preset onto its own light rig —
