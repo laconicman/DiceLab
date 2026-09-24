@@ -72,6 +72,9 @@ struct AppearanceEditor<Table: DiceTable>: View {
                       let image = UIImage(data: data) else { return }
                 FeltImageStore.save(image)
                 appearance.wrappedValue.felt.usesImage = true
+                // Replacing a photo keeps `usesImage` true — the revision
+                // bump is what makes the theme differ and the felt reload.
+                appearance.wrappedValue.felt.revision += 1
             }
         }
     }
