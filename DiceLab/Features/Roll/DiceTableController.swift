@@ -22,15 +22,25 @@ final class DiceTableController: NSObject {
     /// can't be completed by the previous roll's queued publish.
     private var rollID = 0
 
+    /// Collision feel — owned here so views never hear about Core Haptics.
+    private let haptics = HapticsController()
+
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
 
-    /// NSObject, because `SCNSceneRendererDelegate` is an `NSObjectProtocol` —
-    /// the price of the controller doubling as the renderer delegate.
+    /// NSObject, because `SCNSceneRendererDelegate`/`SCNPhysicsContactDelegate`
+    /// are `NSObjectProtocol`s — the price of the controller doubling as the
+    /// renderer/physics delegate.
     override init() {
         super.init()
         setUpScene()
+    }
+
+    /// Called from the view when `scenePhase` becomes `.active` — the system
+    /// suspends the haptic engine in the background and never resumes it.
+    func sceneActivated() {
+        haptics.start()
     }
 
     /// Throws every die: a randomized torque impulse for spin plus an upward
@@ -94,6 +104,18 @@ extension DiceTableController: SCNSceneRendererDelegate {
                   dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
             lastRoll = RollResult(faces: faces)
             isRolling = false
+        }
+    }
+}
+
+extension DiceTableController: SCNPhysicsContactDelegate {
+    /// Fires on SceneKit's physics queue, not main — the only thing done here
+    /// is read the impulse and hop; all mutation happens on the main actor.
+    /// (That's REVIEW.md's rule, kept.)
+    func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
+        let impulse = Float(contact.collisionImpulse)
+        Task { @MainActor [haptics] in
+            haptics.collision(impulse: impulse)
         }
     }
 }
