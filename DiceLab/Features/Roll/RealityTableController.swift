@@ -86,7 +86,8 @@ final class RealityTableController: DiceTable {
 
     /// Gates the synthesized collision knock — a separate user choice from
     /// haptics, and the only channel on hardware without a Taptic Engine.
-    var soundEnabled = UserDefaults.standard.object(forKey: TableSettings.sound) as? Bool ?? true {
+    /// Defaults from the legacy combined toggle via `storedSound()`.
+    var soundEnabled = TableSettings.storedSound() {
         didSet {
             UserDefaults.standard.set(soundEnabled, forKey: TableSettings.sound)
             haptics.isSoundEnabled = soundEnabled
@@ -123,7 +124,11 @@ final class RealityTableController: DiceTable {
         subscriptions.append(content.subscribe(to: CollisionEvents.Began.self) { [haptics, weak self] event in
             // Same rule as the SceneKit path: read the impulse, hop to main.
             Task { @MainActor in
-                if DevFlags.impulseLog { self?.rollImpulses.append(event.impulse) }
+                // The roll gate keeps stragglers queued at settle out of
+                // the next roll's statistics.
+                if DevFlags.impulseLog, self?.isRolling == true {
+                    self?.rollImpulses.append(event.impulse)
+                }
                 haptics.collision(impulse: event.impulse)
             }
         })

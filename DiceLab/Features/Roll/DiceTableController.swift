@@ -70,7 +70,8 @@ final class DiceTableController: NSObject {
 
     /// Gates the synthesized collision knock — a separate user choice from
     /// haptics, and the only channel on hardware without a Taptic Engine.
-    var soundEnabled = UserDefaults.standard.object(forKey: TableSettings.sound) as? Bool ?? true {
+    /// Defaults from the legacy combined toggle via `storedSound()`.
+    var soundEnabled = TableSettings.storedSound() {
         didSet {
             UserDefaults.standard.set(soundEnabled, forKey: TableSettings.sound)
             haptics.isSoundEnabled = soundEnabled
@@ -228,7 +229,9 @@ extension DiceTableController: SCNPhysicsContactDelegate {
                           + Float(a.z - b.z) * Float(n.z))
         let impulse = closing * Self.impulseScale
         Task { @MainActor [haptics] in
-            if DevFlags.impulseLog { rollImpulses.append(impulse) }
+            // The roll gate keeps stragglers queued at settle out of the
+            // next roll's statistics — the log is for honest calibration.
+            if DevFlags.impulseLog, isRolling { rollImpulses.append(impulse) }
             haptics.collision(impulse: impulse)
         }
     }
