@@ -140,7 +140,25 @@ inside `applyLighting` never port, same lesson as physics constants.
 - **Migration:** `settings.skin` resolves once into the matching preset; the
   richer `settings.theme` JSON wins thereafter.
 - **Editing semantics (legacy):** choosing a preset fills the fields;
-  touching any field flips the theme to `.custom` carrying a full copy.
+  touching any field flips the theme to `.custom` carrying a full copy. In
+  `AppearanceEditor` that rule *is* the binding — a `Binding<Appearance>`
+  whose setter writes `theme = .custom(...)`, so no separate "make custom"
+  affordance exists.
+- **The editor previews live, per engine.** Each controller owns a second,
+  one-die world (`previewScene`/`previewRoot`, plus `previewDie`) that
+  `applyAppearance` re-materials alongside the table; each engine view
+  builds the widget — `SceneView` with `.rendersContinuously` driving an
+  `SCNAction` spin, or a second `RealityView` whose `SceneEvents.Update`
+  subscription spins the entity. Same ownership story as the table: the
+  world is controller state, the view only renders it. The preview die is
+  a statue — `makeDie` minus physics on SceneKit, a bare `ModelEntity` on
+  RealityKit.
+- **Speech is view-layer feedback.** `SpeechController` wraps
+  `AVSpeechSynthesizer`; `RollScreen` speaks `lastRoll` on change. The
+  trigger is the published result — engine-free — so the controllers never
+  hear about it, and `settings.speech` is `@AppStorage` like
+  `settings.engine`: a setting the scene doesn't touch doesn't belong on
+  the controller.
 
 ## Shake-to-roll rides the responder chain
 
@@ -216,6 +234,10 @@ identity — identical totals are still distinct rolls.
 - `DiceLabApp.engine` — `@AppStorage("settings.engine")`, the app-level
   choice of which controller exists. Plus two `@State` controllers — the
   documented Apple pattern for root-owned reference objects.
-- Per-controller settings (`dieCount`, `skin`, `haptics`, `camera`) —
-  controller `didSet` → `UserDefaults`, shared keys across engines.
+- Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
+  `camera`) — controller `didSet` → `UserDefaults`, shared keys across
+  engines.
+- `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
+  view-layer feedback reads a view-layer key (same slot as `engine`).
 - `RollScreen.showingSettings` — `@State`, the textbook transient case.
+  `speech` is `@State` too — a service object that must outlive rebuilds.

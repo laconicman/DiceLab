@@ -150,11 +150,3 @@ enum DieFaceTexture {
 
     private static func sign(_ x: Float) -> Float { x >= 0 ? 1 : -1 }
 }
-
-extension CodableColor {
-    /// Model→UIKit bridge — lives here rather than in `Model/` so the model
-    /// layer carries no framework types.
-    var uiColor: UIColor {
-        UIColor(red: red, green: green, blue: blue, alpha: alpha)
-    }
-}

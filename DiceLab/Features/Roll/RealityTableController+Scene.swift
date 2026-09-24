@@ -20,9 +20,11 @@ extension RealityTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
+        setUpPreview()
         // Dice and felt already read the stored appearance at build —
         // the lighting rig is the one piece that waits for this pass.
-        applyLighting(theme.appearance.lighting)
+        applyLighting(theme.appearance.lighting, in: root)
+        applyLighting(theme.appearance.lighting, in: previewRoot)
     }
 
     private func setUpCamera() {
@@ -176,17 +178,20 @@ extension RealityTableController {
         for die in dice {
             die.components[ModelComponent.self]?.materials = materials
         }
+        previewDie?.components[ModelComponent.self]?.materials = materials
         if let felt = root.findEntity(named: EntityName.felt) {
             felt.components[ModelComponent.self]?.materials =
                 [Self.feltMaterial(for: appearance.felt)]
         }
-        applyLighting(appearance.lighting)
+        applyLighting(appearance.lighting, in: root)
+        applyLighting(appearance.lighting, in: previewRoot)
     }
 
     /// One mood per preset — RealityKit's mapping is key/fill intensity.
-    private func applyLighting(_ preset: LightingPreset) {
-        let key = root.findEntity(named: EntityName.keyLight) as? DirectionalLight
-        let fill = root.findEntity(named: EntityName.fillLight) as? PointLight
+    /// Applies under any named-light parent, so the preview honors the picker.
+    private func applyLighting(_ preset: LightingPreset, in parent: Entity) {
+        let key = parent.findEntity(named: EntityName.keyLight) as? DirectionalLight
+        let fill = parent.findEntity(named: EntityName.fillLight) as? PointLight
         switch preset {
         case .studio:   key?.light.intensity = 2500; fill?.light.intensity = 500
         case .soft:     key?.light.intensity = 1800; fill?.light.intensity = 800
@@ -214,6 +219,46 @@ extension RealityTableController {
     static let dieMesh = MeshResource.generateBox(
         width: Bounds.dieEdge, height: Bounds.dieEdge, depth: Bounds.dieEdge,
         cornerRadius: Bounds.dieEdge * 0.06, splitFaces: true)
+
+    /// The preview world's staging — meter-scale like the table (die ≈ 3 cm).
+    private enum Preview {
+        static let cameraPosition = SIMD3<Float>(0, 0.055, 0.08)
+        static let cameraFieldOfView: Float = 40
+        static let keyDirection = SIMD3<Float>(0.2, 1.0, 0.15)
+        static let keyIntensity: Float = 2500
+        static let fillPosition = SIMD3<Float>(0, 0.15, 0.1)
+        static let fillIntensity: Float = 400
+        static let fillAttenuation: Float = 1
+    }
+
+    /// The appearance editor's live preview: one die, a camera, lights —
+    /// and nothing else. No physics components: a statue has no table to
+    /// hit. The preview `RealityView` spins it per-frame. Lights carry the
+    /// table's names so `applyLighting` reaches them.
+    private func setUpPreview() {
+        let camera = Entity()
+        camera.components.set(PerspectiveCameraComponent(
+            near: 0.001, far: 2, fieldOfViewInDegrees: Preview.cameraFieldOfView))
+        camera.look(at: .zero, from: Preview.cameraPosition, relativeTo: nil)
+        previewRoot.addChild(camera)
+
+        let die = ModelEntity(mesh: Self.dieMesh,
+                              materials: Self.materials(appearance: theme.appearance.die))
+        previewRoot.addChild(die)
+        previewDie = die
+
+        let key = DirectionalLight()
+        key.name = EntityName.keyLight
+        key.light.intensity = Preview.keyIntensity
+        key.look(at: .zero, from: Preview.keyDirection, relativeTo: nil)
+        previewRoot.addChild(key)
+        let fill = PointLight()
+        fill.name = EntityName.fillLight
+        fill.light.intensity = Preview.fillIntensity
+        fill.light.attenuationRadius = Preview.fillAttenuation
+        fill.position = Preview.fillPosition
+        previewRoot.addChild(fill)
+    }
 
     private static func makeDie(at position: SIMD3<Float>,
                                 appearance: DieAppearance) -> ModelEntity {
