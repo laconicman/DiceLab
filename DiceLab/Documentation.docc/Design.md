@@ -107,3 +107,19 @@ Apple's documented pattern for keeping a reference type alive — and
 - *TD-3 discharged:* camera control is now a user toggle, default on — this
   is a learning toy, free orbiting is a feature until scripted camera work
   arrives.
+
+## Shake-to-roll rides the responder chain
+
+SwiftUI has no shake gesture, and `UIDevice.deviceDidShakeNotification` only
+posts when *nothing* consumed `motionEnded` — depending on that is fragile.
+`ShakeDetector` is an invisible `UIView` that claims first responder:
+motion events walk the responder chain (object graph, not hit-testing), so
+zero size and no visuals are fine. This is the one place the
+`UIViewRepresentable` escape hatch earns its keep.
+
+## Roll history is a session record, not a log
+
+`history` holds the last 20 `RollResult`s (cleared when `dieCount` changes —
+a result from a different dice set is meaningless). The strip shows the last
+five, newest first; `RollResult` gained `Identifiable` so rows key by event
+identity — identical totals are still distinct rolls.
