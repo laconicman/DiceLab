@@ -150,6 +150,10 @@ final class DiceTableController: NSObject {
     }
 }
 
+/// The shared table contract — every member already exists; conformance is
+/// free because M1–M6 defined exactly this surface.
+extension DiceTableController: DiceTable {}
+
 extension DiceTableController: SCNSceneRendererDelegate {
     /// Per-frame hook: publishes the result once every die is asleep.
     /// `isResting` is SceneKit's own settle signal — the ancestors polled

@@ -17,10 +17,11 @@ final class HapticsController {
     /// plays; afterwards `minInterval` gates how often taps can fire.
     private var lastPlay: ContinuousClock.Instant?
 
-    /// Empirical ceiling for a mass-1 die hitting the table at full impulse —
+    /// Empirical ceiling for a die hitting the table at full impulse —
     /// impulses above it clamp to intensity 1.0 (HapticBounce's `kMaxVelocity`
-    /// role). Tune by feel on device.
-    static let maxImpulse: Float = 25
+    /// role). Engine-dependent: impulse is mass×velocity, and RealityKit's
+    /// meter-scale dice weigh grams where SceneKit's weigh 1 unit.
+    let maxImpulse: Float
 
     /// A tumbling die contacts far more often than the Taptic Engine can
     /// render; 60 ms between taps keeps haptics readable.
@@ -34,7 +35,8 @@ final class HapticsController {
     /// callback dumb and the engine lifecycle untouched.
     var isEnabled = true
 
-    init() {
+    init(maxImpulse: Float = 25) {
+        self.maxImpulse = maxImpulse
         capabilities = CHHapticEngine.capabilitiesForHardware()
         // No engine when the device renders neither event kind — `collision`
         // then no-ops; callers don't need to care.
@@ -59,7 +61,7 @@ final class HapticsController {
     /// contact delegate's hop; `lastPlay` mutations stay serialized there.
     func collision(impulse: Float) {
         guard isEnabled else { return }
-        let intensity = Self.normalizedIntensity(for: impulse)
+        let intensity = Self.normalizedIntensity(for: impulse, maxImpulse: maxImpulse)
         guard intensity > Self.intensityFloor else { return }
         let now = ContinuousClock.now
         if let lastPlay, now - lastPlay < Self.minInterval { return }
@@ -98,7 +100,7 @@ final class HapticsController {
 
     /// Newton-seconds → 0…1. Extracted as pure math so tests can pin the
     /// clamp without a haptic engine.
-    static func normalizedIntensity(for impulse: Float) -> Float {
+    static func normalizedIntensity(for impulse: Float, maxImpulse: Float = 25) -> Float {
         min(max(impulse / maxImpulse, 0), 1)
     }
 }
