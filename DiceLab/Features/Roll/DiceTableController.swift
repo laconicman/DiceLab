@@ -18,6 +18,10 @@ final class DiceTableController: NSObject {
     /// The last settled throw's outcome — `nil` until the first roll rests.
     private(set) var lastRoll: RollResult?
 
+    /// Bumped per throw; the settle task compares against it so a re-roll
+    /// can't be completed by the previous roll's queued publish.
+    private var rollID = 0
+
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
@@ -36,6 +40,7 @@ final class DiceTableController: NSObject {
     /// `(1, 24, 2)` to every die — correlated, repeatable rolls. Randomizing
     /// per die is what makes consecutive rolls differ.
     func roll() {
+        rollID += 1
         isRolling = true
         for die in dice {
             // Clear momentum first: a re-throw is a fresh throw, not a
@@ -79,7 +84,14 @@ extension DiceTableController: SCNSceneRendererDelegate {
         guard isRolling else { return }
         guard dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
         let faces = dice.map { DieFace.up(of: $0.presentation.simdOrientation) }
+        let generation = rollID
         Task { @MainActor in
+            // Re-verify on main: a re-roll between the render-thread check and
+            // this task must not publish stale faces or clear the new roll's
+            // flag. The isResting re-check catches an impulse that already
+            // landed after the generation was captured.
+            guard isRolling, rollID == generation,
+                  dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
             lastRoll = RollResult(faces: faces)
             isRolling = false
         }
