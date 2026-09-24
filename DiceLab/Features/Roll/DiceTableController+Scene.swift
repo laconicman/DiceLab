@@ -18,6 +18,7 @@ extension DiceTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
+        setUpPreview()
         // Dice and felt already read the stored appearance at build —
         // the lighting rig is the one piece that waits for this pass.
         applyLighting(theme.appearance.lighting)
@@ -167,6 +168,9 @@ extension DiceTableController {
             guard let box = die.geometry as? SCNBox else { continue }
             box.materials = DieFaceTexture.materials(for: box, appearance: appearance.die)
         }
+        if let previewDie, let box = previewDie.geometry as? SCNBox {
+            box.materials = DieFaceTexture.materials(for: box, appearance: appearance.die)
+        }
         if let floor = scene.rootNode.childNode(withName: NodeName.felt, recursively: false) {
             floor.geometry?.firstMaterial?.diffuse.contents =
                 (appearance.felt.usesImage ? FeltImageStore.load() : nil)
@@ -197,6 +201,36 @@ extension DiceTableController {
             key?.shadowColor = UIColor.black.withAlphaComponent(0.75)
             fill?.color = UIColor(white: 0.15, alpha: 1)
         }
+    }
+
+    /// The appearance editor's live preview: one die, a camera, lights —
+    /// and nothing else. Reuses `makeDie` minus its physics (a statue has
+    /// no table to hit). The die spins on a mixed axis so every face reads.
+    private func setUpPreview() {
+        let camera = SCNNode()
+        camera.camera = SCNCamera()
+        camera.position = SCNVector3(x: 0, y: 2.4, z: 3.2)
+        previewScene.rootNode.addChildNode(camera)
+        camera.look(at: SCNVector3(x: 0, y: 0, z: 0))
+
+        let die = Self.makeDie(at: SCNVector3(x: 0, y: 0, z: 0),
+                               appearance: theme.appearance.die)
+        die.physicsBody = nil
+        die.runAction(SCNAction.repeatForever(
+            SCNAction.rotateBy(x: 0.9, y: 1.6, z: 0, duration: 3)))
+        previewScene.rootNode.addChildNode(die)
+        previewDie = die
+
+        let key = SCNNode()
+        key.light = SCNLight()
+        key.light?.type = .omni
+        key.position = SCNVector3(x: 0, y: 6, z: 4)
+        previewScene.rootNode.addChildNode(key)
+        let fill = SCNNode()
+        fill.light = SCNLight()
+        fill.light?.type = .ambient
+        fill.light?.color = UIColor(white: 0.4, alpha: 1)
+        previewScene.rootNode.addChildNode(fill)
     }
 
     private static func makeDie(at position: SCNVector3, appearance: DieAppearance) -> SCNNode {

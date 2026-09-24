@@ -18,6 +18,16 @@ final class RealityTableController: DiceTable {
     /// The entity graph — the ECS analog of the owned `SCNScene`.
     let root = Entity()
 
+    /// A one-die entity graph for the appearance editor's live preview —
+    /// separate world, re-materialized alongside the table by
+    /// `applyAppearance`. Its `RealityView` is constructed by the engine
+    /// view; the controller owns only the world.
+    let previewRoot = Entity()
+
+    /// The preview's die — `applyAppearance` re-materials it with the rest,
+    /// and the preview view reads it to drive the spin.
+    var previewDie: ModelEntity?
+
     /// True from a throw until the physics settle. `private(set)`: views
     /// observe, only the controller mutates.
     private(set) var isRolling = false

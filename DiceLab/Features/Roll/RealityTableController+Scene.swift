@@ -20,6 +20,7 @@ extension RealityTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
+        setUpPreview()
         // Dice and felt already read the stored appearance at build —
         // the lighting rig is the one piece that waits for this pass.
         applyLighting(theme.appearance.lighting)
@@ -176,6 +177,7 @@ extension RealityTableController {
         for die in dice {
             die.components[ModelComponent.self]?.materials = materials
         }
+        previewDie?.components[ModelComponent.self]?.materials = materials
         if let felt = root.findEntity(named: EntityName.felt) {
             felt.components[ModelComponent.self]?.materials =
                 [Self.feltMaterial(for: appearance.felt)]
@@ -214,6 +216,32 @@ extension RealityTableController {
     static let dieMesh = MeshResource.generateBox(
         width: Bounds.dieEdge, height: Bounds.dieEdge, depth: Bounds.dieEdge,
         cornerRadius: Bounds.dieEdge * 0.06, splitFaces: true)
+
+    /// The appearance editor's live preview: one die, a camera, lights —
+    /// and nothing else. No physics components: a statue has no table to
+    /// hit. The preview `RealityView` spins it per-frame.
+    private func setUpPreview() {
+        let camera = Entity()
+        camera.components.set(PerspectiveCameraComponent(
+            near: 0.001, far: 2, fieldOfViewInDegrees: 40))
+        camera.look(at: .zero, from: [0, 0.055, 0.08], relativeTo: nil)
+        previewRoot.addChild(camera)
+
+        let die = ModelEntity(mesh: Self.dieMesh,
+                              materials: Self.materials(appearance: theme.appearance.die))
+        previewRoot.addChild(die)
+        previewDie = die
+
+        let key = DirectionalLight()
+        key.light.intensity = 2500
+        key.look(at: .zero, from: [0.2, 1.0, 0.15], relativeTo: nil)
+        previewRoot.addChild(key)
+        let fill = PointLight()
+        fill.light.intensity = 400
+        fill.light.attenuationRadius = 1
+        fill.position = [0, 0.15, 0.1]
+        previewRoot.addChild(fill)
+    }
 
     private static func makeDie(at position: SIMD3<Float>,
                                 appearance: DieAppearance) -> ModelEntity {

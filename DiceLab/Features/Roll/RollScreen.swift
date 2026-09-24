@@ -11,10 +11,19 @@ import SwiftUI
 struct RollScreen<Table: DiceTable, SceneContent: View>: View {
     let table: Table
     let scene: SceneContent
+    /// The appearance editor's live die preview — each engine builds its
+    /// own (`SceneView`/`RealityView`); the chrome only hosts it.
+    let preview: AnyView
     @Environment(\.scenePhase) private var scenePhase
     /// Transient UI state — the correct home for `@State`: its lifetime
     /// *should* match this view's, unlike the world (the Q2 lesson applied).
     @State private var showingSettings = false
+    /// Speech service — `@State` because it must outlive view rebuilds
+    /// (synthesizer state), same discipline as the controllers' ownership.
+    @State private var speech = SpeechController()
+    /// View-layer setting for view-layer feedback — `@AppStorage`, same
+    /// slot the settings sheet writes.
+    @AppStorage(TableSettings.speech) private var speechEnabled = true
 
     var body: some View {
         scene
@@ -31,6 +40,16 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                 if DevFlags.autoroll {
                     table.roll()
                 }
+                if DevFlags.appearanceEditor {
+                    showingSettings = true
+                }
+            }
+            // Speech rides the published result, not the physics — the view
+            // observes `lastRoll`, so the trigger is engine-free and the
+            // controllers never hear about AVSpeechSynthesizer.
+            .onChange(of: table.lastRoll) { _, roll in
+                guard speechEnabled, let roll else { return }
+                speech.speak(roll)
             }
             .overlay(alignment: .top) {
                 if let roll = table.lastRoll {
@@ -81,6 +100,16 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             // Shake-to-roll: an invisible first responder, because SwiftUI has
             // no shake gesture — see ShakeDetector.
             .background(ShakeDetector(onShake: table.roll))
-            .sheet(isPresented: $showingSettings) { SettingsView(table: table) }
+            .sheet(isPresented: $showingSettings) {
+                // Dev driver: `-appearanceeditor` lands directly in the
+                // editor so its live preview is screenshotable via simctl.
+                if DevFlags.appearanceEditor {
+                    NavigationStack {
+                        AppearanceEditor(table: table, preview: preview)
+                    }
+                } else {
+                    SettingsView(table: table, preview: preview)
+                }
+            }
     }
 }
