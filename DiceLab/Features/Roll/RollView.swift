@@ -9,9 +9,20 @@ struct RollView: View {
         SceneView(
             scene: table.scene,
             options: [.allowsCameraControl],
-            antialiasingMode: .multisampling4X
+            antialiasingMode: .multisampling4X,
+            delegate: table
         )
         .ignoresSafeArea()
+        .overlay(alignment: .top) {
+            if let roll = table.lastRoll {
+                Text(roll.faces.map(String.init).joined(separator: " + ")
+                     + " = \(roll.total)")
+                    .font(.title2.monospacedDigit().bold())
+                    .padding(8)
+                    .background(.regularMaterial, in: .capsule)
+                    .padding(.top, 8)
+            }
+        }
         .overlay(alignment: .bottom) {
             Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
                 .buttonStyle(.borderedProminent)

@@ -10,7 +10,8 @@ holds the dice-table screen (`RollView` root view + `DiceTableController`, the
 screen's dedicated controller), `Model/` holds domain value types.
 
 No `RootView` exists yet — there is no top-level branch to put in it (YAGNI).
-`Model/` is likewise empty until a domain type earns it.
+`Model/` holds `DieFace` (pure face-up math on `simd` quaternions) and
+`RollResult` since M3 — kept SceneKit-free so the M7 port keeps them.
 
 ## The scene lives in the controller
 

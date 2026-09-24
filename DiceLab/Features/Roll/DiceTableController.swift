@@ -5,22 +5,31 @@ import SceneKit
 /// physics world reports back. Views bind to this controller; they never touch
 /// SceneKit themselves.
 @Observable
-final class DiceTableController {
+final class DiceTableController: NSObject {
     /// The rendered world. A `let` reference owned here because a scene must
     /// outlive any view that displays it — view structs are ephemeral values,
     /// recreated on every render pass.
     let scene = SCNScene()
 
-    /// True from a throw until the physics settle (M3 detects rest and
-    /// publishes the result). `private(set)`: views observe, only the
-    /// controller mutates.
+    /// True from a throw until the physics settle. `private(set)`: views
+    /// observe, only the controller mutates.
     private(set) var isRolling = false
+
+    /// The last settled throw's outcome — `nil` until the first roll rests.
+    private(set) var lastRoll: RollResult?
+
+    /// Bumped per throw; the settle task compares against it so a re-roll
+    /// can't be completed by the previous roll's queued publish.
+    private var rollID = 0
 
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
 
-    init() {
+    /// NSObject, because `SCNSceneRendererDelegate` is an `NSObjectProtocol` —
+    /// the price of the controller doubling as the renderer delegate.
+    override init() {
+        super.init()
         setUpScene()
     }
 
@@ -31,6 +40,7 @@ final class DiceTableController {
     /// `(1, 24, 2)` to every die — correlated, repeatable rolls. Randomizing
     /// per die is what makes consecutive rolls differ.
     func roll() {
+        rollID += 1
         isRolling = true
         for die in dice {
             // Clear momentum first: a re-throw is a fresh throw, not a
@@ -60,5 +70,30 @@ final class DiceTableController {
             y: .random(in: 20...28),
             z: .random(in: -4...4)
         )
+    }
+}
+
+extension DiceTableController: SCNSceneRendererDelegate {
+    /// Per-frame hook: publishes the result once every die is asleep.
+    /// `isResting` is SceneKit's own settle signal — the ancestors polled
+    /// velocity magnitudes by hand; Bullet already tracks that.
+    ///
+    /// The callback isn't documented as main-thread, and SwiftUI reads the
+    /// published state on main — so publishing hops to `MainActor`.
+    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+        guard isRolling else { return }
+        guard dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
+        let faces = dice.map { DieFace.up(of: $0.presentation.simdOrientation) }
+        let generation = rollID
+        Task { @MainActor in
+            // Re-verify on main: a re-roll between the render-thread check and
+            // this task must not publish stale faces or clear the new roll's
+            // flag. The isResting re-check catches an impulse that already
+            // landed after the generation was captured.
+            guard isRolling, rollID == generation,
+                  dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
+            lastRoll = RollResult(faces: faces)
+            isRolling = false
+        }
     }
 }
