@@ -28,7 +28,7 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                 table.sceneActivated()
                 // Dev driver: `xcrun simctl launch … -autoroll` exercises
                 // throw → settle → publish without manual tapping.
-                if ProcessInfo.processInfo.arguments.contains("-autoroll") {
+                if DevFlags.autoroll {
                     table.roll()
                 }
             }
