@@ -125,10 +125,13 @@ final class RealityTableController: DiceTable {
         content.add(root)
         subscriptions.append(content.subscribe(to: CollisionEvents.Began.self) { [haptics, weak self] event in
             // Same rule as the SceneKit path: read the impulse, hop to main.
+            let generation = self?.rollID ?? 0
             Task { @MainActor in
-                // The roll gate keeps stragglers queued at settle out of
-                // the next roll's statistics.
-                if DevFlags.impulseLog, self?.isRolling == true {
+                // Generation pins the sample to its roll — a contact queued
+                // before settle but run after the next `roll()` would pass
+                // an `isRolling`-only gate and contaminate the new stats.
+                if DevFlags.impulseLog, self?.isRolling == true,
+                   self?.rollID == generation {
                     self?.rollImpulses.append(event.impulse)
                 }
                 haptics.collision(impulse: event.impulse)

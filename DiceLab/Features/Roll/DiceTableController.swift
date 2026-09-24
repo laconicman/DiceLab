@@ -229,10 +229,16 @@ extension DiceTableController: SCNPhysicsContactDelegate {
                           + Float(a.y - b.y) * Float(n.y)
                           + Float(a.z - b.z) * Float(n.z))
         let impulse = closing * Self.impulseScale
+        // Render-thread read of an Int — atomic in practice, and a stale
+        // value only fails safe (the generation check drops the sample).
+        let generation = rollID
         Task { @MainActor [haptics] in
-            // The roll gate keeps stragglers queued at settle out of the
-            // next roll's statistics — the log is for honest calibration.
-            if DevFlags.impulseLog, isRolling { rollImpulses.append(impulse) }
+            // Generation pins the sample to its roll — a contact queued
+            // before settle but run after the next `roll()` would pass an
+            // `isRolling`-only gate and contaminate the new stats.
+            if DevFlags.impulseLog, isRolling, rollID == generation {
+                rollImpulses.append(impulse)
+            }
             haptics.collision(impulse: impulse)
         }
     }
