@@ -4,6 +4,7 @@ import SwiftUI
 /// The dice table screen: the 3D scene with app chrome layered over it.
 struct RollView: View {
     @Environment(DiceTableController.self) private var table
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         SceneView(
@@ -13,6 +14,12 @@ struct RollView: View {
             delegate: table
         )
         .ignoresSafeArea()
+        // The haptic engine is suspended on backgrounding and never resumes
+        // on its own — restart it each time the app returns to active.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { table.sceneActivated() }
+        }
+        .onAppear { table.sceneActivated() }
         .overlay(alignment: .top) {
             if let roll = table.lastRoll {
                 Text(roll.faces.map(String.init).joined(separator: " + ")

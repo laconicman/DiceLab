@@ -61,3 +61,13 @@ struct PhysicsCategoryTests {
         #expect(PhysicsCategory.die.isDisjoint(with: .table))
     }
 }
+
+struct HapticsTests {
+    @Test("impulse normalizes into 0…1 and clamps at both ends")
+    func intensityClamp() {
+        #expect(HapticsController.normalizedIntensity(for: 0) == 0)
+        #expect(HapticsController.normalizedIntensity(for: -5) == 0)
+        #expect(HapticsController.normalizedIntensity(for: 100) == 1)
+        #expect(HapticsController.normalizedIntensity(for: HapticsController.maxImpulse / 2) == 0.5)
+    }
+}
