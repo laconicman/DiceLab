@@ -13,14 +13,8 @@ SwiftUI shell, SceneKit physics, RealityKit port planned as a later milestone.
   generated, not committed: run `xcodegen` after cloning or changing
   `project.yml`.
 
-## Roadmap
+## Documentation
 
-- [x] M1 — SwiftUI shell: `SceneView` + controller-owned scene
-- [ ] M2 — physics: dice, walls, floor, impulses
-- [ ] M3 — rest detection + face-up reading (`simd`), first tests
-- [ ] M4 — Core Haptics + collision audio
-- [ ] M5 — materials, lighting, face textures, shader modifier
-- [ ] M6 — app features: dice count, shake-to-roll, history
-- [ ] M7 — RealityKit port
-
-Why each choice was made is logged in `docs/decisions/`.
+Direction docs — architecture decisions, the M1–M7 milestone roadmap, and the
+tech-debt register — live in `DiceLab/Documentation.docc/` and render via
+**Product ▸ Build Documentation** in Xcode. `Design.md` there is authoritative.
