@@ -46,22 +46,33 @@ extension DiceTableController {
     /// The box the dice play in: floor, four walls, ceiling. The table is a
     /// *static* body — immovable geometry, cheaper than the ancestors'
     /// kinematic choice (kinematic is for objects moved by code).
+    /// Inner faces of the play volume, plus collider dimensions. `Float`
+    /// because `SCNVector3` fields are — geometry inits want `CGFloat`.
+    private enum Bounds {
+        static let halfX: Float = 10     // x ∈ −10…10
+        static let halfZ: Float = 15     // z ∈ −15…15
+        static let floorY: Float = -8
+        static let ceilingY: Float = 12
+        static let thickness: Float = 4
+        static let span: Float = 60
+    }
+
     private func setUpTable() {
         let felt = SCNFloor()
         felt.reflectivity = 0 // M5 decides between this and the grain texture
         felt.firstMaterial?.diffuse.contents = UIColor.systemGreen
         let floor = SCNNode(geometry: felt)
-        floor.position.y = -8
+        floor.position.y = Bounds.floorY
         floor.physicsBody = .tableBody()
         scene.rootNode.addChildNode(floor)
 
-        // Play volume: x −10…10, z −15…15, y −8…12.
         // Thin boxes, not the ancestors' oriented planes: an axis-aligned box
         // needs no orientation math at all — `reposition`'s arbitrary-normal
         // matrix dance earns nothing here. But a box collider is *finite*, so
-        // thickness matters: a die takes ~24 units/s of impulse (mass 1), and
-        // a fast step can carry it ~1 unit — 4-unit bounds keep tunneling
-        // impossible even if the timestep subdivision ever degrades.
+        // thickness matters: a die takes ~24 units/s of impulse (mass 1.0,
+        // measured), and a solver step can carry it ~1 unit — 4 units of
+        // thickness is a margin, not a guarantee. What bounds the speed is
+        // `roll()` clearing velocity before each impulse.
         let wallMaterial = SCNMaterial()
         wallMaterial.diffuse.contents = UIColor.systemGray.withAlphaComponent(0.15)
 
@@ -76,13 +87,21 @@ extension DiceTableController {
             scene.rootNode.addChildNode(node)
         }
 
-        // Inner faces land on the same planes as before; the extra size pads
-        // outward so walls seal the corners and the ceiling's top face too.
-        bound(SCNVector3(60, 4, 60), at: SCNVector3(0, 14, 0), hidden: true) // ceiling
-        bound(SCNVector3(4, 60, 60), at: SCNVector3(12, 5, 0))              // +x wall
-        bound(SCNVector3(4, 60, 60), at: SCNVector3(-12, 5, 0))             // −x wall
-        bound(SCNVector3(60, 60, 4), at: SCNVector3(0, 5, 17))              // +z wall
-        bound(SCNVector3(60, 60, 4), at: SCNVector3(0, 5, -17))             // −z wall
+        // Each center sits half a thickness outside its inner face, so the
+        // faces land exactly on the declared volume — and the spans pad past
+        // the corners and the ceiling's top face.
+        let wallY = (Bounds.floorY + Bounds.ceilingY) / 2
+        bound(SCNVector3(Bounds.span, Bounds.thickness, Bounds.span),
+              at: SCNVector3(0, Bounds.ceilingY + Bounds.thickness / 2, 0),
+              hidden: true)                                                    // ceiling
+        bound(SCNVector3(Bounds.thickness, Bounds.span, Bounds.span),
+              at: SCNVector3(Bounds.halfX + Bounds.thickness / 2, wallY, 0))  // +x wall
+        bound(SCNVector3(Bounds.thickness, Bounds.span, Bounds.span),
+              at: SCNVector3(-Bounds.halfX - Bounds.thickness / 2, wallY, 0)) // −x wall
+        bound(SCNVector3(Bounds.span, Bounds.span, Bounds.thickness),
+              at: SCNVector3(0, wallY, Bounds.halfZ + Bounds.thickness / 2))  // +z wall
+        bound(SCNVector3(Bounds.span, Bounds.span, Bounds.thickness),
+              at: SCNVector3(0, wallY, -Bounds.halfZ - Bounds.thickness / 2)) // −z wall
     }
 
     private func spawnDice(_ count: Int) {
