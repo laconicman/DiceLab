@@ -9,15 +9,6 @@ import SceneKit
 /// vertex position is its outward normal. `DieFace.axes` stays the
 /// value↔axis authority; this file maps axis→material slot, so visible
 /// pips can never disagree with the reported face-up value.
-/// Dice looks — persisted via `rawValue` in settings. `ivory` is the
-/// classic casino die; `onyx` inverts it.
-enum DieSkin: String, CaseIterable {
-    case ivory, onyx
-
-    var faceColor: UIColor { self == .ivory ? UIColor(white: 0.96, alpha: 1) : UIColor(white: 0.10, alpha: 1) }
-    var pipColor: UIColor { self == .ivory ? .black : .white }
-}
-
 enum DieFaceTexture {
 
     /// Pip cells on a 3×3 grid, (column, row), (0,0) top-left. Pure data —
@@ -34,30 +25,43 @@ enum DieFaceTexture {
         }
     }
 
-    /// Six face images per skin, drawn once — identical for every die, so
-    /// `materials(for:)` reuses them instead of re-rendering per spawn.
-    private static let faceImages: [DieSkin: [UIImage]] =
-        Dictionary(uniqueKeysWithValues: DieSkin.allCases.map { skin in
-            (skin, (1...6).map { image(for: $0, skin: skin) })
-        })
+    /// Cache key: only the two ink colors reach the pixels — finish
+    /// channels shape the material, not the texture, so keying by them
+    /// would duplicate identical images on every slider edit.
+    private struct Ink: Hashable {
+        let face: CodableColor
+        let pip: CodableColor
+    }
+
+    /// Six face images per ink, drawn lazily and cached — identical for
+    /// every die, so `materials(for:)` reuses them instead of re-rendering
+    /// per spawn.
+    private static var faceImageCache: [Ink: [UIImage]] = [:]
 
     /// The cached six faces, 1…6 — the RealityKit path binds the same images
     /// through `TextureResource`; generation stays in one place.
-    static func images(for skin: DieSkin) -> [UIImage] {
-        faceImages[skin] ?? []
+    static func images(for appearance: DieAppearance) -> [UIImage] {
+        let key = Ink(face: appearance.faceColor, pip: appearance.pipColor)
+        if let cached = faceImageCache[key] { return cached }
+        // Color sliders mint a key per sampled value — a long edit session
+        // could grow the map without limit, so it resets past 16 entries.
+        if faceImageCache.count >= 16 { faceImageCache.removeAll(keepingCapacity: false) }
+        let drawn = (1...6).map { image(for: $0, appearance: appearance) }
+        faceImageCache[key] = drawn
+        return drawn
     }
 
     /// Runtime-drawn face: opaque fill + pips. The fill must be opaque —
     /// transparent texture corners render as holes in the die face (the
     /// geometry's chamfer already provides the rounded look).
-    static func image(for value: Int, skin: DieSkin = .ivory,
+    static func image(for value: Int, appearance: DieAppearance = Appearance.ivory.die,
                       side: CGFloat = 256) -> UIImage {
         let size = CGSize(width: side, height: side)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            skin.faceColor.setFill()
+            appearance.faceColor.uiColor.setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
-            skin.pipColor.setFill()
+            appearance.pipColor.uiColor.setFill()
             let margin = side * 0.24
             let step = (side - 2 * margin) / 2
             let radius = side * 0.085
@@ -71,14 +75,19 @@ enum DieFaceTexture {
     }
 
     /// Six materials in the box's own material order — the assignment is
-    /// derived from geometry, never assumed (see type docs).
-    static func materials(for box: SCNBox, skin: DieSkin = .ivory) -> [SCNMaterial] {
-        materialAxes(of: box).map { axis in
+    /// derived from geometry, never assumed (see type docs). Finish channels
+    /// come from the appearance: `clearCoat` is the lacquer layer that makes
+    /// a die read as polished resin instead of printed cardboard.
+    static func materials(for box: SCNBox,
+                          appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {
+        let images = images(for: appearance)
+        return materialAxes(of: box).map { axis in
             let material = SCNMaterial()
             material.lightingModel = .physicallyBased
-            material.diffuse.contents = faceImages[skin]?[value(on: axis) - 1]
-            material.roughness.contents = NSNumber(0.35)
-            material.metalness.contents = NSNumber(0)
+            material.diffuse.contents = images[value(on: axis) - 1]
+            material.roughness.contents = NSNumber(value: appearance.roughness)
+            material.metalness.contents = NSNumber(value: appearance.metalness)
+            material.clearCoat.contents = NSNumber(value: appearance.clearcoat)
             return material
         }
     }
@@ -140,4 +149,12 @@ enum DieFaceTexture {
     }
 
     private static func sign(_ x: Float) -> Float { x >= 0 ? 1 : -1 }
+}
+
+extension CodableColor {
+    /// Model→UIKit bridge — lives here rather than in `Model/` so the model
+    /// layer carries no framework types.
+    var uiColor: UIColor {
+        UIColor(red: red, green: green, blue: blue, alpha: alpha)
+    }
 }

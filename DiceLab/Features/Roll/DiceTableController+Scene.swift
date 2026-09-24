@@ -18,6 +18,9 @@ extension DiceTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
+        // Dice and felt already read the stored appearance at build —
+        // the lighting rig is the one piece that waits for this pass.
+        applyLighting(theme.appearance.lighting)
     }
 
     private func setUpCamera() {
@@ -29,10 +32,20 @@ extension DiceTableController {
         scene.rootNode.addChildNode(camera)
     }
 
+    /// Nodes the appearance pass reaches for by name — the alternative is
+    /// stored refs on the main class, and a name is honest enough for three
+    /// fixed nodes.
+    private enum NodeName {
+        static let felt = "felt"
+        static let keyLight = "keyLight"
+        static let fillLight = "fillLight"
+    }
+
     private func setUpLighting() {
         // Key light: one point source casting soft shadows — shadowRadius
         // blurs the shadow map at lookup, cheaper than a shadow map upscale.
         let key = SCNNode()
+        key.name = NodeName.keyLight
         key.light = SCNLight()
         key.light?.type = .omni
         key.light?.castsShadow = true
@@ -43,6 +56,7 @@ extension DiceTableController {
 
         // Fill light: flat ambient so the shadow sides aren't pitch black.
         let fill = SCNNode()
+        fill.name = NodeName.fillLight
         fill.light = SCNLight()
         fill.light?.type = .ambient
         fill.light?.color = UIColor(white: 0.35, alpha: 1)
@@ -68,10 +82,14 @@ extension DiceTableController {
     private func setUpTable() {
         let felt = SCNFloor()
         felt.reflectivity = 0 // TD-4: FloorPass warning is harmless at 0
-        felt.firstMaterial?.diffuse.contents = UIColor(red: 0.05, green: 0.30, blue: 0.15, alpha: 1)
+        let feltAppearance = theme.appearance.felt
+        felt.firstMaterial?.diffuse.contents =
+            (feltAppearance.usesImage ? FeltImageStore.load() : nil)
+            ?? feltAppearance.color.uiColor
         felt.firstMaterial?.roughness.contents = NSNumber(1) // matte felt
         felt.firstMaterial?.specular.contents = UIColor.black
         let floor = SCNNode(geometry: felt)
+        floor.name = NodeName.felt
         floor.position.y = Bounds.floorY
         floor.physicsBody = .tableBody()
         scene.rootNode.addChildNode(floor)
@@ -118,7 +136,7 @@ extension DiceTableController {
     /// scene construction lives here, roll-state bookkeeping lives there.
     func spawnDice(_ count: Int) {
         for position in Self.spawnPositions(count: count) {
-            let die = Self.makeDie(at: position, skin: skin)
+            let die = Self.makeDie(at: position, appearance: theme.appearance.die)
             dice.append(die)
             scene.rootNode.addChildNode(die)
         }
@@ -140,22 +158,54 @@ extension DiceTableController {
         return (0..<count).map { SCNVector3(first + spacing * Float($0), 0, 0) }
     }
 
-    /// Re-skins existing dice in place — the derived material mapping makes
-    /// the swap a straight reassignment.
-    func applySkin() {
+    /// Re-skins the whole table in place — dice, felt, and lighting preset.
+    /// The derived material mapping makes the die swap a straight
+    /// reassignment; felt and lights are found by name.
+    func applyAppearance() {
+        let appearance = theme.appearance
         for die in dice {
             guard let box = die.geometry as? SCNBox else { continue }
-            box.materials = DieFaceTexture.materials(for: box, skin: skin)
+            box.materials = DieFaceTexture.materials(for: box, appearance: appearance.die)
+        }
+        if let floor = scene.rootNode.childNode(withName: NodeName.felt, recursively: false) {
+            floor.geometry?.firstMaterial?.diffuse.contents =
+                (appearance.felt.usesImage ? FeltImageStore.load() : nil)
+                ?? appearance.felt.color.uiColor
+        }
+        applyLighting(appearance.lighting)
+    }
+
+    /// One mood per preset — the SceneKit mapping is omni intensity,
+    /// shadow softness/darkness, and ambient fill level.
+    private func applyLighting(_ preset: LightingPreset) {
+        let key = scene.rootNode.childNode(withName: NodeName.keyLight, recursively: false)?.light
+        let fill = scene.rootNode.childNode(withName: NodeName.fillLight, recursively: false)?.light
+        switch preset {
+        case .studio:
+            key?.intensity = 1000
+            key?.shadowRadius = 6
+            key?.shadowColor = UIColor.black.withAlphaComponent(0.5)
+            fill?.color = UIColor(white: 0.35, alpha: 1)
+        case .soft:
+            key?.intensity = 700
+            key?.shadowRadius = 14
+            key?.shadowColor = UIColor.black.withAlphaComponent(0.3)
+            fill?.color = UIColor(white: 0.5, alpha: 1)
+        case .dramatic:
+            key?.intensity = 1400
+            key?.shadowRadius = 2
+            key?.shadowColor = UIColor.black.withAlphaComponent(0.75)
+            fill?.color = UIColor(white: 0.15, alpha: 1)
         }
     }
 
-    private static func makeDie(at position: SCNVector3, skin: DieSkin) -> SCNNode {
+    private static func makeDie(at position: SCNVector3, appearance: DieAppearance) -> SCNNode {
         // Chamfered box: the rounded edge is what lets a die tumble instead of
         // sliding like a brick.
         let geometry = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
         // Pips are mapped to material slots by inspecting the box's own
         // geometry — never a hardcoded index order (see DieFaceTexture).
-        geometry.materials = DieFaceTexture.materials(for: geometry, skin: skin)
+        geometry.materials = DieFaceTexture.materials(for: geometry, appearance: appearance)
 
         let die = SCNNode(geometry: geometry)
         die.position = position
