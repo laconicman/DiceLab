@@ -46,17 +46,22 @@ struct RollView: View {
         .overlay(alignment: .bottom) {
             VStack(spacing: 16) {
                 // Session history: last five settled rolls, newest first.
+                // Scrolled — six-die results overflow a portrait row.
                 if !table.history.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(table.history.suffix(5).reversed()) { roll in
-                            Text(roll.faces.map(String.init).joined(separator: "+")
-                                 + "=\(roll.total)")
-                                .font(.caption.monospacedDigit())
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.regularMaterial, in: .capsule)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 6) {
+                            ForEach(table.history.suffix(5).reversed()) { roll in
+                                Text(roll.faces.map(String.init).joined(separator: "+")
+                                     + "=\(roll.total)")
+                                    .font(.caption.monospacedDigit())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.regularMaterial, in: .capsule)
+                            }
                         }
+                        .padding(.horizontal)
                     }
+                    .scrollIndicators(.hidden)
                 }
                 Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
                     .buttonStyle(.borderedProminent)

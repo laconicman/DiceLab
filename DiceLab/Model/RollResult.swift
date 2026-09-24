@@ -8,4 +8,8 @@ struct RollResult: Equatable, Identifiable {
     let faces: [Int]
 
     var total: Int { faces.reduce(0, +) }
+
+    /// Equality is about the *outcome* — `id` distinguishes roll events for
+    /// SwiftUI, it must not make equal results compare unequal.
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.faces == rhs.faces }
 }

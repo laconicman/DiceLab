@@ -51,6 +51,14 @@ struct RollResultTests {
         #expect(RollResult(faces: [2, 5, 3]).total == 10)
         #expect(RollResult(faces: []).total == 0)
     }
+
+    @Test("equality is by outcome — id distinguishes events, not values")
+    func equalityByOutcome() {
+        #expect(RollResult(faces: [2, 5]) == RollResult(faces: [2, 5]))
+        #expect(RollResult(faces: [2, 5]) != RollResult(faces: [1, 5]))
+        // Distinct identities survive equal faces — history rows don't merge.
+        #expect(RollResult(faces: [3]).id != RollResult(faces: [3]).id)
+    }
 }
 
 struct PhysicsCategoryTests {
