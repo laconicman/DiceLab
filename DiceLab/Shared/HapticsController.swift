@@ -10,7 +10,11 @@ import CoreHaptics
 /// `AudioServicesPlaySystemSound(1103)` IDs.
 final class HapticsController {
     private var engine: CHHapticEngine?
-    /// nil = nothing played yet; otherwise the last tap's timestamp.
+    /// Which event kinds the hardware renders — iPads have no Taptic Engine
+    /// but can still play the audio knock, so the two are tracked apart.
+    private let capabilities: CHHapticDeviceCapability
+    /// Cooldown state — nil until the first tap so the first impact always
+    /// plays; afterwards `minInterval` gates how often taps can fire.
     private var lastPlay: ContinuousClock.Instant?
 
     /// Empirical ceiling for a mass-1 die hitting the table at full impulse —
@@ -27,9 +31,10 @@ final class HapticsController {
     static let intensityFloor: Float = 0.15
 
     init() {
-        // No engine on devices without a haptic interface (simulator, iPad) —
-        // `collision` then no-ops; callers don't need to care.
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        capabilities = CHHapticEngine.capabilitiesForHardware()
+        // No engine when the device renders neither event kind — `collision`
+        // then no-ops; callers don't need to care.
+        guard capabilities.supportsHaptics || capabilities.supportsAudio else { return }
         engine = try? CHHapticEngine()
         // The server can drop the engine on route changes (calls, headphones);
         // restart it rather than losing haptics for the session.
@@ -55,24 +60,32 @@ final class HapticsController {
         if let lastPlay, now - lastPlay < Self.minInterval { return }
         lastPlay = now
 
-        let haptic = CHHapticEvent(
-            eventType: .hapticTransient,
-            parameters: [
-                .init(parameterID: .hapticIntensity, value: intensity),
-                // Sharper for harder hits, but never softer than a tap.
-                .init(parameterID: .hapticSharpness, value: 0.3 + intensity * 0.5),
-            ],
-            relativeTime: 0)
-        let knock = CHHapticEvent(
-            eventType: .audioContinuous,
-            parameters: [
-                .init(parameterID: .audioVolume, value: intensity * 0.4),
-                .init(parameterID: .audioPitch, value: -0.2),
-                .init(parameterID: .decayTime, value: intensity * 0.15),
-                .init(parameterID: .sustained, value: 0),
-            ],
-            relativeTime: 0)
-        guard let pattern = try? CHHapticPattern(events: [haptic, knock],
+        var events: [CHHapticEvent] = []
+        if capabilities.supportsHaptics {
+            events.append(CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    .init(parameterID: .hapticIntensity, value: intensity),
+                    // Sharper for harder hits, but never softer than a tap.
+                    .init(parameterID: .hapticSharpness, value: 0.3 + intensity * 0.5),
+                ],
+                relativeTime: 0))
+        }
+        if capabilities.supportsAudio {
+            // Continuous events need an explicit duration — the no-duration
+            // initializer leaves the event zero-length, i.e. silent.
+            events.append(CHHapticEvent(
+                eventType: .audioContinuous,
+                parameters: [
+                    .init(parameterID: .audioVolume, value: intensity * 0.4),
+                    .init(parameterID: .audioPitch, value: -0.2),
+                    .init(parameterID: .decayTime, value: intensity * 0.15),
+                    .init(parameterID: .sustained, value: 0),
+                ],
+                relativeTime: 0,
+                duration: 0.2))
+        }
+        guard let pattern = try? CHHapticPattern(events: events,
                                                  parameters: []),
               let player = try? engine?.makePlayer(with: pattern) else { return }
         try? player.start(atTime: CHHapticTimeImmediate)
