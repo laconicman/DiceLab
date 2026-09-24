@@ -63,12 +63,21 @@ extension RealityTableController {
         static let dieMass: Float = 0.02   // kg — impulse tuning assumes it
     }
 
+    /// Friction/restitution pairs — named because they're the dials a device
+    /// tuning pass would reach for first (TD-6).
+    private enum PhysicsTune {
+        static let tableFriction: Float = 0.6
+        static let tableRestitution: Float = 0.3
+        static let dieFriction: Float = 0.4
+        static let dieRestitution: Float = 0.55
+    }
+
     /// Physics material shared by table and dice — the SceneKit scene's
     /// implicit defaults made explicit: grippy felt, lively dice.
     private static let tableMaterial = PhysicsMaterialResource.generate(
-        friction: 0.6, restitution: 0.3)
+        friction: PhysicsTune.tableFriction, restitution: PhysicsTune.tableRestitution)
     private static let dieMaterial = PhysicsMaterialResource.generate(
-        friction: 0.4, restitution: 0.55)
+        friction: PhysicsTune.dieFriction, restitution: PhysicsTune.dieRestitution)
 
     private func setUpTable() {
         // Visible felt: a thin box whose top face sits on floorY. SCNFloor's

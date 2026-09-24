@@ -9,7 +9,7 @@ import SwiftUI
 /// key the app root reads — `@AppStorage` is the shared slot.
 struct SettingsView<Table: DiceTable>: View {
     @Bindable var table: Table
-    @AppStorage("settings.engine") private var engine: DiceEngine = .sceneKit
+    @AppStorage(TableSettings.engine) private var engine: DiceEngine = .sceneKit
 
     var body: some View {
         NavigationStack {

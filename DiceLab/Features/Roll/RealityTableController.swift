@@ -53,50 +53,36 @@ final class RealityTableController: DiceTable {
     /// controller's lifetime.
     private var subscriptions: [EventSubscription] = []
 
-    // MARK: Settings — same keys as the SceneKit controller, deliberately:
-    // a setting is the user's choice about the *table*, not the engine —
-    // switching engines must not reset dice count or skin.
+    // MARK: Settings — the keys are shared with the SceneKit controller via
+    // `TableSettings`: a setting is the user's choice about the *table*, not
+    // the engine — switching engines must not reset dice count or skin.
 
     /// 1…6 dice on the table. Respawns the dice when changed.
-    var dieCount = RealityTableController.storedDieCount() {
+    var dieCount = TableSettings.storedDieCount() {
         didSet {
-            UserDefaults.standard.set(dieCount, forKey: Keys.dieCount)
+            UserDefaults.standard.set(dieCount, forKey: TableSettings.dieCount)
             guard dieCount != oldValue else { return }
             respawnDice()
         }
     }
 
-    var cameraControlEnabled = UserDefaults.standard.object(forKey: Keys.cameraControl) as? Bool ?? true {
-        didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: Keys.cameraControl) }
+    var cameraControlEnabled = UserDefaults.standard.object(forKey: TableSettings.cameraControl) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: TableSettings.cameraControl) }
     }
 
-    var hapticsEnabled = UserDefaults.standard.object(forKey: Keys.haptics) as? Bool ?? true {
+    var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
-            UserDefaults.standard.set(hapticsEnabled, forKey: Keys.haptics)
+            UserDefaults.standard.set(hapticsEnabled, forKey: TableSettings.haptics)
             haptics.isEnabled = hapticsEnabled
         }
     }
 
-    var skin = DieSkin(rawValue: UserDefaults.standard.string(forKey: Keys.skin) ?? "") ?? .ivory {
+    var skin = DieSkin(rawValue: UserDefaults.standard.string(forKey: TableSettings.skin) ?? "") ?? .ivory {
         didSet {
-            UserDefaults.standard.set(skin.rawValue, forKey: Keys.skin)
+            UserDefaults.standard.set(skin.rawValue, forKey: TableSettings.skin)
             guard skin != oldValue else { return }
             applySkin()
         }
-    }
-
-    private enum Keys {
-        static let dieCount = "settings.dieCount"
-        static let cameraControl = "settings.cameraControl"
-        static let haptics = "settings.haptics"
-        static let skin = "settings.skin"
-    }
-
-    /// UserDefaults returns 0 for a missing Int — distinguish "never set"
-    /// (default 3) from a stored value, then clamp into the supported range.
-    private static func storedDieCount() -> Int {
-        let raw = UserDefaults.standard.integer(forKey: Keys.dieCount)
-        return raw == 0 ? 3 : min(max(raw, 1), 6)
     }
 
     init() {
@@ -111,6 +97,11 @@ final class RealityTableController: DiceTable {
         // `.virtual` — render through our `PerspectiveCameraComponent` entity,
         // not the device camera (the world-tracking default would need AR).
         content.camera = .virtual
+        // A return to this engine runs populate again on a fresh content —
+        // drop the old view's subscriptions or they accumulate for the
+        // controller's lifetime.
+        subscriptions.forEach { $0.cancel() }
+        subscriptions.removeAll()
         content.add(root)
         subscriptions.append(content.subscribe(to: CollisionEvents.Began.self) { [haptics] event in
             // Same rule as the SceneKit path: read the impulse, hop to main.
@@ -122,9 +113,11 @@ final class RealityTableController: DiceTable {
         })
     }
 
-    /// Called from the view when `scenePhase` becomes `.active`.
+    /// Called from the view when `scenePhase` becomes `.active` — also
+    /// reloads settings the other engine may have written while inactive.
     func sceneActivated() {
         haptics.start()
+        reloadSettings()
     }
 
     /// Dice-count changes rebuild the dice — cheaper than diffing per-entity
