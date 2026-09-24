@@ -17,6 +17,8 @@
   comments explain *why* (learning project), not *what*.
 - Flag physics constants (impulse magnitudes, positions, sizes) written as
   inline literals under `DiceLab/Features/`; they belong as named constants.
+- Reject `import SceneKit`/`import RealityKit` under `DiceLab/Model/` — the
+  model layer staying engine-free is what made the M7 port a controller swap.
 
 ## Anti-patterns to Flag
 
