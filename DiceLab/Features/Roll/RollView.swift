@@ -44,11 +44,29 @@ struct RollView: View {
             .padding(.trailing, 12)
         }
         .overlay(alignment: .bottom) {
-            Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.bottom, 32)
+            VStack(spacing: 16) {
+                // Session history: last five settled rolls, newest first.
+                if !table.history.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(table.history.suffix(5).reversed()) { roll in
+                            Text(roll.faces.map(String.init).joined(separator: "+")
+                                 + "=\(roll.total)")
+                                .font(.caption.monospacedDigit())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.regularMaterial, in: .capsule)
+                        }
+                    }
+                }
+                Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+            }
+            .padding(.bottom, 32)
         }
+        // Shake-to-roll: an invisible first responder, because SwiftUI has
+        // no shake gesture — see ShakeDetector.
+        .background(ShakeDetector(onShake: table.roll))
         .sheet(isPresented: $showingSettings) { SettingsView() }
     }
 }
