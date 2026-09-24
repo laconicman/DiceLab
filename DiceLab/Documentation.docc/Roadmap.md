@@ -37,12 +37,13 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   migrates; `rollID` hardened to `Mutex` (contact/renderer read it
   off-main).
 
-## In flight
-
 - **M8c — Appearance editor.** `AppearanceEditor` with live per-engine die
-  preview (controller-owned preview worlds), edit-flips-to-custom binding,
-  felt `PhotosPicker`, lighting presets; `AVSpeechSynthesizer` speaks
-  settled results; `-appearanceeditor` dev flag for preview QA. (PR #10)
+  preview (controller-owned preview worlds whose lights share the table's
+  names, so the lighting picker previews lighting), edit-flips-to-custom
+  binding, felt `PhotosPicker` behind a generation counter for stale
+  imports, lighting presets; `AVSpeechSynthesizer` speaks settled results,
+  keyed on `lastRoll.id` so repeat outcomes still announce; `-appearanceeditor`
+  dev flag for preview QA. (PR #10)
 
 ## Next
 
