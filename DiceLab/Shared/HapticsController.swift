@@ -31,9 +31,11 @@ final class HapticsController {
     /// not an event.
     static let intensityFloor: Float = 0.15
 
-    /// The settings toggle's kill switch — gating here keeps the delegate
+    /// The settings toggles' kill switches — one per channel, so "no taps"
+    /// doesn't have to mean "silent". Gating here keeps the delegate
     /// callback dumb and the engine lifecycle untouched.
-    var isEnabled = true
+    var isHapticsEnabled = true
+    var isSoundEnabled = true
 
     init(maxImpulse: Float = 25) {
         self.maxImpulse = maxImpulse
@@ -60,15 +62,14 @@ final class HapticsController {
     /// One contact → at most one tap. Called on the main actor via the
     /// contact delegate's hop; `lastPlay` mutations stay serialized there.
     func collision(impulse: Float) {
-        guard isEnabled else { return }
+        guard isHapticsEnabled || isSoundEnabled else { return }
         let intensity = Self.normalizedIntensity(for: impulse, maxImpulse: maxImpulse)
         guard intensity > Self.intensityFloor else { return }
         let now = ContinuousClock.now
         if let lastPlay, now - lastPlay < Self.minInterval { return }
-        lastPlay = now
 
         var events: [CHHapticEvent] = []
-        if capabilities.supportsHaptics {
+        if capabilities.supportsHaptics && isHapticsEnabled {
             events.append(CHHapticEvent(
                 eventType: .hapticTransient,
                 parameters: [
@@ -78,7 +79,7 @@ final class HapticsController {
                 ],
                 relativeTime: 0))
         }
-        if capabilities.supportsAudio {
+        if capabilities.supportsAudio && isSoundEnabled {
             // Continuous events need an explicit duration — the no-duration
             // initializer leaves the event zero-length, i.e. silent.
             events.append(CHHapticEvent(
@@ -92,9 +93,14 @@ final class HapticsController {
                 relativeTime: 0,
                 duration: 0.2))
         }
-        guard let pattern = try? CHHapticPattern(events: events,
+        // A toggle can leave the pattern empty even when the capability is
+        // present (haptics off, audio unsupported, sound on → no events) —
+        // so the cooldown is only spent once a pattern actually plays.
+        guard !events.isEmpty,
+              let pattern = try? CHHapticPattern(events: events,
                                                  parameters: []),
               let player = try? engine?.makePlayer(with: pattern) else { return }
+        lastPlay = now
         try? player.start(atTime: CHHapticTimeImmediate)
     }
 

@@ -40,8 +40,15 @@ final class RealityTableController: DiceTable {
 
     /// Collision feel — `maxImpulse` rescales for meters: impulses are
     /// mass×velocity, and 20-gram dice move at m/s where SceneKit's mass-1
-    /// dice move at tens of units/s.
-    private let haptics = HapticsController(maxImpulse: 0.3)
+    /// dice move at tens of units/s. Measured via `-impulseLog` on the
+    /// tuned physics: contacts cluster ~0.03 N·s and peak ~0.17 — a 0.12
+    /// ceiling leaves hard hits near 1.0 and typical ones ~0.3.
+    private let haptics = HapticsController(maxImpulse: 0.12)
+
+    /// `-impulseLog` bookkeeping: impulses gathered during a roll, then
+    /// summarized at settle — the data a `maxImpulse` recalibration needs.
+    private var rollImpulses: [Float] = []
+    private var rollStartedAt: Date?
 
     /// Dice currently on the table — `ModelEntity` because the impulse
     /// methods live on `HasPhysicsBody`, which bare `Entity` lacks.
@@ -73,7 +80,17 @@ final class RealityTableController: DiceTable {
     var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(hapticsEnabled, forKey: TableSettings.haptics)
-            haptics.isEnabled = hapticsEnabled
+            haptics.isHapticsEnabled = hapticsEnabled
+        }
+    }
+
+    /// Gates the synthesized collision knock — a separate user choice from
+    /// haptics, and the only channel on hardware without a Taptic Engine.
+    /// Defaults from the legacy combined toggle via `storedSound()`.
+    var soundEnabled = TableSettings.storedSound() {
+        didSet {
+            UserDefaults.standard.set(soundEnabled, forKey: TableSettings.sound)
+            haptics.isSoundEnabled = soundEnabled
         }
     }
 
@@ -86,7 +103,8 @@ final class RealityTableController: DiceTable {
     }
 
     init() {
-        haptics.isEnabled = hapticsEnabled
+        haptics.isHapticsEnabled = hapticsEnabled
+        haptics.isSoundEnabled = soundEnabled
         setUpScene()
     }
 
@@ -103,9 +121,16 @@ final class RealityTableController: DiceTable {
         subscriptions.forEach { $0.cancel() }
         subscriptions.removeAll()
         content.add(root)
-        subscriptions.append(content.subscribe(to: CollisionEvents.Began.self) { [haptics] event in
+        subscriptions.append(content.subscribe(to: CollisionEvents.Began.self) { [haptics, weak self] event in
             // Same rule as the SceneKit path: read the impulse, hop to main.
-            Task { @MainActor in haptics.collision(impulse: event.impulse) }
+            Task { @MainActor in
+                // The roll gate keeps stragglers queued at settle out of
+                // the next roll's statistics.
+                if DevFlags.impulseLog, self?.isRolling == true {
+                    self?.rollImpulses.append(event.impulse)
+                }
+                haptics.collision(impulse: event.impulse)
+            }
         })
         subscriptions.append(content.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
             let generation = self?.rollID ?? 0
@@ -139,6 +164,10 @@ final class RealityTableController: DiceTable {
         rollID += 1
         steadyFrames = 0
         isRolling = true
+        if DevFlags.impulseLog {
+            rollImpulses = []
+            rollStartedAt = Date()
+        }
         for die in dice {
             // Clear momentum first: a re-throw is a fresh throw, not a
             // compounding of whatever the die was doing.
@@ -171,6 +200,17 @@ final class RealityTableController: DiceTable {
         history.append(result)
         if history.count > 20 { history.removeFirst() }
         isRolling = false
+        if let started = rollStartedAt { logImpulseSummary(since: started) }
+    }
+
+    /// The `-impulseLog` summary: one line per settled roll — enough to
+    /// pick `maxImpulse` from the observed ceiling instead of guessing.
+    private func logImpulseSummary(since start: Date) {
+        let elapsed = Date().timeIntervalSince(start)
+        let maxImpulse = rollImpulses.max() ?? 0
+        let mean = rollImpulses.isEmpty ? 0 : rollImpulses.reduce(0, +) / Float(rollImpulses.count)
+        print(String(format: "[DiceLab] settled %.2fs — %d contacts, impulse max %.3f mean %.3f N·s",
+                     elapsed, rollImpulses.count, maxImpulse, mean))
     }
 
     /// Velocity magnitudes under which a die counts as still — tuned for
@@ -183,12 +223,15 @@ final class RealityTableController: DiceTable {
         static let requiredFrames = 15
     }
 
-    /// Impulse magnitudes for a ~20 g die: J = m·v, so 0.03–0.05 N·s upward
-    /// is a 1.5–2.5 m/s toss — dice clear the table by a few body lengths.
+    /// Impulse magnitudes for a ~20 g die: J = m·v, so 0.07–0.12 N·s upward
+    /// is a 3.5–6 m/s toss. SceneKit gets its drama from `physicsWorld.speed
+    /// = 3` (a ~24 u/s impulse reads as ~72 u/s); RealityKit runs real-time,
+    /// so the velocity itself must carry the energy — dice pinball off the
+    /// walls and ceiling rather than hop in place.
     private enum Toss {
-        static let up: ClosedRange<Float> = 0.03...0.05
-        static let lateral: ClosedRange<Float> = -0.012...0.012
-        static let torque: ClosedRange<Float> = -0.0006...0.0006
+        static let up: ClosedRange<Float> = 0.07...0.12
+        static let lateral: ClosedRange<Float> = -0.045...0.045
+        static let torque: ClosedRange<Float> = -0.0015...0.0015
     }
 
     private static func randomLinearImpulse() -> SIMD3<Float> {

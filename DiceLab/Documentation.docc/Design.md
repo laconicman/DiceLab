@@ -72,10 +72,16 @@ old code carried:
   halved as a second line of defense.
 - **Impulses are randomized per die.** Burke applied the same fixed torque
   `(1, 2, -1, 1)` to every die, correlating their rolls.
-- **Haptics come from `collisionImpulse`, not `penetrationDistance`** — the
-  ancestors scaled feedback by overlap depth (a solver artifact); impulse in
-  N·s is the physics. `CHHapticEngine` also synthesizes the audio knock in
-  the same pattern, replacing undocumented `AudioServices` system-sound IDs.
+- **Haptics estimate impulse from closing speed.** `collisionImpulse` is
+  deprecated and returns 0 on current SDKs (measured: 121 contacts, all
+  zero) — the ancestors' `penetrationDistance` scaling now reads as a
+  workaround for this dead API. The estimate is |Δv·n|, the closing speed
+  along the contact normal read inside `didBegin` before the solver
+  resolves, scaled for mass-1 dice. RealityKit's `CollisionEvents.Began`
+  still reports a true impulse in N·s. `CHHapticEngine` synthesizes the
+  audio knock in the same pattern, replacing undocumented `AudioServices`
+  system-sound IDs — and haptic taps vs. knock are separate user toggles,
+  because hardware without a Taptic Engine can still play audio.
 
 ## Face textures are generated, and the mapping is measured
 
@@ -151,8 +157,13 @@ The port's real findings, SceneKit → RealityKit:
   it was the whole defense.
 - **Physics tuning never ports.** Meters vs SceneKit units (÷100), real-time
   gravity vs `physicsWorld.speed = 3`, gram-scale masses vs mass 1.0. The
-  impulse *shape* ported; every constant was re-tuned. Haptics needed a
-  per-engine `maxImpulse` (25 vs 0.3) — same normalization, different scale.
+  impulse *shape* ported; every constant was re-tuned — and re-tuned again
+  on device feedback: real-time gravity needs the velocity to carry the
+  drama (SceneKit's speed multiplier makes gentle impulses read violent), so
+  `Toss` roughly tripled and restitution/damping were made explicit. Measured
+  on simulator: ~2.2 s settle with ~48 contacts vs SceneKit's ~3.3 s. Haptics
+  needed a per-engine `maxImpulse` (15 vs 0.12 — picked from `-impulseLog`
+  output, which prints each roll's contact count and impulse max/mean).
 - **Impulses need `ModelEntity`.** `applyLinearImpulse`/`applyAngularImpulse`
   hang off `HasPhysicsBody` — bare `Entity` doesn't conform. In SceneKit any
   node takes a body; in ECS the *capability* is a type-level fact.
