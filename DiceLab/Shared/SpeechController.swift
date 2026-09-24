@@ -18,4 +18,10 @@ final class SpeechController {
         synthesizer.stopSpeaking(at: .immediate)
         synthesizer.speak(AVSpeechUtterance(string: Self.text(for: result)))
     }
+
+    /// The toggle going off mid-sentence should mean silence now, not
+    /// after the current utterance finishes.
+    func stop() {
+        synthesizer.stopSpeaking(at: .immediate)
+    }
 }

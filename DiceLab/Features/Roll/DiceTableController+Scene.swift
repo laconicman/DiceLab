@@ -21,7 +21,8 @@ extension DiceTableController {
         setUpPreview()
         // Dice and felt already read the stored appearance at build —
         // the lighting rig is the one piece that waits for this pass.
-        applyLighting(theme.appearance.lighting)
+        applyLighting(theme.appearance.lighting, in: scene.rootNode)
+        applyLighting(theme.appearance.lighting, in: previewScene.rootNode)
     }
 
     private func setUpCamera() {
@@ -176,14 +177,16 @@ extension DiceTableController {
                 (appearance.felt.usesImage ? FeltImageStore.load() : nil)
                 ?? appearance.felt.color.uiColor
         }
-        applyLighting(appearance.lighting)
+        applyLighting(appearance.lighting, in: scene.rootNode)
+        applyLighting(appearance.lighting, in: previewScene.rootNode)
     }
 
     /// One mood per preset — the SceneKit mapping is omni intensity,
-    /// shadow softness/darkness, and ambient fill level.
-    private func applyLighting(_ preset: LightingPreset) {
-        let key = scene.rootNode.childNode(withName: NodeName.keyLight, recursively: false)?.light
-        let fill = scene.rootNode.childNode(withName: NodeName.fillLight, recursively: false)?.light
+    /// shadow softness/darkness, and ambient fill level. Applies to any
+    /// root node holding named lights, so the preview honors the picker.
+    private func applyLighting(_ preset: LightingPreset, in rootNode: SCNNode) {
+        let key = rootNode.childNode(withName: NodeName.keyLight, recursively: false)?.light
+        let fill = rootNode.childNode(withName: NodeName.fillLight, recursively: false)?.light
         switch preset {
         case .studio:
             key?.intensity = 1000
@@ -203,33 +206,47 @@ extension DiceTableController {
         }
     }
 
+    /// The preview world's staging — die-scale, so `Bounds` doesn't apply.
+    private enum Preview {
+        static let cameraPosition = SCNVector3(x: 0, y: 2.4, z: 3.2)
+        static let keyPosition = SCNVector3(x: 0, y: 6, z: 4)
+        static let fillWhiteness: CGFloat = 0.4
+        static let spinX: CGFloat = 0.9
+        static let spinY: CGFloat = 1.6
+        static let spinDuration: TimeInterval = 3
+    }
+
     /// The appearance editor's live preview: one die, a camera, lights —
     /// and nothing else. Reuses `makeDie` minus its physics (a statue has
     /// no table to hit). The die spins on a mixed axis so every face reads.
+    /// Lights carry the table's names so `applyLighting` reaches them.
     private func setUpPreview() {
         let camera = SCNNode()
         camera.camera = SCNCamera()
-        camera.position = SCNVector3(x: 0, y: 2.4, z: 3.2)
+        camera.position = Preview.cameraPosition
         previewScene.rootNode.addChildNode(camera)
-        camera.look(at: SCNVector3(x: 0, y: 0, z: 0))
+        camera.look(at: SCNVector3Zero)
 
-        let die = Self.makeDie(at: SCNVector3(x: 0, y: 0, z: 0),
+        let die = Self.makeDie(at: SCNVector3Zero,
                                appearance: theme.appearance.die)
         die.physicsBody = nil
         die.runAction(SCNAction.repeatForever(
-            SCNAction.rotateBy(x: 0.9, y: 1.6, z: 0, duration: 3)))
+            SCNAction.rotateBy(x: Preview.spinX, y: Preview.spinY, z: 0,
+                               duration: Preview.spinDuration)))
         previewScene.rootNode.addChildNode(die)
         previewDie = die
 
         let key = SCNNode()
+        key.name = NodeName.keyLight
         key.light = SCNLight()
         key.light?.type = .omni
-        key.position = SCNVector3(x: 0, y: 6, z: 4)
+        key.position = Preview.keyPosition
         previewScene.rootNode.addChildNode(key)
         let fill = SCNNode()
+        fill.name = NodeName.fillLight
         fill.light = SCNLight()
         fill.light?.type = .ambient
-        fill.light?.color = UIColor(white: 0.4, alpha: 1)
+        fill.light?.color = UIColor(white: Preview.fillWhiteness, alpha: 1)
         previewScene.rootNode.addChildNode(fill)
     }
 

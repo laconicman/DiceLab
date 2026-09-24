@@ -47,9 +47,14 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             // Speech rides the published result, not the physics — the view
             // observes `lastRoll`, so the trigger is engine-free and the
             // controllers never hear about AVSpeechSynthesizer.
-            .onChange(of: table.lastRoll) { _, roll in
-                guard speechEnabled, let roll else { return }
+            // Keyed on `id`: RollResult equality compares faces, and two
+            // identical rolls are still two announcements.
+            .onChange(of: table.lastRoll?.id) { _, _ in
+                guard speechEnabled, let roll = table.lastRoll else { return }
                 speech.speak(roll)
+            }
+            .onChange(of: speechEnabled) { _, enabled in
+                if !enabled { speech.stop() }
             }
             .overlay(alignment: .top) {
                 if let roll = table.lastRoll {

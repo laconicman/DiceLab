@@ -54,8 +54,13 @@ struct AppearanceEditor<Table: DiceTable>: View {
                 }
                 if appearance.wrappedValue.felt.usesImage {
                     Button("Remove photo", role: .destructive) {
+                        // Clear the selection first — an in-flight import
+                        // checks it and must not resurrect the removed file.
+                        photoItem = nil
                         FeltImageStore.clear()
-                        appearance.wrappedValue.felt.usesImage = false
+                        var next = appearance.wrappedValue
+                        next.felt.usesImage = false
+                        appearance.wrappedValue = next
                     }
                 }
                 Picker("Lighting", selection: appearance.lighting) {
@@ -70,11 +75,17 @@ struct AppearanceEditor<Table: DiceTable>: View {
             Task {
                 guard let data = try? await item?.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else { return }
+                // The import is async — a Remove or a newer pick while it
+                // was in flight must win over the stale load.
+                guard item?.itemIdentifier == photoItem?.itemIdentifier else { return }
                 FeltImageStore.save(image)
-                appearance.wrappedValue.felt.usesImage = true
-                // Replacing a photo keeps `usesImage` true — the revision
-                // bump is what makes the theme differ and the felt reload.
-                appearance.wrappedValue.felt.revision += 1
+                // One write: usesImage + revision both flip — a replaced
+                // photo differs only by revision, and two writes would
+                // re-materialize the table twice for one pick.
+                var next = appearance.wrappedValue
+                next.felt.usesImage = true
+                next.felt.revision += 1
+                appearance.wrappedValue = next
             }
         }
     }
