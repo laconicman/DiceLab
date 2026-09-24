@@ -13,7 +13,7 @@ struct RollView: View {
         )
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
-            Button("Roll", action: table.roll)
+            Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .padding(.bottom, 32)
