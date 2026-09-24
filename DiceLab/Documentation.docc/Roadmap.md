@@ -16,16 +16,14 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   Swift Testing coverage on the pure math.
 - **M4 — Feel.** `CHHapticEngine` transients scaled by `collisionImpulse`;
   contact audio.
-
-## Now
-
 - **M5 — Looks.** Runtime-drawn pip face textures with geometry-derived
   material mapping, PBR materials, lighting/shadow tuning.
 
-## Next
+## Now
 
-- **M6 — App features.** Dice count, shake-to-roll, roll history, settings
-  (incl. camera-control decision and a die-skin switcher — the ancestors'
-  alternate skin goes here).
+- **M6 — App features.** Settings sheet (dice count, ivory/onyx skin,
+  haptics, camera-control — discharges TD-3), shake-to-roll, roll history.
+
+## Next
 - **M7 — RealityKit port.** `RealityView`, `PhysicsBodyComponent`/
   `CollisionComponent`; the comparative exercise that discharges `TD-1`.

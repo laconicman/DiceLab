@@ -86,3 +86,24 @@ authority. Textures are `UIGraphicsImageRenderer`-drawn pips — no assets.
   scope until PBR proves insufficient.
 - *Confirmed at runtime:* `SCNBox(chamferRadius:)` produces identical
   triangle layout, so the derivation survives the tumble-friendly chamfer.
+
+## Settings live in the controller, persisted by it
+
+M6 adds dice count, skin, haptics, and camera-control toggles. They live on
+`DiceTableController` — not `@AppStorage` in a view — because they shape the
+scene, which is controller state (same argument as scene ownership). Each
+is a stored property with `didSet`: persist to `UserDefaults`, apply to the
+world (`respawnDice`, `applySkin`, `haptics.isEnabled`). `SettingsView`
+binds through `@Bindable` and holds zero state itself. Two `@State`s exist,
+deliberately distinct kinds: `DiceLabApp.table` — app-root object ownership,
+Apple's documented pattern for keeping a reference type alive — and
+`RollView.showingSettings`, the textbook transient-UI case.
+
+- *Consequence:* changing `dieCount` rebuilds the dice. `respawnDice` bumps
+  `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
+  the discarded dice can never publish a result for dice that no longer
+  exist — the same stale-publish class Devin caught in M3, handled the
+  same way.
+- *TD-3 discharged:* camera control is now a user toggle, default on — this
+  is a learning toy, free orbiting is a feature until scripted camera work
+  arrives.

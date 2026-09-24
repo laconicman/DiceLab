@@ -9,6 +9,15 @@ import SceneKit
 /// vertex position is its outward normal. `DieFace.axes` stays the
 /// value↔axis authority; this file maps axis→material slot, so visible
 /// pips can never disagree with the reported face-up value.
+/// Dice looks — persisted via `rawValue` in settings. `ivory` is the
+/// classic casino die; `onyx` inverts it.
+enum DieSkin: String, CaseIterable {
+    case ivory, onyx
+
+    var faceColor: UIColor { self == .ivory ? UIColor(white: 0.96, alpha: 1) : UIColor(white: 0.10, alpha: 1) }
+    var pipColor: UIColor { self == .ivory ? .black : .white }
+}
+
 enum DieFaceTexture {
 
     /// Pip cells on a 3×3 grid, (column, row), (0,0) top-left. Pure data —
@@ -25,20 +34,24 @@ enum DieFaceTexture {
         }
     }
 
-    /// The six face images, drawn once — identical for every die, so
+    /// Six face images per skin, drawn once — identical for every die, so
     /// `materials(for:)` reuses them instead of re-rendering per spawn.
-    private static let faceImages: [UIImage] = (1...6).map { image(for: $0) }
+    private static let faceImages: [DieSkin: [UIImage]] =
+        Dictionary(uniqueKeysWithValues: DieSkin.allCases.map { skin in
+            (skin, (1...6).map { image(for: $0, skin: skin) })
+        })
 
-    /// Runtime-drawn face: opaque ivory + pips. The fill must be opaque —
+    /// Runtime-drawn face: opaque fill + pips. The fill must be opaque —
     /// transparent texture corners render as holes in the die face (the
     /// geometry's chamfer already provides the rounded look).
-    static func image(for value: Int, side: CGFloat = 256) -> UIImage {
+    static func image(for value: Int, skin: DieSkin = .ivory,
+                      side: CGFloat = 256) -> UIImage {
         let size = CGSize(width: side, height: side)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            UIColor(white: 0.96, alpha: 1).setFill()
+            skin.faceColor.setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
-            UIColor.black.setFill()
+            skin.pipColor.setFill()
             let margin = side * 0.24
             let step = (side - 2 * margin) / 2
             let radius = side * 0.085
@@ -53,11 +66,11 @@ enum DieFaceTexture {
 
     /// Six materials in the box's own material order — the assignment is
     /// derived from geometry, never assumed (see type docs).
-    static func materials(for box: SCNBox) -> [SCNMaterial] {
+    static func materials(for box: SCNBox, skin: DieSkin = .ivory) -> [SCNMaterial] {
         materialAxes(of: box).map { axis in
             let material = SCNMaterial()
             material.lightingModel = .physicallyBased
-            material.diffuse.contents = faceImages[value(on: axis) - 1]
+            material.diffuse.contents = faceImages[skin]?[value(on: axis) - 1]
             material.roughness.contents = NSNumber(0.35)
             material.metalness.contents = NSNumber(0)
             return material

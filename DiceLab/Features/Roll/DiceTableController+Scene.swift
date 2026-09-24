@@ -17,7 +17,7 @@ extension DiceTableController {
         setUpCamera()
         setUpLighting()
         setUpTable()
-        spawnDice(3)
+        spawnDice(dieCount)
     }
 
     private func setUpCamera() {
@@ -114,24 +114,48 @@ extension DiceTableController {
               at: SCNVector3(0, wallY, -Bounds.halfZ - Bounds.thickness / 2)) // −z wall
     }
 
-    private func spawnDice(_ count: Int) {
-        let positions: [SCNVector3] = [
-            SCNVector3(-4, 0, 0), SCNVector3(0, 0, 0), SCNVector3(4, 0, 0),
-        ]
-        for position in positions.prefix(count) {
-            let die = Self.makeDie(at: position)
+    /// Internal (not private) so the main file's `respawnDice` can rebuild —
+    /// scene construction lives here, roll-state bookkeeping lives there.
+    func spawnDice(_ count: Int) {
+        for position in Self.spawnPositions(count: count) {
+            let die = Self.makeDie(at: position, skin: skin)
             dice.append(die)
             scene.rootNode.addChildNode(die)
         }
     }
 
-    private static func makeDie(at position: SCNVector3) -> SCNNode {
+    /// Spawn geometry: dice spread across `span` units of table width,
+    /// never farther apart than `maxSpacing` (sparse sets stay clustered).
+    private enum Spawn {
+        static let span: Float = 16
+        static let maxSpacing: Float = 4.5
+    }
+
+    /// Spawn slots centered on the table midline, evenly spread across the
+    /// play volume's width. Static and pure so tests can pin the geometry.
+    static func spawnPositions(count: Int) -> [SCNVector3] {
+        guard count > 0 else { return [] }
+        let spacing = min(Spawn.maxSpacing, Spawn.span / Float(max(count - 1, 1)))
+        let first = -spacing * Float(count - 1) / 2
+        return (0..<count).map { SCNVector3(first + spacing * Float($0), 0, 0) }
+    }
+
+    /// Re-skins existing dice in place — the derived material mapping makes
+    /// the swap a straight reassignment.
+    func applySkin() {
+        for die in dice {
+            guard let box = die.geometry as? SCNBox else { continue }
+            box.materials = DieFaceTexture.materials(for: box, skin: skin)
+        }
+    }
+
+    private static func makeDie(at position: SCNVector3, skin: DieSkin) -> SCNNode {
         // Chamfered box: the rounded edge is what lets a die tumble instead of
         // sliding like a brick.
         let geometry = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
         // Pips are mapped to material slots by inspecting the box's own
         // geometry — never a hardcoded index order (see DieFaceTexture).
-        geometry.materials = DieFaceTexture.materials(for: geometry)
+        geometry.materials = DieFaceTexture.materials(for: geometry, skin: skin)
 
         let die = SCNNode(geometry: geometry)
         die.position = position
