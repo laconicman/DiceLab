@@ -5,11 +5,14 @@ import SwiftUI
 struct RollView: View {
     @Environment(DiceTableController.self) private var table
     @Environment(\.scenePhase) private var scenePhase
+    /// Transient UI state — the correct home for `@State`: its lifetime
+    /// *should* match this view's, unlike the scene (the Q2 lesson applied).
+    @State private var showingSettings = false
 
     var body: some View {
         SceneView(
             scene: table.scene,
-            options: [.allowsCameraControl],
+            options: table.cameraControlEnabled ? [.allowsCameraControl] : [],
             antialiasingMode: .multisampling4X,
             delegate: table
         )
@@ -30,12 +33,23 @@ struct RollView: View {
                     .padding(.top, 8)
             }
         }
+        .overlay(alignment: .topTrailing) {
+            Button { showingSettings = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.title3)
+                    .padding(10)
+                    .background(.regularMaterial, in: .circle)
+            }
+            .padding(.top, 8)
+            .padding(.trailing, 12)
+        }
         .overlay(alignment: .bottom) {
             Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .padding(.bottom, 32)
         }
+        .sheet(isPresented: $showingSettings) { SettingsView() }
     }
 }
 

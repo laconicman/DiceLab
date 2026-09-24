@@ -63,6 +63,21 @@ struct PhysicsCategoryTests {
     }
 }
 
+struct SpawnPositionTests {
+    @Test("N dice → N positions, centered on the table midline")
+    func countsAndSymmetry() {
+        #expect(DiceTableController.spawnPositions(count: 0).isEmpty)
+        for count in 1...6 {
+            let positions = DiceTableController.spawnPositions(count: count)
+            #expect(positions.count == count)
+            let xs = positions.map(\.x)
+            #expect(xs.first! == -xs.last!) // symmetric spread
+            // Die is 3 units wide; a centered die needs |x| ≤ 10 − 1.5.
+            #expect(xs.allSatisfy { abs($0) <= 8.5 })
+        }
+    }
+}
+
 struct HapticsTests {
     @Test("impulse normalizes into 0…1 and clamps at both ends")
     func intensityClamp() {

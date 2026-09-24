@@ -30,6 +30,10 @@ final class HapticsController {
     /// not an event.
     static let intensityFloor: Float = 0.15
 
+    /// The settings toggle's kill switch — gating here keeps the delegate
+    /// callback dumb and the engine lifecycle untouched.
+    var isEnabled = true
+
     init() {
         capabilities = CHHapticEngine.capabilitiesForHardware()
         // No engine when the device renders neither event kind — `collision`
@@ -54,6 +58,7 @@ final class HapticsController {
     /// One contact → at most one tap. Called on the main actor via the
     /// contact delegate's hop; `lastPlay` mutations stay serialized there.
     func collision(impulse: Float) {
+        guard isEnabled else { return }
         let intensity = Self.normalizedIntensity(for: impulse)
         guard intensity > Self.intensityFloor else { return }
         let now = ContinuousClock.now
