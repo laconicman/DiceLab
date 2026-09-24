@@ -39,7 +39,7 @@ extension DiceTable {
         dieCount = TableSettings.storedDieCount()
         cameraControlEnabled = defaults.object(forKey: TableSettings.cameraControl) as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
-        soundEnabled = defaults.object(forKey: TableSettings.sound) as? Bool ?? true
+        soundEnabled = TableSettings.storedSound()
         skin = DieSkin(rawValue: defaults.string(forKey: TableSettings.skin) ?? "") ?? .ivory
     }
 }
@@ -60,6 +60,14 @@ enum TableSettings {
     static func storedDieCount() -> Int {
         let raw = UserDefaults.standard.integer(forKey: dieCount)
         return raw == 0 ? 3 : min(max(raw, 1), 6)
+    }
+
+    /// Sound predates its own toggle: users who muted the old combined
+    /// "Haptics & sound" switch expect silence to carry forward, so the
+    /// haptics key is the honest default until `sound` has been written.
+    static func storedSound(defaults: UserDefaults = .standard) -> Bool {
+        if let stored = defaults.object(forKey: sound) as? Bool { return stored }
+        return defaults.object(forKey: haptics) as? Bool ?? true
     }
 }
 
