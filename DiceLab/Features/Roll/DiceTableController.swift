@@ -29,11 +29,61 @@ final class DiceTableController: NSObject {
     /// populate it during construction.
     var dice: [SCNNode] = []
 
+    // MARK: Settings — controller state because they shape the scene;
+    // persisted to UserDefaults so the table reopens the way it was left.
+
+    /// 1…6 dice on the table. Respawns the dice when changed.
+    var dieCount = DiceTableController.storedDieCount() {
+        didSet {
+            UserDefaults.standard.set(dieCount, forKey: Keys.dieCount)
+            guard dieCount != oldValue else { return }
+            respawnDice()
+        }
+    }
+
+    /// Free camera orbiting for debugging — the product tradeoff from TD-3
+    /// is resolved by exposing the choice instead of shipping it silently.
+    var cameraControlEnabled = UserDefaults.standard.object(forKey: Keys.cameraControl) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: Keys.cameraControl) }
+    }
+
+    /// Gates the haptic/audio knock — the engine exists either way.
+    var hapticsEnabled = UserDefaults.standard.object(forKey: Keys.haptics) as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(hapticsEnabled, forKey: Keys.haptics)
+            haptics.isEnabled = hapticsEnabled
+        }
+    }
+
+    /// Dice skin — re-textures the dice in place when changed.
+    var skin = DieSkin(rawValue: UserDefaults.standard.string(forKey: Keys.skin) ?? "") ?? .ivory {
+        didSet {
+            UserDefaults.standard.set(skin.rawValue, forKey: Keys.skin)
+            guard skin != oldValue else { return }
+            applySkin()
+        }
+    }
+
+    private enum Keys {
+        static let dieCount = "settings.dieCount"
+        static let cameraControl = "settings.cameraControl"
+        static let haptics = "settings.haptics"
+        static let skin = "settings.skin"
+    }
+
+    /// UserDefaults returns 0 for a missing Int — distinguish "never set"
+    /// (default 3) from a stored value, then clamp into the supported range.
+    private static func storedDieCount() -> Int {
+        let raw = UserDefaults.standard.integer(forKey: Keys.dieCount)
+        return raw == 0 ? 3 : min(max(raw, 1), 6)
+    }
+
     /// NSObject, because `SCNSceneRendererDelegate`/`SCNPhysicsContactDelegate`
     /// are `NSObjectProtocol`s — the price of the controller doubling as the
     /// renderer/physics delegate.
     override init() {
         super.init()
+        haptics.isEnabled = hapticsEnabled
         setUpScene()
     }
 
@@ -41,6 +91,17 @@ final class DiceTableController: NSObject {
     /// suspends the haptic engine in the background and never resumes it.
     func sceneActivated() {
         haptics.start()
+    }
+
+    /// Dice-count changes rebuild the dice — cheaper than juggling per-node
+    /// add/remove diffs for at most six nodes.
+    private func respawnDice() {
+        for die in dice { die.removeFromParentNode() }
+        dice = []
+        rollID += 1 // a settle queued for the old dice must not publish
+        isRolling = false
+        lastRoll = nil
+        spawnDice(dieCount)
     }
 
     /// Throws every die: a randomized torque impulse for spin plus an upward
