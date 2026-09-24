@@ -11,6 +11,9 @@ extension DiceTableController {
         // sub-stepping is the mitigation for fast dice tunneling.
         scene.physicsWorld.speed = 3
         scene.physicsWorld.timeStep = 1.0 / 120.0
+        // Contact callbacks → haptics (M4). Only the dice opted into
+        // contactTestBitMask, so every reported contact involves a die.
+        scene.physicsWorld.contactDelegate = self
         setUpCamera()
         setUpLighting()
         setUpTable()
