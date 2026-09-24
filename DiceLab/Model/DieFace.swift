@@ -3,9 +3,10 @@ import simd
 /// Which face of a d6 is up, as pure math — no SceneKit, so the M7 RealityKit
 /// port keeps it and tests run without a scene.
 enum DieFace {
-    /// Face values on the die's local axes; opposites sum to 7. The order
-    /// matches `SCNBox`'s material order [+X, −X, +Y, −Y, +Z, −Z], which is
-    /// what M5's face textures will map onto.
+    /// Face values on the die's local axes; opposites sum to 7. This table is
+    /// the value↔axis authority — `DieFaceTexture` maps pip textures onto
+    /// `SCNBox` material slots by deriving each slot's axis from geometry,
+    /// so this ordering is a convention, not a claim about SceneKit internals.
     static let axes: [(normal: SIMD3<Float>, value: Int)] = [
         (SIMD3(1, 0, 0), 1), (SIMD3(-1, 0, 0), 6),
         (SIMD3(0, 1, 0), 2), (SIMD3(0, -1, 0), 5),
