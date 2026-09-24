@@ -72,12 +72,16 @@ extension DiceTableController: SCNSceneRendererDelegate {
     /// Per-frame hook: publishes the result once every die is asleep.
     /// `isResting` is SceneKit's own settle signal — the ancestors polled
     /// velocity magnitudes by hand; Bullet already tracks that.
+    ///
+    /// The callback isn't documented as main-thread, and SwiftUI reads the
+    /// published state on main — so publishing hops to `MainActor`.
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
         guard isRolling else { return }
         guard dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
-        lastRoll = RollResult(
-            faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) }
-        )
-        isRolling = false
+        let faces = dice.map { DieFace.up(of: $0.presentation.simdOrientation) }
+        Task { @MainActor in
+            lastRoll = RollResult(faces: faces)
+            isRolling = false
+        }
     }
 }
