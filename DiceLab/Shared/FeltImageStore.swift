@@ -30,10 +30,20 @@ enum FeltImageStore {
 
 private extension UIImage {
     func scaled(toFit maxSide: CGFloat) -> UIImage {
-        let scale = min(1, maxSide / max(size.width, size.height))
+        // Measure pixels, not points: `size` is in points, so a 2×/3×
+        // source could exceed the pixel cap unseen.
+        let pixelSize = cgImage.map { CGSize(width: $0.width, height: $0.height) }
+            ?? CGSize(width: size.width * scale, height: size.height * scale)
+        let scale = min(1, maxSide / max(pixelSize.width, pixelSize.height))
         guard scale < 1 else { return self }
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        return UIGraphicsImageRenderer(size: newSize).image { _ in
+        let newSize = CGSize(width: pixelSize.width * scale,
+                             height: pixelSize.height * scale)
+        // scale = 1 makes renderer points == pixels — the device display
+        // scale can't re-inflate the output (a 1024-pt render at 3× would
+        // emit a 3072-px texture).
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: newSize, format: format).image { _ in
             draw(in: CGRect(origin: .zero, size: newSize))
         }
     }

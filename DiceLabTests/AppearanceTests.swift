@@ -65,6 +65,20 @@ struct AppearanceTests {
         #expect(ivoryFaces[0].pngData() != darkFaces[0].pngData())
     }
 
+    /// Payloads written before `revision` existed must still decode — a
+    /// stored custom theme that bounced to default would silently lose the
+    /// user's look on upgrade.
+    @Test("felt payloads without revision still decode")
+    func legacyFeltPayload() throws {
+        let json = #"{"custom":{"_0":{"die":{"faceColor":{"red":1,"green":1,"blue":1,"alpha":1},"pipColor":{"red":0,"green":0,"blue":0,"alpha":1},"roughness":0.35,"metalness":0,"clearcoat":0},"felt":{"color":{"red":0.05,"green":0.3,"blue":0.15,"alpha":1},"usesImage":true},"lighting":"studio"}}}"#
+        let theme = try JSONDecoder().decode(Theme.self, from: Data(json.utf8))
+        guard case .custom(let appearance) = theme else {
+            Issue.record("expected .custom, got \(theme)")
+            return
+        }
+        #expect(appearance.felt.usesImage && appearance.felt.revision == 0)
+    }
+
     /// Presets resolve to real appearances — the editor's pickers bind
     /// through `theme.appearance`, so a preset that returned nothing would
     /// blank the table.
