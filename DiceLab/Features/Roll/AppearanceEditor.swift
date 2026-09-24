@@ -16,6 +16,10 @@ struct AppearanceEditor<Table: DiceTable>: View {
     let preview: AnyView
 
     @State private var photoItem: PhotosPickerItem?
+    /// Same stale-event guard as the controllers' rollID: an async import
+    /// must not outlive the selection that started it. itemIdentifier can't
+    /// serve — identifier-less items all compare equal (nil == nil).
+    @State private var importGeneration = 0
 
     /// Writes through to `theme = .custom(...)`: presets are read-only
     /// templates, editing makes the theme custom automatically.
@@ -57,6 +61,7 @@ struct AppearanceEditor<Table: DiceTable>: View {
                         // Clear the selection first — an in-flight import
                         // checks it and must not resurrect the removed file.
                         photoItem = nil
+                        importGeneration += 1
                         FeltImageStore.clear()
                         var next = appearance.wrappedValue
                         next.felt.usesImage = false
@@ -72,12 +77,14 @@ struct AppearanceEditor<Table: DiceTable>: View {
         }
         .navigationTitle("Appearance")
         .onChange(of: photoItem) { _, item in
+            importGeneration += 1
+            let generation = importGeneration
             Task {
                 guard let data = try? await item?.loadTransferable(type: Data.self),
                       let image = UIImage(data: data) else { return }
                 // The import is async — a Remove or a newer pick while it
                 // was in flight must win over the stale load.
-                guard item?.itemIdentifier == photoItem?.itemIdentifier else { return }
+                guard generation == importGeneration else { return }
                 FeltImageStore.save(image)
                 // One write: usesImage + revision both flip — a replaced
                 // photo differs only by revision, and two writes would
