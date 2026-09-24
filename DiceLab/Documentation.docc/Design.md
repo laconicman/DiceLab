@@ -104,7 +104,7 @@ M6 adds dice count, skin, haptics, and camera-control toggles. They live on
 `DiceTableController` — not `@AppStorage` in a view — because they shape the
 scene, which is controller state (same argument as scene ownership). Each
 is a stored property with `didSet`: persist to `UserDefaults`, apply to the
-world (`respawnDice`, `applySkin`, `haptics.isEnabled`). `SettingsView`
+world (`respawnDice`, `applyAppearance`, haptic gates). `SettingsView`
 binds through `@Bindable` and holds zero state itself. State lives in
 deliberately distinct kinds: `DiceLabApp`'s `@State` controllers — app-root
 object ownership, Apple's documented pattern for keeping a reference type
@@ -119,6 +119,28 @@ and `RollScreen.showingSettings`, the textbook transient-UI `@State`.
 - *TD-3 discharged:* camera control is now a user toggle, default on — this
   is a learning toy, free orbiting is a feature until scripted camera work
   arrives.
+
+## Appearance is an engine-agnostic model, translated per engine
+
+M8 replaces the two-value `DieSkin` enum with `Theme`/`Appearance` in
+`Model/` — the `CubeMaterialSettings` idea (preset + custom themes holding
+die colors and a table surface) generalized to everything the finish
+channels can express: face/pip colors, roughness, metalness, clearcoat,
+felt color-or-photo, lighting preset. All of it is Codable value types with
+no framework colors (`CodableColor` bridges at the consumers), so `Model/`
+stays engine-free — the rule that made the M7 port a controller swap.
+
+Each controller translates the model into its own material vocabulary:
+`SCNMaterial` properties (`clearCoat` included — polished resin reads
+lacquered, not printed) vs `PhysicallyBasedMaterial` scalar parameters;
+`SCNFloor` diffuse vs the felt box's `baseColor`; omni/ambient intensities
+vs directional/point intensities. The *model* is identical; the *numbers*
+inside `applyLighting` never port, same lesson as physics constants.
+
+- **Migration:** `settings.skin` resolves once into the matching preset; the
+  richer `settings.theme` JSON wins thereafter.
+- **Editing semantics (legacy):** choosing a preset fills the fields;
+  touching any field flips the theme to `.custom` carrying a full copy.
 
 ## Shake-to-roll rides the responder chain
 

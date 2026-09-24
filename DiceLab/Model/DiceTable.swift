@@ -21,8 +21,10 @@ protocol DiceTable: AnyObject, Observable {
     var hapticsEnabled: Bool { get set }
     /// Gates the synthesized collision knock — independent of haptics.
     var soundEnabled: Bool { get set }
-    /// Dice skin.
-    var skin: DieSkin { get set }
+    /// The look of the table — preset or custom appearance. Replaces the
+    /// M6 `DieSkin` enum: a theme resolves to a full `Appearance` (colors,
+    /// finish, felt, lighting) that each engine translates its own way.
+    var theme: Theme { get set }
     /// Throws every die.
     func roll()
     /// Called when `scenePhase` becomes `.active` — restart suspended systems.
@@ -40,7 +42,7 @@ extension DiceTable {
         cameraControlEnabled = defaults.object(forKey: TableSettings.cameraControl) as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
         soundEnabled = TableSettings.storedSound()
-        skin = DieSkin(rawValue: defaults.string(forKey: TableSettings.skin) ?? "") ?? .ivory
+        theme = TableSettings.storedTheme()
     }
 }
 
@@ -53,12 +55,13 @@ enum TableSettings {
     static let haptics = "settings.haptics"
     static let sound = "settings.sound"
     static let skin = "settings.skin"
+    static let theme = "settings.theme"
     static let engine = "settings.engine"
 
     /// UserDefaults returns 0 for a missing Int — distinguish "never set"
     /// (default 3) from a stored value, then clamp into the supported range.
-    static func storedDieCount() -> Int {
-        let raw = UserDefaults.standard.integer(forKey: dieCount)
+    static func storedDieCount(defaults: UserDefaults = .standard) -> Int {
+        let raw = defaults.integer(forKey: dieCount)
         return raw == 0 ? 3 : min(max(raw, 1), 6)
     }
 
@@ -68,6 +71,21 @@ enum TableSettings {
     static func storedSound(defaults: UserDefaults = .standard) -> Bool {
         if let stored = defaults.object(forKey: sound) as? Bool { return stored }
         return defaults.object(forKey: haptics) as? Bool ?? true
+    }
+
+    /// The stored theme, or a migration from M6's `settings.skin` rawValue —
+    /// a user who picked onyx shouldn't lose it because the model got richer.
+    static func storedTheme(defaults: UserDefaults = .standard) -> Theme {
+        if let data = defaults.data(forKey: theme),
+           let stored = try? JSONDecoder().decode(Theme.self, from: data) {
+            return stored
+        }
+        if let raw = defaults.string(forKey: skin) { return raw == "onyx" ? .onyx : .ivory }
+        return .ivory
+    }
+
+    static func persist(_ theme: Theme, defaults: UserDefaults = .standard) {
+        defaults.set(try? JSONEncoder().encode(theme), forKey: TableSettings.theme)
     }
 }
 
