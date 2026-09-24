@@ -94,11 +94,13 @@ final class RealityTableController: DiceTable {
         }
     }
 
-    var skin = DieSkin(rawValue: UserDefaults.standard.string(forKey: TableSettings.skin) ?? "") ?? .ivory {
+    /// The table's look — preset theme or a custom appearance. Re-skins
+    /// dice, felt, and lighting in place when changed.
+    var theme = TableSettings.storedTheme() {
         didSet {
-            UserDefaults.standard.set(skin.rawValue, forKey: TableSettings.skin)
-            guard skin != oldValue else { return }
-            applySkin()
+            TableSettings.persist(theme)
+            guard theme != oldValue else { return }
+            applyAppearance()
         }
     }
 

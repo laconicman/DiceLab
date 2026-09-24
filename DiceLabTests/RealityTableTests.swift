@@ -7,7 +7,8 @@ import Testing
 /// the same isolation the controller declares.
 @MainActor
 struct RealityTableTests {
-    /// A `splitFaces` box gets one part per face; `materials(skin:)` maps each
+    /// A `splitFaces` box gets one part per face; `materials(appearance:)`
+    /// maps each
     /// part's material index to a face value via the part centroid. This test
     /// is the M7 counterpart of `materialAxesCoverAllFaces`: all six faces
     /// must be covered, exactly once.
@@ -30,7 +31,7 @@ struct RealityTableTests {
     /// would pass on the blank pre-allocated fallback.
     @Test("materials fills every slot the mesh expects, all textured")
     func materialsFillEverySlot() {
-        let materials = RealityTableController.materials(skin: .ivory)
+        let materials = RealityTableController.materials(appearance: Appearance.ivory.die)
         #expect(materials.count == RealityTableController.dieMesh.expectedMaterialCount)
         #expect(materials.allSatisfy {
             ($0 as? PhysicallyBasedMaterial)?.baseColor.texture != nil
