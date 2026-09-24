@@ -153,17 +153,18 @@ extension DiceTableController: SCNSceneRendererDelegate {
     /// published state on main — so publishing hops to `MainActor`.
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
         guard isRolling else { return }
-        guard dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
-        let faces = dice.map { DieFace.up(of: $0.presentation.simdOrientation) }
         let generation = rollID
         Task { @MainActor in
-            // Re-verify on main: a re-roll between the render-thread check and
-            // this task must not publish stale faces or clear the new roll's
-            // flag. The isResting re-check catches an impulse that already
-            // landed after the generation was captured.
+            // Everything dice-related happens here, not on the render
+            // thread: `respawnDice` mutates the array on main, so iterating
+            // it there would race. Re-verify inside the hop: a re-roll or
+            // respawn between capture and now must not publish stale faces
+            // or clear the new roll's flag — the generation guard covers
+            // invalidation, the isResting re-check covers an impulse that
+            // landed after it.
             guard isRolling, rollID == generation,
                   dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
-            lastRoll = RollResult(faces: faces)
+            lastRoll = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
             isRolling = false
         }
     }

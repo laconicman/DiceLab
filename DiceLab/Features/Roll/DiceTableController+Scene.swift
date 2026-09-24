@@ -124,11 +124,18 @@ extension DiceTableController {
         }
     }
 
+    /// Spawn geometry: dice spread across `span` units of table width,
+    /// never farther apart than `maxSpacing` (sparse sets stay clustered).
+    private enum Spawn {
+        static let span: Float = 16
+        static let maxSpacing: Float = 4.5
+    }
+
     /// Spawn slots centered on the table midline, evenly spread across the
     /// play volume's width. Static and pure so tests can pin the geometry.
     static func spawnPositions(count: Int) -> [SCNVector3] {
         guard count > 0 else { return [] }
-        let spacing = min(Float(4.5), Float(Bounds.halfX) * 1.6 / Float(max(count - 1, 1)))
+        let spacing = min(Spawn.maxSpacing, Spawn.span / Float(max(count - 1, 1)))
         let first = -spacing * Float(count - 1) / 2
         return (0..<count).map { SCNVector3(first + spacing * Float($0), 0, 0) }
     }

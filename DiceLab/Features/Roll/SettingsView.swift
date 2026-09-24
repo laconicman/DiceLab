@@ -20,7 +20,10 @@ struct SettingsView: View {
                     }
                 }
                 Section("Feel") {
-                    Toggle("Haptics", isOn: $table.hapticsEnabled)
+                    // One feedback channel: the toggle gates haptics *and*
+                    // the audio knock (they're events in the same pattern),
+                    // so the label says what it actually silences.
+                    Toggle("Haptics & sound", isOn: $table.hapticsEnabled)
                 }
                 Section("Debug") {
                     Toggle("Camera control", isOn: $table.cameraControlEnabled)

@@ -94,8 +94,10 @@ M6 adds dice count, skin, haptics, and camera-control toggles. They live on
 scene, which is controller state (same argument as scene ownership). Each
 is a stored property with `didSet`: persist to `UserDefaults`, apply to the
 world (`respawnDice`, `applySkin`, `haptics.isEnabled`). `SettingsView`
-binds through `@Bindable` and holds zero state itself; the only `@State` in
-the app is `showingSettings` — transient UI, the textbook case.
+binds through `@Bindable` and holds zero state itself. Two `@State`s exist,
+deliberately distinct kinds: `DiceLabApp.table` — app-root object ownership,
+Apple's documented pattern for keeping a reference type alive — and
+`RollView.showingSettings`, the textbook transient-UI case.
 
 - *Consequence:* changing `dieCount` rebuilds the dice. `respawnDice` bumps
   `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
