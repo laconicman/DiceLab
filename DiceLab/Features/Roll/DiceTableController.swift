@@ -33,6 +33,11 @@ final class DiceTableController {
     func roll() {
         isRolling = true
         for die in dice {
+            // Clear momentum first: a re-throw is a fresh throw, not a
+            // compounding of whatever the die was doing — and bounding the
+            // speed is what makes the 4-unit colliders' margin real.
+            die.physicsBody?.velocity = SCNVector3Zero
+            die.physicsBody?.angularVelocity = SCNVector4Zero
             die.physicsBody?.applyTorque(Self.randomTorque(), asImpulse: true)
             die.physicsBody?.applyForce(Self.randomForce(), asImpulse: true)
         }

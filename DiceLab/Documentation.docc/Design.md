@@ -56,11 +56,13 @@ old code carried:
   default body category. `PhysicsCategory` makes the three masks explicit.
 - **Walls are static, not kinematic.** Kinematic is for code-moved objects;
   static is the correct (and cheaper) type for immovable geometry.
-- **Bounds are thin boxes, not oriented planes.** The ancestors computed an
+- **Bounds are boxes, not oriented planes.** The ancestors computed an
   arbitrary-normal plane orientation via GLK matrices (`reposition`); our
-  bounds are axis-aligned, and a collider wants thickness anyway — SceneKit
-  exposes no per-body continuous collision detection, so a zero-thickness
-  plane risks tunneling at high impulse. Boxes kill the math and the risk at
-  once; `timeStep` is halved as a second line of defense.
+  bounds are axis-aligned, so `reposition`'s math earns nothing here. But a
+  box collider is finite where a plane is not: dice take ~24 units/s of
+  impulse (body mass is 1.0, measured), so bounds are 4 units thick
+  (`DiceTableController.Bounds`), and `roll()` clears velocity before each
+  impulse — bounded speed is what makes the margin real. `timeStep` is
+  halved as a second line of defense.
 - **Impulses are randomized per die.** Burke applied the same fixed torque
   `(1, 2, -1, 1)` to every die, correlating their rolls.
