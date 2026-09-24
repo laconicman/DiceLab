@@ -4,7 +4,12 @@ A 3D dice roller for iOS, rebuilt on a modern stack — a learning project.
 
 Descends from [profburke/DiceRollDemo](https://github.com/profburke/DiceRollDemo)
 (SceneKit, 2021) and its sibling rewrite `RollingDice`. This is a fresh start:
-SwiftUI shell, SceneKit physics, RealityKit port planned as a later milestone.
+SwiftUI shell over **two interchangeable engines** — SceneKit (scene graph)
+and RealityKit (ECS) — switchable in Settings, the M7 comparison exercise.
+
+## Requirements
+
+- iOS 18+ (the RealityKit engine needs `RealityView`)
 
 ## Requirements
 

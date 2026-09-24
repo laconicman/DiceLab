@@ -41,6 +41,12 @@ enum DieFaceTexture {
             (skin, (1...6).map { image(for: $0, skin: skin) })
         })
 
+    /// The cached six faces, 1…6 — the RealityKit path binds the same images
+    /// through `TextureResource`; generation stays in one place.
+    static func images(for skin: DieSkin) -> [UIImage] {
+        faceImages[skin] ?? []
+    }
+
     /// Runtime-drawn face: opaque fill + pips. The fill must be opaque —
     /// transparent texture corners render as holes in the die face (the
     /// geometry's chamfer already provides the rounded look).

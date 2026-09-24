@@ -18,12 +18,15 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   contact audio.
 - **M5 — Looks.** Runtime-drawn pip face textures with geometry-derived
   material mapping, PBR materials, lighting/shadow tuning.
-
-## Now
-
 - **M6 — App features.** Settings sheet (dice count, ivory/onyx skin,
   haptics, camera-control — discharges TD-3), shake-to-roll, roll history.
+- **M7 — RealityKit port.** `DiceTable` protocol, generic `RollScreen`
+  chrome, `RealityView` + `PhysicsBodyComponent`/`CollisionComponent`,
+  velocity-defined rest, per-body CCD; engine picker in settings.
+  Deployment floor moved to iOS 18 (`RealityView`); discharges `TD-1`.
 
 ## Next
-- **M7 — RealityKit port.** `RealityView`, `PhysicsBodyComponent`/
-  `CollisionComponent`; the comparative exercise that discharges `TD-1`.
+
+- Open learning surface: device-time haptic/tuning pass, scripted camera
+  moments (would revisit TD-3's default-on toggle), a second skin family,
+  or RealityKit-vs-SceneKit performance measurement.
