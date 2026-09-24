@@ -1,3 +1,4 @@
+import SceneKit
 import simd
 import Testing
 @testable import DiceLab
@@ -69,5 +70,36 @@ struct HapticsTests {
         #expect(HapticsController.normalizedIntensity(for: -5) == 0)
         #expect(HapticsController.normalizedIntensity(for: 100) == 1)
         #expect(HapticsController.normalizedIntensity(for: HapticsController.maxImpulse / 2) == 0.5)
+    }
+}
+
+/// The pip textures are drawn per material slot of `SCNBox`, but Apple never
+/// documents which slot is which face — `materialAxes` derives it from
+/// vertex data. These tests pin the derivation and the layout data itself.
+struct DieFaceTextureTests {
+    @Test("face value N draws exactly N pips, all inside the 3×3 grid")
+    func pipCounts() {
+        for value in 1...6 {
+            let pips = DieFaceTexture.pipLayout(for: value)
+            #expect(pips.count == value)
+            #expect(pips.allSatisfy { (0...2).contains($0.x) && (0...2).contains($0.y) })
+        }
+        #expect(DieFaceTexture.pipLayout(for: 0).isEmpty)
+        #expect(DieFaceTexture.pipLayout(for: 7).isEmpty)
+    }
+
+    @Test("an SCNBox's six material slots cover all six axes exactly once")
+    func materialAxesCoverAllFaces() {
+        let box = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
+        let axes = DieFaceTexture.materialAxes(of: box)
+        #expect(axes.count == 6)
+        #expect(Set(axes) == Set(DieFace.axes.map(\.normal)))
+    }
+
+    @Test("every derived material slot resolves to a face value 1…6")
+    func everySlotHasAValue() {
+        let box = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
+        let values = DieFaceTexture.materialAxes(of: box).map(DieFaceTexture.value(on:))
+        #expect(Set(values) == Set(1...6))
     }
 }

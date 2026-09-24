@@ -67,3 +67,22 @@ old code carried:
   halved as a second line of defense.
 - **Impulses are randomized per die.** Burke applied the same fixed torque
   `(1, 2, -1, 1)` to every die, correlating their rolls.
+- **Haptics come from `collisionImpulse`, not `penetrationDistance`** — the
+  ancestors scaled feedback by overlap depth (a solver artifact); impulse in
+  N·s is the physics. `CHHapticEngine` also synthesizes the audio knock in
+  the same pattern, replacing undocumented `AudioServices` system-sound IDs.
+
+## Face textures are generated, and the mapping is measured
+
+`SCNBox` exposes one geometry element; its six material slots map to
+contiguous triangle groups inside it — measured order `+Z, +X, −Z, −X, +Y,
+−Y`. `DieFaceTexture.materialAxes` derives each slot's face axis from vertex
+data (mean position = outward normal) rather than hardcoding that order, so
+the visible pips can never silently disagree with `DieFace`'s value↔axis
+authority. Textures are `UIGraphicsImageRenderer`-drawn pips — no assets.
+
+- *Deferred to M6:* the ancestors' alternate skin and a style switcher —
+  that is settings UI, not material work. `SCNShaderModifier` stays out of
+  scope until PBR proves insufficient.
+- *Confirmed at runtime:* `SCNBox(chamferRadius:)` produces identical
+  triangle layout, so the derivation survives the tumble-friendly chamfer.

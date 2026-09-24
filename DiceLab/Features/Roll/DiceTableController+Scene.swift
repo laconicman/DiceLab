@@ -30,11 +30,14 @@ extension DiceTableController {
     }
 
     private func setUpLighting() {
-        // Key light: one point source casting shadows.
+        // Key light: one point source casting soft shadows — shadowRadius
+        // blurs the shadow map at lookup, cheaper than a shadow map upscale.
         let key = SCNNode()
         key.light = SCNLight()
         key.light?.type = .omni
         key.light?.castsShadow = true
+        key.light?.shadowRadius = 6
+        key.light?.shadowColor = UIColor.black.withAlphaComponent(0.5)
         key.position = SCNVector3(x: 0, y: 20, z: 10)
         scene.rootNode.addChildNode(key)
 
@@ -42,8 +45,10 @@ extension DiceTableController {
         let fill = SCNNode()
         fill.light = SCNLight()
         fill.light?.type = .ambient
-        fill.light?.color = UIColor.darkGray
+        fill.light?.color = UIColor(white: 0.35, alpha: 1)
         scene.rootNode.addChildNode(fill)
+
+        scene.background.contents = UIColor.black
     }
 
     /// The box the dice play in: floor, four walls, ceiling. The table is a
@@ -62,8 +67,10 @@ extension DiceTableController {
 
     private func setUpTable() {
         let felt = SCNFloor()
-        felt.reflectivity = 0 // M5 decides between this and the grain texture
-        felt.firstMaterial?.diffuse.contents = UIColor.systemGreen
+        felt.reflectivity = 0 // TD-4: FloorPass warning is harmless at 0
+        felt.firstMaterial?.diffuse.contents = UIColor(red: 0.05, green: 0.30, blue: 0.15, alpha: 1)
+        felt.firstMaterial?.roughness.contents = NSNumber(1) // matte felt
+        felt.firstMaterial?.specular.contents = UIColor.black
         let floor = SCNNode(geometry: felt)
         floor.position.y = Bounds.floorY
         floor.physicsBody = .tableBody()
@@ -122,7 +129,9 @@ extension DiceTableController {
         // Chamfered box: the rounded edge is what lets a die tumble instead of
         // sliding like a brick.
         let geometry = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
-        geometry.firstMaterial?.diffuse.contents = UIColor.white
+        // Pips are mapped to material slots by inspecting the box's own
+        // geometry — never a hardcoded index order (see DieFaceTexture).
+        geometry.materials = DieFaceTexture.materials(for: geometry)
 
         let die = SCNNode(geometry: geometry)
         die.position = position
