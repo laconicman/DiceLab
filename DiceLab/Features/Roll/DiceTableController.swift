@@ -18,6 +18,11 @@ final class DiceTableController: NSObject {
     /// The last settled throw's outcome — `nil` until the first roll rests.
     private(set) var lastRoll: RollResult?
 
+    /// Settled rolls, oldest first, capped at 20 — a session record, not a
+    /// log. Cleared when the dice set changes (a result from another
+    /// configuration would be meaningless).
+    private(set) var history: [RollResult] = []
+
     /// Bumped per throw; the settle task compares against it so a re-roll
     /// can't be completed by the previous roll's queued publish.
     private var rollID = 0
@@ -101,6 +106,7 @@ final class DiceTableController: NSObject {
         rollID += 1 // a settle queued for the old dice must not publish
         isRolling = false
         lastRoll = nil
+        history = []
         spawnDice(dieCount)
     }
 
@@ -164,7 +170,10 @@ extension DiceTableController: SCNSceneRendererDelegate {
             // landed after it.
             guard isRolling, rollID == generation,
                   dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
-            lastRoll = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
+            let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
+            lastRoll = result
+            history.append(result)
+            if history.count > 20 { history.removeFirst() }
             isRolling = false
         }
     }
