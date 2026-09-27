@@ -73,6 +73,10 @@ enum TableSettings {
     /// as `@AppStorage` like `engine` — not on the controllers, which hold
     /// only settings that shape the scene.
     static let speech = "settings.speech"
+    /// History-panel visibility — the same class as `speech`: chrome
+    /// reading `history`, not a scene property, so `@AppStorage` on the
+    /// views carries it.
+    static let history = "settings.history"
     static let skin = "settings.skin"
     static let theme = "settings.theme"
     static let engine = "settings.engine"
