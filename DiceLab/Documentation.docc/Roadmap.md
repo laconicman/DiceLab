@@ -51,6 +51,18 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   `TextureResource.init(image:)` replaces the deprecated `generate(from:)`;
   default dice count 3→2 matching the legacy `NumberOfDice` default;
   settings-persistence audit tests. (PR #11)
+- **M9b — Camera fit.** Shared engine-free math in `Model/CameraFit.swift`
+  (bounding sphere → fit distance from FOV and viewport aspect); damped
+  per-frame glide toward one target that flips home↔fitted on a dice-speed
+  gate; `fitConverged` latch hands the camera back to orbit once the
+  settled pose arrives. Walls became faintly visible glass (legacy was
+  `.clear` — fully invisible). Hard-won RealityKit finding: gating
+  `realityViewCameraControls` on `isRolling` recreates `RealityView`
+  mid-roll and wedges the render graph — the orbit gate must stay static.
+  Review also caught: the distance cap must cover the *full* volume
+  diagonal (lopsided clusters center the sphere off-origin), the SceneKit
+  far plane needed raising past the retreat distance, and `dt` must be
+  capped for render pauses. Discharges TD-8, records TD-10. (PR #12)
 
 ## Planned — M9, device-feedback round
 
@@ -59,15 +71,6 @@ fitted on the dice after settling; backdrop is presets *plus* a user photo;
 emission is a full per-part editor; voice roll is deferred until after the
 string catalog exists.
 
-- **M9b — Camera fit.** Shared engine-free math in `Model/CameraFit.swift`
-  (bounding sphere → fit distance from FOV and viewport aspect);
-  damped per-frame glide toward one target that flips home↔fitted on a
-  dice-speed gate; `fitConverged` latch hands the camera back to orbit
-  once the settled pose arrives. Walls become faintly visible glass
-  (the legacy affordance was `.clear` — fully invisible). Hard-won
-  RealityKit finding: gating `realityViewCameraControls` on `isRolling`
-  recreates `RealityView` mid-roll and wedges the render graph — the
-  orbit gate must stay static. Discharges TD-8, records TD-10.
 - **M9c — History panel.** Optional via a persisted settings toggle;
   `.ultraThinMaterial` background; capped near a quarter of the screen;
   tap/drag to expand toward the safe area. Row-tint scaffolded (neutral
