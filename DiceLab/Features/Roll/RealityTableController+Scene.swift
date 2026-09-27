@@ -337,14 +337,22 @@ extension RealityTableController {
     /// An LDR photo still works as a probe source; it just lights without
     /// the over-range dynamic range a real .hdr environment carries.
     private func applyBackdrop(_ backdrop: BackdropAppearance) {
+        guard backdrop != appliedBackdrop else { return }
+        appliedBackdrop = backdrop
         backdropGeneration += 1
         let generation = backdropGeneration
         let dome = root.findEntity(named: EntityName.backdropDome)
-        let probe = root.findEntity(named: EntityName.iblProbe)
+        // The probe lives in both worlds — the preview die must answer to
+        // the same environment the table does.
+        let probes = [root, previewRoot].compactMap {
+            $0.findEntity(named: EntityName.iblProbe)
+        }
         guard let image = BackdropImage.resolve(backdrop),
               let cgImage = image.cgImage else {
             dome?.isEnabled = false
-            probe?.components.remove(VirtualEnvironmentProbeComponent.self)
+            for probe in probes {
+                probe.components.remove(VirtualEnvironmentProbeComponent.self)
+            }
             return
         }
         if let texture = try? TextureResource(
@@ -356,14 +364,25 @@ extension RealityTableController {
             dome?.isEnabled = true
         }
         Task {
-            guard let cube = try? await TextureResource(
-                    cubeFromEquirectangular: cgImage,
-                    options: .init(semantic: .color)),
-                  let environment = try? await EnvironmentResource(
-                    cube: cube, options: .init()) else { return }
+            var environment: EnvironmentResource?
+            if let cube = try? await TextureResource(
+                cubeFromEquirectangular: cgImage,
+                options: .init(semantic: .color)) {
+                environment = try? await EnvironmentResource(
+                    cube: cube, options: .init())
+            }
             guard generation == backdropGeneration else { return }
-            probe?.components.set(VirtualEnvironmentProbeComponent(
-                source: .single(.init(environment: environment))))
+            for probe in probes {
+                if let environment {
+                    probe.components.set(VirtualEnvironmentProbeComponent(
+                        source: .single(.init(environment: environment))))
+                } else {
+                    // Conversion failed — stale environment light is worse
+                    // than none; the analytic rig carries the scene.
+                    probe.components.remove(
+                        VirtualEnvironmentProbeComponent.self)
+                }
+            }
         }
     }
 
@@ -438,6 +457,12 @@ extension RealityTableController {
         fill.light.attenuationRadius = Preview.fillAttenuation
         fill.position = Preview.fillPosition
         previewRoot.addChild(fill)
+
+        // Same probe host as the table — `applyBackdrop` sets the shared
+        // environment on both, no dome needed in a one-die world.
+        let probe = Entity()
+        probe.name = EntityName.iblProbe
+        previewRoot.addChild(probe)
     }
 
     private static func makeDie(at position: SIMD3<Float>,

@@ -321,10 +321,17 @@ extension DiceTableController {
     /// worth of effect — the asymmetry is the M9d lesson, recorded in
     /// Design.md.
     private func applyBackdrop(_ backdrop: BackdropAppearance) {
+        guard backdrop != appliedBackdrop else { return }
+        appliedBackdrop = backdrop
         let image = BackdropImage.resolve(backdrop)
         scene.background.contents = image ?? UIColor.black
         scene.lightingEnvironment.contents = image
         scene.lightingEnvironment.intensity = CGFloat(BackdropIBL.intensity)
+        // The preview shows the same environment — the backdrop is
+        // lighting, so the die in the editor must answer to it too.
+        previewScene.background.contents = image ?? UIColor.black
+        previewScene.lightingEnvironment.contents = image
+        previewScene.lightingEnvironment.intensity = CGFloat(BackdropIBL.intensity)
     }
 
     /// Environment-light tuning for the backdrop channel. A plain photo is

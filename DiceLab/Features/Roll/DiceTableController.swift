@@ -58,6 +58,11 @@ final class DiceTableController: NSObject {
     private var rollImpulses: [Float] = []
     private var rollStartedAt: Date?
 
+    /// The last backdrop `applyBackdrop` rendered — `applyAppearance`
+    /// re-applies every channel on any edit, and a slider drag shouldn't
+    /// redraw the equirect gradient per tick.
+    var appliedBackdrop: BackdropAppearance?
+
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
