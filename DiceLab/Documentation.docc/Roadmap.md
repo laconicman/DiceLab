@@ -87,16 +87,15 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   failed conversion must drop the stale probe, the die preview needs the
   same environment, and backdrop rebuilds must dedupe. (PR #15)
 
-## Planned — M9, device-feedback round
-
-Decisions taken with the user after the first device session: camera stays
-fitted on the dice after settling; backdrop is presets *plus* a user photo;
-emission is a full per-part editor; voice roll is deferred until after the
-string catalog exists.
-
-- **M9e — Localization prep.** `.xcstrings` catalog, every user-facing
-  string extracted. Voice-roll ("Say roll!") is deliberately deferred —
-  mic permission + locale handling is a milestone of its own.
+- **M9e — Localization prep.** `Localizable.xcstrings` + compiler
+  extraction (`SWIFT_EMIT_LOC_STRINGS`/`LOCALIZATION_PREFERS_STRING_CATALOGS`
+  — XcodeGen emits neither). Literals extract for free; the diff routed
+  what the compiler can't see: runtime-built text took `String(localized:)`
+  dotted keys (banner/history equations, spoken result, dice-count
+  stepper), enum labels moved off `rawValue.capitalized` onto model
+  `title`s, `sliderRow` takes `LocalizedStringKey`. Speech localizes with
+  the UI; per-locale voice pinning stays with voice-roll. Verified
+  exhaustively: extracted keys ≡ catalog entries, both directions. (PR #17)
 
 ## Next
 
