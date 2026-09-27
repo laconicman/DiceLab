@@ -120,6 +120,8 @@ enum DiceEngine: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    /// Framework brand names — deliberately not localized; proper nouns
+    /// stay Latin across Apple's own translations.
     var title: String {
         switch self {
         case .sceneKit: "SceneKit"

@@ -110,14 +110,14 @@ struct AppearanceEditor<Table: DiceTable>: View {
                         }
                         Picker("Lighting", selection: appearance.lighting) {
                             ForEach(LightingPreset.allCases, id: \.self) {
-                                Text($0.rawValue.capitalized).tag($0)
+                                Text($0.title).tag($0)
                             }
                         }
                     }
                     Section {
                         Picker("Style", selection: backdropPreset) {
                             ForEach(BackdropPreset.allCases, id: \.self) {
-                                Text($0.rawValue.capitalized).tag($0)
+                                Text($0.title).tag($0)
                             }
                         }
                         PhotosPicker(selection: $backdropItem, matching: .images) {
@@ -204,7 +204,9 @@ struct AppearanceEditor<Table: DiceTable>: View {
                 set: { binding.wrappedValue = CodableColor($0) })
     }
 
-    private func sliderRow(_ title: String,
+    /// `LocalizedStringKey` so each call-site literal reaches the string
+    /// catalog; a `String` param would render verbatim and extract nothing.
+    private func sliderRow(_ title: LocalizedStringKey,
                            _ binding: Binding<Double>,
                            in range: ClosedRange<Double> = 0...1) -> some View {
         LabeledContent(title) {

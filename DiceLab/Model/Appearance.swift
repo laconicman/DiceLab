@@ -150,6 +150,17 @@ struct FeltAppearance: Codable, Equatable, Hashable {
 /// deep shadows.
 enum LightingPreset: String, Codable, CaseIterable, Hashable {
     case studio, soft, dramatic
+
+    /// Display name. `String(localized:)` is Foundation, so Model/ stays
+    /// engine-free; a `rawValue.capitalized` label couldn't reach the
+    /// string catalog at all.
+    var title: String {
+        switch self {
+        case .studio: String(localized: "Studio", comment: "Lighting preset name")
+        case .soft: String(localized: "Soft", comment: "Lighting preset name")
+        case .dramatic: String(localized: "Dramatic", comment: "Lighting preset name")
+        }
+    }
 }
 
 /// What surrounds the table. Presets are procedural gradients drawn at
@@ -158,6 +169,16 @@ enum LightingPreset: String, Codable, CaseIterable, Hashable {
 /// is lighting, not just wallpaper. `none` keeps the flat-black look.
 enum BackdropPreset: String, Codable, CaseIterable, Hashable {
     case none, graphite, dusk, ember
+
+    /// Display name — same catalog route as `LightingPreset.title`.
+    var title: String {
+        switch self {
+        case .none: String(localized: "None", comment: "Backdrop preset: no backdrop")
+        case .graphite: String(localized: "Graphite", comment: "Backdrop preset name")
+        case .dusk: String(localized: "Dusk", comment: "Backdrop preset name")
+        case .ember: String(localized: "Ember", comment: "Backdrop preset name")
+        }
+    }
 }
 
 /// The backdrop channel: a procedural preset, or a user photo kept on disk
