@@ -10,10 +10,18 @@ struct SceneKitRollView: View {
     var body: some View {
         RollScreen(table: table, scene: SceneView(
             scene: table.scene,
+            // Static on purpose: flipping this option mid-roll rebuilds
+            // the view, and the RealityKit twin wedges its render graph on
+            // that. Ownership is instead time-sliced by the fit itself —
+            // it stops writing once the settled pose converges.
             options: table.cameraControlEnabled ? [.allowsCameraControl] : [],
             antialiasingMode: .multisampling4X,
             delegate: table
-        ), preview: AnyView(SceneView(
+        )
+        // The fit's horizontal-FOV math needs the viewport shape.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width / $0.size.height }
+            action: { table.viewAspect = $0 },
+        preview: AnyView(SceneView(
             scene: table.previewScene,
             // The preview's spin is an SCNAction — continuous rendering
             // keeps it animating inside the settings sheet.

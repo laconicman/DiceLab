@@ -25,13 +25,107 @@ extension DiceTableController {
         applyLighting(theme.appearance.lighting, in: previewScene.rootNode)
     }
 
+    /// The camera's rest pose: 20 units up, tilted straight down, slightly
+    /// viewer-ward in z. `axis` is the direction fitting slides along —
+    /// straight up — so a fitted camera always looks directly at the
+    /// cluster centroid without ever re-aiming (fixed orientation, no
+    /// gimbal edge cases from `look(at:)` near vertical).
+    private enum CameraHome {
+        static let position = SIMD3<Float>(0, 20, 2)
+        static let axis = SIMD3<Float>(0, 1, 0)
+        /// Straight-down pose — the `rotation` vector at setup as a quat.
+        /// Damped back toward on every fitted frame so an orbit the user
+        /// took between rolls unwinds instead of lingering.
+        static let orientation = simd_quaternion(-Float.pi / 2,
+                                                 SIMD3<Float>(1, 0, 0))
+    }
+
+    /// Scripted-fit tuning (M9b). `speed` is the gate: above it dice are
+    /// flying and the camera holds home; below it the camera fits. In
+    /// SceneKit physics units — a fresh impulse is ~20 u/s, settle sits at
+    /// ~0, so anything under a few units/s means "final tumbling."
+    private enum Fit {
+        static let speed: Float = 4
+        /// Bounding-sphere breathing room: a die's half-diagonal (~2.6 for
+        /// the 3-unit box) plus margin so pips never kiss the frame edge.
+        static let padding: Float = 4
+        /// Never zoom closer than this — a single die shouldn't fill the
+        /// screen; and never farther than the ceiling allows.
+        static let minDistance: Float = 14
+        static let maxDistance: Float = 40
+        /// Exponential damp rate: ~99% converged in one second, and tracks
+        /// a moving target without animation restarts.
+        static let rate: Float = 5
+        /// Converged-pose epsilon — a fraction of a die's edge (3 units).
+        static let epsilon: Float = 0.05
+    }
+
+    /// Per-frame camera framing, called from the renderer hop. The target
+    /// flips between the home pose (dice flying, or nothing rolled yet)
+    /// and the fitted pose (dice slow or settled — the "stay fitted" end
+    /// state), and the damped position glides between them — the easing
+    /// chain emerges from the target selection, no explicit animations.
+    /// Once the fitted pose converges after a settle, `fitConverged`
+    /// latches and the fit stops writing — the orbit gesture is then free
+    /// instead of fighting a per-frame write.
+    func updateCameraFit(now: TimeInterval) {
+        guard cameraFitEnabled, !fitConverged,
+              let camera = cameraNode else { return }
+        let dt = lastFitTime.map { Float(now - $0) } ?? 0
+        lastFitTime = now
+
+        let positions = dice.map { $0.presentation.simdPosition }
+        let fastest = dice.compactMap { die -> Float? in
+            guard let v = die.physicsBody?.velocity else { return nil }
+            return simd_length(simd_float3(v))
+        }.max() ?? 0
+        let sphere = CameraFit.boundingSphere(of: positions, padding: Fit.padding)
+        let fov = camera.camera?.fieldOfView ?? 60
+        var distance = CameraFit.requiredDistance(
+            radius: sphere.radius,
+            verticalFieldOfView: Float(fov),
+            aspect: Float(viewAspect))
+        distance = min(max(distance, Fit.minDistance), Fit.maxDistance)
+        // Only reach for the cluster once the dice are nearly down; while
+        // they fly (or before the first roll) the target is simply home.
+        let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
+        let target = fitting
+            ? sphere.center + CameraHome.axis * distance
+            : CameraHome.position
+        // A NaN transform blanks the frame *permanently* — the damp can't
+        // recover because NaN + x = NaN. Snap back to sanity instead.
+        if !camera.simdPosition.x.isFinite {
+            camera.simdPosition = CameraHome.position
+        }
+        // Settled + arrived: snap the last fraction of a unit and hand the
+        // camera back to the user. Only when not rolling — dice may still
+        // drift while `isResting` hasn't flipped yet.
+        if !isRolling, fitting,
+           simd_distance(camera.simdPosition, target) < Fit.epsilon,
+           abs(simd_dot(camera.simdOrientation, CameraHome.orientation)) > 0.9999 {
+            camera.simdPosition = target
+            camera.simdOrientation = CameraHome.orientation
+            fitConverged = true
+            return
+        }
+        camera.simdPosition = CameraFit.damp(
+            camera.simdPosition, toward: target, rate: Fit.rate, dt: dt)
+        // Orientation is never the fit's knob — the axis is fixed — but
+        // the user may have orbited between rolls; ease that back too.
+        // `CameraFit.damp` guards the identical-quat NaN `simd_slerp` hits.
+        camera.simdOrientation = CameraFit.damp(
+            camera.simdOrientation, toward: CameraHome.orientation,
+            rate: Fit.rate, dt: dt)
+    }
+
     private func setUpCamera() {
         let camera = SCNNode()
         camera.camera = SCNCamera()
         // Top-down view onto the table: 20 units up, tilted straight down.
-        camera.position = SCNVector3(x: 0, y: 20, z: 2)
+        camera.position = SCNVector3(CameraHome.position)
         camera.rotation = SCNVector4(x: 1, y: 0, z: 0, w: -.pi / 2)
         scene.rootNode.addChildNode(camera)
+        cameraNode = camera
     }
 
     /// Nodes the appearance pass reaches for by name — the alternative is
@@ -115,8 +209,13 @@ extension DiceTableController {
         // measured), and a solver step can carry it ~1 unit — 4 units of
         // thickness is a margin, not a guarantee. What bounds the speed is
         // `roll()` clearing velocity before each impulse.
+        // Faintly visible on purpose — the legacy walls were `.clear`
+        // (fully invisible), but the user asked to *see* the bounds:
+        // a whisper of diffuse plus a specular sheen reads as glass,
+        // not fog.
         let wallMaterial = SCNMaterial()
-        wallMaterial.diffuse.contents = UIColor.systemGray.withAlphaComponent(0.15)
+        wallMaterial.diffuse.contents = UIColor.systemGray.withAlphaComponent(0.22)
+        wallMaterial.specular.contents = UIColor.white.withAlphaComponent(0.5)
 
         func bound(_ size: SCNVector3, at position: SCNVector3, hidden: Bool = false) {
             let node = SCNNode(geometry: SCNBox(

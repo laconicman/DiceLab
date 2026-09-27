@@ -117,8 +117,9 @@ and `RollScreen.showingSettings`, the textbook transient-UI `@State`.
   exist — the same stale-publish class Devin caught in M3, handled the
   same way.
 - *TD-3 discharged:* camera control is now a user toggle, default on — this
-  is a learning toy, free orbiting is a feature until scripted camera work
-  arrives.
+  is a learning toy, free orbiting is a feature. M9b's scripted fit shares
+  the camera with it by time-slicing, not by disabling the gesture (see
+  "Scripted camera fit").
 
 ## Appearance is an engine-agnostic model, translated per engine
 
@@ -232,6 +233,46 @@ The port's real findings, SceneKit → RealityKit:
 throw→settle→publish without manual tapping — on both engines the banner and
 history agree with the pips on the felt.
 
+## Scripted camera fit — M9b's moving lens
+
+Dice settling near the walls used to rest half-off-screen (TD-8). The fix
+reframes instead of widening the FOV — bigger FOV fits the bounds but
+shrinks the dice, and the dice are the content.
+
+- **Fit = translation + orientation recovery, never re-aiming.** The
+  camera slides along its fixed view axis to `centroid + axis·d` where
+  `d` comes from the cluster's bounding sphere and the smaller of the
+  vertical/horizontal half-FOVs (`Model/CameraFit.swift` — engine-free,
+  unit-tested; horizontal FOV is derived from the viewport aspect the
+  view feeds in). Orientation damps back to the captured home pose, so
+  a between-rolls orbit unwinds on the next roll — without `lookAt`,
+  which has a gimbal edge looking straight down.
+- **One damped target, no animation phases.** Per frame the target flips:
+  dice fast → home pose; dice slow or settled → fitted pose; next roll →
+  home again. An exponential damp toward the moving target turns those
+  flips into the "one animation eases into another" the ask described —
+  there is no animation object at all.
+- **`fitConverged` latches.** Once the settled pose is within epsilon
+  *and* `isRolling` cleared (dice may still drift under the settle gate),
+  the fit snaps the remainder and stops writing — the camera belongs to
+  the user's orbit until `roll()` or a dice respawn clears the latch.
+  Without the latch every orbit gesture would fight a per-frame write.
+- **Do not gate the scene view on `isRolling`.** Flipping
+  `realityViewCameraControls` (or `SceneView`'s `options`) mid-roll
+  rebuilds the view — and `RealityView` wedges its render graph on
+  rebuild mid-render (`Requested framebuffer 1 is invalid`, permanent
+  blank; TD-10). `SceneView` survives it, but both engines keep the gate
+  static for symmetry: ownership is time-sliced inside the controllers.
+- **NaN transforms are unrecoverable.** `simd_slerp` between identical
+  quaternions divides by `sin(0)` → NaN orientation → blank frame
+  *forever* (NaN+x=NaN). `CameraFit.damp` short-circuits identical quats,
+  and both engines snap a non-finite camera back to the home pose. A
+  0/0 viewport aspect is guarded the same way.
+- **Walls became visible.** The legacy bounds were `.clear` — fully
+  invisible. Now: faint translucent `SCNMaterial` on SceneKit, unlit
+  translucent panels flush on the colliders' inner faces on RealityKit.
+  Both read as a glass box; the ceiling stays invisible either way.
+
 ## Roll history is a session record, not a log
 
 `history` holds the last 20 `RollResult`s (cleared when `dieCount` changes —
@@ -245,8 +286,8 @@ identity — identical totals are still distinct rolls.
   choice of which controller exists. Plus two `@State` controllers — the
   documented Apple pattern for root-owned reference objects.
 - Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
-  `camera`) — controller `didSet` → `UserDefaults`, shared keys across
-  engines.
+  `cameraControl`, `cameraFit`) — controller `didSet` → `UserDefaults`,
+  shared keys across engines.
 - `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
   view-layer feedback reads a view-layer key (same slot as `engine`).
 - `RollScreen.showingSettings` — `@State`, the textbook transient case.
