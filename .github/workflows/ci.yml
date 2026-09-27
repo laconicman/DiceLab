@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+
+      - name: Validate REVIEW.md
+        run: python3 scripts/check_review_md.py REVIEW.md --repo-root .
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Test on iOS Simulator
+        run: |
+          DEST=$(xcrun simctl list devices available -j | python3 -c '
+            import json, sys
+            devices = json.load(sys.stdin)["devices"]
+            phones = sorted({d["name"] for rt in devices for d in devices[rt]
+                             if d["name"].startswith("iPhone")})
+            print(phones[-1])')
+          echo "Destination: $DEST"
+          xcodebuild -project DiceLab.xcodeproj -scheme DiceLab \
+            -destination "platform=iOS Simulator,name=$DEST" test
