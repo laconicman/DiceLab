@@ -63,6 +63,13 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   diagonal (lopsided clusters center the sphere off-origin), the SceneKit
   far plane needed raising past the retreat distance, and `dt` must be
   capped for render pauses. Discharges TD-8, records TD-10. (PR #12)
+- **M9c — History panel + sheet anatomy.** `.ultraThinMaterial` panel
+  replaces the chip strip: quarter-screen collapsed, tap-to-expand toward
+  the safe area, `settings.history` toggle, `rowTint` scaffold for future
+  per-player colors. Sheet detents (`.medium`/`.large`) moved onto the
+  `.sheet` itself; the editor's preview is pinned above the form — the
+  device log's `Picker: invalid selection` spam was also fixed here
+  (`Theme.Kind`, a payload-free selection). (PR #13)
 
 ## Planned — M9, device-feedback round
 
@@ -71,15 +78,12 @@ fitted on the dice after settling; backdrop is presets *plus* a user photo;
 emission is a full per-part editor; voice roll is deferred until after the
 string catalog exists.
 
-- **M9c — History panel.** Optional via a persisted settings toggle;
-  `.ultraThinMaterial` background; capped near a quarter of the screen;
-  tap/drag to expand toward the safe area. Row-tint scaffolded (neutral
-  default) for future per-player colors.
 - **M9d — Appearance II.** Editor hides material controls unless the theme
-  is `.custom`; sheet detents; per-part emission (face color+intensity and
-  pip color+intensity — "glowing pips" and "glowing body, dark pips" are
-  both expressible); backdrop channel with procedural presets and an
-  optional photo. On RealityKit the backdrop doubles as the IBL source —
+  is `.custom` (detents already shipped in M9c); per-part emission (face
+  color+intensity and pip color+intensity — "glowing pips" and "glowing
+  body, dark pips" are both expressible); backdrop channel with procedural
+  presets and an optional photo. On RealityKit the backdrop doubles as
+  the IBL source —
   the real fix for the flat plastic look: `PhysicallyBasedMaterial` was
   designed to be lit by an environment, not two analytic lights.
 - **M9e — Localization prep.** `.xcstrings` catalog, every user-facing
