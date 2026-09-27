@@ -42,11 +42,24 @@ struct RealityRollView: View {
             table.populate(&content)
         }
         // Orbit gestures when the setting is on; no modifier when off —
-        // `CameraControls` isn't an OptionSet, so there's no `.none` to pass.
+        // `CameraControls` isn't an OptionSet, so there's no `.none` to
+        // pass. The gate must NOT key on `isRolling`: flipping the branch
+        // rebuilds `RealityView`, and a mid-roll rebuild wedges the render
+        // graph (framebuffer errors, blank view). Fit/orbit ownership is
+        // time-sliced inside the controller instead (`fitConverged`).
         if table.cameraControlEnabled {
-            view.realityViewCameraControls(.orbit)
+            aspectFeed(view.realityViewCameraControls(.orbit))
         } else {
-            view
+            aspectFeed(view)
         }
+    }
+
+    /// The fit's horizontal-FOV math needs the viewport shape — applied
+    /// via a helper because the orbit-gated and plain branches are
+    /// different view types.
+    private func aspectFeed(_ content: some View) -> some View {
+        content.onGeometryChange(for: CGFloat.self) {
+            $0.size.width / $0.size.height
+        } action: { table.viewAspect = $0 }
     }
 }

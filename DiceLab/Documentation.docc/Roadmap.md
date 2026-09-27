@@ -44,6 +44,13 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   imports, lighting presets; `AVSpeechSynthesizer` speaks settled results,
   keyed on `lastRoll.id` so repeat outcomes still announce; `-appearanceeditor`
   dev flag for preview QA. (PR #10)
+- **M9a — Hygiene.** `SCNFloor`→box (the FloorPass spams every frame even
+  at `reflectivity = 0`, and the box gives the felt a real UV surface);
+  `DiceTable` gains `@MainActor` (discharges TD-9 — a non-isolated
+  protocol can't be safely witnessed by actor-isolated classes);
+  `TextureResource.init(image:)` replaces the deprecated `generate(from:)`;
+  default dice count 3→2 matching the legacy `NumberOfDice` default;
+  settings-persistence audit tests. (PR #11)
 
 ## Planned — M9, device-feedback round
 
@@ -52,16 +59,15 @@ fitted on the dice after settling; backdrop is presets *plus* a user photo;
 emission is a full per-part editor; voice roll is deferred until after the
 string catalog exists.
 
-- **M9a — Hygiene.** `SCNFloor`→plane (the FloorPass spams every frame even
-  at `reflectivity = 0`, and a plane gives the felt a real UV for texture
-  work); `DiceTable` gains `@MainActor` (discharges TD-9 — a non-isolated
-  protocol can't be safely witnessed by actor-isolated classes);
-  `TextureResource.init(image:)` replaces the deprecated `generate(from:)`;
-  default dice count 3→2; settings-persistence audit.
-- **M9b — Camera fit.** Dice below a speed threshold → ease the camera to
-  fit all dice in frame; settle → snug framing on the result (it *is* the
-  point of interest); next `roll()` eases back to wide. Plus faint
-  transparent walls — the legacy affordance that makes bounds legible.
+- **M9b — Camera fit.** Shared engine-free math in `Model/CameraFit.swift`
+  (bounding sphere → fit distance from FOV and viewport aspect);
+  damped per-frame glide toward one target that flips home↔fitted on a
+  dice-speed gate; `fitConverged` latch hands the camera back to orbit
+  once the settled pose arrives. Walls become faintly visible glass
+  (the legacy affordance was `.clear` — fully invisible). Hard-won
+  RealityKit finding: gating `realityViewCameraControls` on `isRolling`
+  recreates `RealityView` mid-roll and wedges the render graph — the
+  orbit gate must stay static. Discharges TD-8, records TD-10.
 - **M9c — History panel.** Optional via a persisted settings toggle;
   `.ultraThinMaterial` background; capped near a quarter of the screen;
   tap/drag to expand toward the safe area. Row-tint scaffolded (neutral

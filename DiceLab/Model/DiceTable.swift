@@ -19,8 +19,16 @@ protocol DiceTable: AnyObject, Observable {
     var history: [RollResult] { get }
     /// 1…6 dice on the table; respawns the dice when changed.
     var dieCount: Int { get set }
-    /// Free camera orbiting, exposed to the user.
+    /// Free camera orbiting, exposed to the user. Stays attached even
+    /// during a roll — suppressing it would mean rebuilding the scene view
+    /// mid-render, which wedges RealityKit's render graph (TD-10). The fit
+    /// owns the camera while writing and hands it back once the settled
+    /// pose converges.
     var cameraControlEnabled: Bool { get set }
+    /// Scripted framing (M9b): as dice slow, the camera eases along its
+    /// fixed view axis until every die is in frame, holds the fitted pose
+    /// after settle, and eases home on the next throw.
+    var cameraFitEnabled: Bool { get set }
     /// Gates haptic taps — independent of sound since the two are
     /// separate user choices about feedback, not one feature.
     var hapticsEnabled: Bool { get set }
@@ -45,6 +53,7 @@ extension DiceTable {
         let defaults = UserDefaults.standard
         dieCount = TableSettings.storedDieCount()
         cameraControlEnabled = defaults.object(forKey: TableSettings.cameraControl) as? Bool ?? true
+        cameraFitEnabled = defaults.object(forKey: TableSettings.cameraFit) as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
         soundEnabled = TableSettings.storedSound()
         theme = TableSettings.storedTheme()
@@ -57,6 +66,7 @@ extension DiceTable {
 enum TableSettings {
     static let dieCount = "settings.dieCount"
     static let cameraControl = "settings.cameraControl"
+    static let cameraFit = "settings.cameraFit"
     static let haptics = "settings.haptics"
     static let sound = "settings.sound"
     /// Speech is view-layer feedback (it observes `lastRoll`), so it lives
