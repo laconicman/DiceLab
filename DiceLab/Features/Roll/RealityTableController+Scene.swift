@@ -25,6 +25,7 @@ extension RealityTableController {
         // the lighting rig is the one piece that waits for this pass.
         applyLighting(theme.appearance.lighting, in: root)
         applyLighting(theme.appearance.lighting, in: previewRoot)
+        applyBackdrop(theme.appearance.backdrop)
     }
 
     /// The camera's rest pose (meters). `axis` — the direction fitting
@@ -130,11 +131,13 @@ extension RealityTableController {
 
     /// Entities the appearance pass reaches for by name — the alternative
     /// is stored refs on the main class, and a name is honest enough for
-    /// three fixed entities.
+    /// five fixed entities.
     private enum EntityName {
         static let felt = "felt"
         static let keyLight = "keyLight"
         static let fillLight = "fillLight"
+        static let backdropDome = "backdropDome"
+        static let iblProbe = "iblProbe"
     }
 
     private func setUpLighting() {
@@ -253,6 +256,34 @@ extension RealityTableController {
         pane([0.001, wallHeight, 2 * Bounds.halfZ], at: [-Bounds.halfX, wallY, 0])
         pane([2 * Bounds.halfX, wallHeight, 0.001], at: [0, wallY, Bounds.halfZ])
         pane([2 * Bounds.halfX, wallHeight, 0.001], at: [0, wallY, -Bounds.halfZ])
+
+        // The visible backdrop is geometry, not a scene property — iOS
+        // RealityKit has no `scene.background` (that's SceneKit's
+        // convenience). An inside-out unlit sphere plays skybox: front-face
+        // culling leaves the inward surfaces, no winding-flip scale needed.
+        // Radius keeps the camera (max retreat < 1 m) and its far plane
+        // (10 m) comfortably inside. Disabled until a backdrop applies.
+        var domeMaterial = UnlitMaterial(color: .black)
+        domeMaterial.faceCulling = .front
+        let dome = ModelEntity(
+            mesh: .generateSphere(radius: Backdrop.domeRadius),
+            materials: [domeMaterial])
+        dome.name = EntityName.backdropDome
+        dome.isEnabled = false
+        root.addChild(dome)
+
+        // The IBL probe's host — an inert entity `applyBackdrop` sets and
+        // removes `VirtualEnvironmentProbeComponent` on. A component, not a
+        // light: physics is a component, lighting influence is too.
+        let probe = Entity()
+        probe.name = EntityName.iblProbe
+        root.addChild(probe)
+    }
+
+    /// Backdrop staging constants — the dome is big enough to read as
+    /// "the room," small enough to stay inside the 10 m far plane.
+    private enum Backdrop {
+        static let domeRadius: Float = 4
     }
 
     /// Spawn geometry in meters — same spread rule as SceneKit, scaled ÷100.
@@ -294,6 +325,65 @@ extension RealityTableController {
         }
         applyLighting(appearance.lighting, in: root)
         applyLighting(appearance.lighting, in: previewRoot)
+        applyBackdrop(appearance.backdrop)
+    }
+
+    /// The same image does backdrop double duty, the RealityKit way: the
+    /// *visible* backdrop is the dome's unlit texture, and the *lighting*
+    /// backdrop is a `VirtualEnvironmentProbeComponent` built async
+    /// (equirect → cube `TextureResource` → `EnvironmentResource` → probe).
+    /// SceneKit did both in two scene-property lines — here the visible
+    /// part is geometry and the lighting part is a generated component.
+    /// An LDR photo still works as a probe source; it just lights without
+    /// the over-range dynamic range a real .hdr environment carries.
+    private func applyBackdrop(_ backdrop: BackdropAppearance) {
+        guard backdrop != appliedBackdrop else { return }
+        appliedBackdrop = backdrop
+        backdropGeneration += 1
+        let generation = backdropGeneration
+        let dome = root.findEntity(named: EntityName.backdropDome)
+        // The probe lives in both worlds — the preview die must answer to
+        // the same environment the table does.
+        let probes = [root, previewRoot].compactMap {
+            $0.findEntity(named: EntityName.iblProbe)
+        }
+        guard let image = BackdropImage.resolve(backdrop),
+              let cgImage = image.cgImage else {
+            dome?.isEnabled = false
+            for probe in probes {
+                probe.components.remove(VirtualEnvironmentProbeComponent.self)
+            }
+            return
+        }
+        if let texture = try? TextureResource(
+            image: cgImage, options: .init(semantic: .color)) {
+            var material = UnlitMaterial()
+            material.color = .init(tint: .white, texture: .init(texture))
+            material.faceCulling = .front
+            dome?.components[ModelComponent.self]?.materials = [material]
+            dome?.isEnabled = true
+        }
+        Task {
+            var environment: EnvironmentResource?
+            if let cube = try? await TextureResource(
+                cubeFromEquirectangular: cgImage,
+                options: .init(semantic: .color)) {
+                environment = try? await EnvironmentResource(
+                    cube: cube, options: .init())
+            }
+            guard generation == backdropGeneration else { return }
+            for probe in probes {
+                if let environment {
+                    probe.components.set(VirtualEnvironmentProbeComponent(
+                        source: .single(.init(environment: environment))))
+                } else {
+                    // Conversion failed — stale environment light is worse
+                    // than none; the analytic rig carries the scene.
+                    probe.components.remove(
+                        VirtualEnvironmentProbeComponent.self)
+                }
+            }
+        }
     }
 
     /// One mood per preset — RealityKit's mapping is key/fill intensity.
@@ -312,7 +402,7 @@ extension RealityTableController {
     /// falls back to the flat color rather than a broken texture.
     private static func feltMaterial(for felt: FeltAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
-        if felt.usesImage, let cgImage = FeltImageStore.load()?.cgImage,
+        if felt.usesImage, let cgImage = UserImageStore.felt.load()?.cgImage,
            let texture = try? TextureResource(
                image: cgImage, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white, texture: .init(texture))
@@ -367,6 +457,12 @@ extension RealityTableController {
         fill.light.attenuationRadius = Preview.fillAttenuation
         fill.position = Preview.fillPosition
         previewRoot.addChild(fill)
+
+        // Same probe host as the table — `applyBackdrop` sets the shared
+        // environment on both, no dome needed in a one-die world.
+        let probe = Entity()
+        probe.name = EntityName.iblProbe
+        previewRoot.addChild(probe)
     }
 
     private static func makeDie(at position: SIMD3<Float>,
@@ -431,6 +527,18 @@ extension RealityTableController {
         material.roughness = .init(floatLiteral: Float(appearance.roughness))
         material.metallic = .init(floatLiteral: Float(appearance.metalness))
         material.clearcoat = .init(floatLiteral: Float(appearance.clearcoat))
+        // Emission is a texture here too, with `emissiveIntensity` carrying
+        // the peak — the same split as the SceneKit `emission` channel.
+        // The color parameter must stay unset: a non-black `EmissiveColor`
+        // color adds a flat wash on top of the texture rather than tinting
+        // it (verified on-device — `color: .white` whites out the face).
+        if let emissionImages = DieFaceTexture.emissionImages(for: appearance),
+           let cgImage = emissionImages[value - 1].cgImage,
+           let texture = try? TextureResource(
+               image: cgImage, options: .init(semantic: .color)) {
+            material.emissiveColor = .init(texture: .init(texture))
+            material.emissiveIntensity = Float(appearance.emission.intensity)
+        }
         return material
     }
 
