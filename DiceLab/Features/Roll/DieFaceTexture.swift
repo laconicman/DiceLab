@@ -38,36 +38,54 @@ enum DieFaceTexture {
     /// per spawn.
     private static var faceImageCache: [Ink: [UIImage]] = [:]
 
-    /// The cached six faces, 1…6 — the RealityKit path binds the same images
-    /// through `TextureResource`; generation stays in one place.
-    static func images(for appearance: DieAppearance) -> [UIImage] {
-        let key = Ink(face: appearance.faceColor, pip: appearance.pipColor)
+    /// The cached six faces, 1…6, keyed by ink alone — the diffuse and
+    /// emission channels both draw through here; a packed-emission ink that
+    /// happens to match a diffuse ink shares the same images.
+    static func images(face: CodableColor, pip: CodableColor) -> [UIImage] {
+        let key = Ink(face: face, pip: pip)
         if let cached = faceImageCache[key] { return cached }
         // Color sliders mint a key per sampled value — a long edit session
         // could grow the map without limit, so it resets past 16 entries.
         if faceImageCache.count >= 16 { faceImageCache.removeAll(keepingCapacity: false) }
-        let drawn = (1...6).map { image(for: $0, appearance: appearance) }
+        let drawn = (1...6).map { image(for: $0, face: face, pip: pip) }
         faceImageCache[key] = drawn
         return drawn
+    }
+
+    /// The diffuse channel — the RealityKit path binds the same images
+    /// through `TextureResource`; generation stays in one place.
+    static func images(for appearance: DieAppearance) -> [UIImage] {
+        images(face: appearance.faceColor, pip: appearance.pipColor)
+    }
+
+    /// The emission channel as images, or nil when nothing emits: the
+    /// packed colors put each part's *share of the peak* in the texture so
+    /// the material's scalar intensity can carry the magnitude (see
+    /// `EmissionAppearance`). `peak == 0` means "leave emission off" — no
+    /// black textures need drawing.
+    static func emissionImages(for appearance: DieAppearance) -> [UIImage]? {
+        let emission = appearance.emission
+        guard emission.peak > 0 else { return nil }
+        return images(face: emission.packedFace, pip: emission.packedPips)
     }
 
     /// Runtime-drawn face: opaque fill + pips. The fill must be opaque —
     /// transparent texture corners render as holes in the die face (the
     /// geometry's chamfer already provides the rounded look).
-    static func image(for value: Int, appearance: DieAppearance = Appearance.ivory.die,
+    static func image(for value: Int, face: CodableColor, pip: CodableColor,
                       side: CGFloat = 256) -> UIImage {
         let size = CGSize(width: side, height: side)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            appearance.faceColor.uiColor.setFill()
+            face.uiColor.setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
-            appearance.pipColor.uiColor.setFill()
+            pip.uiColor.setFill()
             let margin = side * 0.24
             let step = (side - 2 * margin) / 2
             let radius = side * 0.085
-            for pip in pipLayout(for: value) {
-                let center = CGPoint(x: margin + step * CGFloat(pip.x),
-                                     y: margin + step * CGFloat(pip.y))
+            for cell in pipLayout(for: value) {
+                let center = CGPoint(x: margin + step * CGFloat(cell.x),
+                                     y: margin + step * CGFloat(cell.y))
                 UIBezierPath(ovalIn: CGRect(x: center.x - radius, y: center.y - radius,
                                             width: radius * 2, height: radius * 2)).fill()
             }
@@ -77,10 +95,14 @@ enum DieFaceTexture {
     /// Six materials in the box's own material order — the assignment is
     /// derived from geometry, never assumed (see type docs). Finish channels
     /// come from the appearance: `clearCoat` is the lacquer layer that makes
-    /// a die read as polished resin instead of printed cardboard.
+    /// a die read as polished resin instead of printed cardboard. Emission
+    /// is a second texture, not a flat color: `emission.intensity` carries
+    /// the peak while the texture holds the face-vs-pip ratio, which is the
+    /// only way "glowing pips, dark body" fits one emission channel.
     static func materials(for box: SCNBox,
                           appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {
         let images = images(for: appearance)
+        let emissionImages = emissionImages(for: appearance)
         return materialAxes(of: box).map { axis in
             let material = SCNMaterial()
             material.lightingModel = .physicallyBased
@@ -88,6 +110,10 @@ enum DieFaceTexture {
             material.roughness.contents = NSNumber(value: appearance.roughness)
             material.metalness.contents = NSNumber(value: appearance.metalness)
             material.clearCoat.contents = NSNumber(value: appearance.clearcoat)
+            if let emissionImages {
+                material.emission.contents = emissionImages[value(on: axis) - 1]
+                material.emission.intensity = CGFloat(appearance.emission.intensity)
+            }
             return material
         }
     }

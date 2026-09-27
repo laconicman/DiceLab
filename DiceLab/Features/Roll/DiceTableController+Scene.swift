@@ -23,6 +23,7 @@ extension DiceTableController {
         // the lighting rig is the one piece that waits for this pass.
         applyLighting(theme.appearance.lighting, in: scene.rootNode)
         applyLighting(theme.appearance.lighting, in: previewScene.rootNode)
+        applyBackdrop(theme.appearance.backdrop)
     }
 
     /// The camera's rest pose: 20 units up, tilted straight down, slightly
@@ -177,8 +178,6 @@ extension DiceTableController {
         fill.light?.type = .ambient
         fill.light?.color = UIColor(white: 0.35, alpha: 1)
         scene.rootNode.addChildNode(fill)
-
-        scene.background.contents = UIColor.black
     }
 
     /// The box the dice play in: floor, four walls, ceiling. The table is a
@@ -203,7 +202,7 @@ extension DiceTableController {
         let feltMaterial = SCNMaterial()
         let feltAppearance = theme.appearance.felt
         feltMaterial.diffuse.contents =
-            (feltAppearance.usesImage ? FeltImageStore.load() : nil)
+            (feltAppearance.usesImage ? UserImageStore.felt.load() : nil)
             ?? feltAppearance.color.uiColor
         feltMaterial.roughness.contents = NSNumber(1) // matte felt
         feltMaterial.specular.contents = UIColor.black
@@ -305,11 +304,33 @@ extension DiceTableController {
         }
         if let floor = scene.rootNode.childNode(withName: NodeName.felt, recursively: false) {
             floor.geometry?.firstMaterial?.diffuse.contents =
-                (appearance.felt.usesImage ? FeltImageStore.load() : nil)
+                (appearance.felt.usesImage ? UserImageStore.felt.load() : nil)
                 ?? appearance.felt.color.uiColor
         }
         applyLighting(appearance.lighting, in: scene.rootNode)
         applyLighting(appearance.lighting, in: previewScene.rootNode)
+        applyBackdrop(appearance.backdrop)
+    }
+
+    /// SceneKit's backdrop is two scene properties, and the same image
+    /// serves both: `background` is the visible backdrop, and
+    /// `lightingEnvironment` accepts the *same LDR image* as an IBL source
+    /// (it would take an .hdr for true HDR probes, but LDR is legal — the
+    /// light just lacks over-range dynamic range). RealityKit needs a dome
+    /// mesh and an async EnvironmentResource build for the same two lines'
+    /// worth of effect — the asymmetry is the M9d lesson, recorded in
+    /// Design.md.
+    private func applyBackdrop(_ backdrop: BackdropAppearance) {
+        let image = BackdropImage.resolve(backdrop)
+        scene.background.contents = image ?? UIColor.black
+        scene.lightingEnvironment.contents = image
+        scene.lightingEnvironment.intensity = CGFloat(BackdropIBL.intensity)
+    }
+
+    /// Environment-light tuning for the backdrop channel. A plain photo is
+    /// LDR, so modest intensity — the analytic lights still carry the mood.
+    private enum BackdropIBL {
+        static let intensity: Double = 1.0
     }
 
     /// One mood per preset — the SceneKit mapping is omni intensity,

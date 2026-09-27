@@ -20,6 +20,10 @@ struct AppearanceEditor<Table: DiceTable>: View {
     /// must not outlive the selection that started it. itemIdentifier can't
     /// serve — identifier-less items all compare equal (nil == nil).
     @State private var importGeneration = 0
+    /// The backdrop channel gets its own picker state — one counter per
+    /// channel, so a felt import in flight can't cancel a backdrop pick.
+    @State private var backdropItem: PhotosPickerItem?
+    @State private var backdropImportGeneration = 0
 
     /// Writes through to `theme = .custom(...)`: presets are read-only
     /// templates, editing makes the theme custom automatically.
@@ -50,41 +54,89 @@ struct AppearanceEditor<Table: DiceTable>: View {
             preview
                 .frame(height: 140)
             Form {
-                Section("Theme") {
+                Section {
                     Picker("Preset", selection: themeKind) {
                         Text("Ivory").tag(Theme.Kind.ivory)
                         Text("Onyx").tag(Theme.Kind.onyx)
                         Text("Custom").tag(Theme.Kind.custom)
                     }
-                }
-                Section("Die") {
-                    ColorPicker("Face", selection: color(appearance.die.faceColor))
-                    ColorPicker("Pips", selection: color(appearance.die.pipColor))
-                    sliderRow("Roughness", appearance.die.roughness)
-                    sliderRow("Metalness", appearance.die.metalness)
-                    sliderRow("Clearcoat", appearance.die.clearcoat)
-                }
-                Section("Table") {
-                    ColorPicker("Felt color", selection: color(appearance.felt.color))
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        Label("Use photo as felt", systemImage: "photo")
+                } header: {
+                    Text("Theme")
+                } footer: {
+                    // M9d: presets are sealed looks — the dials only exist
+                    // under .custom, so a slider can't silently mutate
+                    // "Ivory". Choosing Custom snapshots the preset's
+                    // fields, and *then* editing is safe.
+                    if table.theme.kind != .custom {
+                        Text("Presets are sealed looks — choose Custom to edit materials.")
                     }
-                    if appearance.wrappedValue.felt.usesImage {
-                        Button("Remove photo", role: .destructive) {
-                            // Clear the selection first — an in-flight import
-                            // checks it and must not resurrect the removed file.
-                            photoItem = nil
-                            importGeneration += 1
-                            FeltImageStore.clear()
-                            var next = appearance.wrappedValue
-                            next.felt.usesImage = false
-                            appearance.wrappedValue = next
+                }
+                if table.theme.kind == .custom {
+                    Section("Die") {
+                        ColorPicker("Face", selection: color(appearance.die.faceColor))
+                        ColorPicker("Pips", selection: color(appearance.die.pipColor))
+                        sliderRow("Roughness", appearance.die.roughness)
+                        sliderRow("Metalness", appearance.die.metalness)
+                        sliderRow("Clearcoat", appearance.die.clearcoat)
+                    }
+                    Section("Emission") {
+                        ColorPicker("Face glow",
+                                    selection: color(appearance.die.emission.faceColor))
+                        sliderRow("Face intensity",
+                                  appearance.die.emission.faceIntensity,
+                                  in: 0...EmissionAppearance.maxIntensity)
+                        ColorPicker("Pip glow",
+                                    selection: color(appearance.die.emission.pipColor))
+                        sliderRow("Pip intensity",
+                                  appearance.die.emission.pipIntensity,
+                                  in: 0...EmissionAppearance.maxIntensity)
+                    }
+                    Section("Table") {
+                        ColorPicker("Felt color", selection: color(appearance.felt.color))
+                        PhotosPicker(selection: $photoItem, matching: .images) {
+                            Label("Use photo as felt", systemImage: "photo")
+                        }
+                        if appearance.wrappedValue.felt.usesImage {
+                            Button("Remove photo", role: .destructive) {
+                                // Clear the selection first — an in-flight import
+                                // checks it and must not resurrect the removed file.
+                                photoItem = nil
+                                importGeneration += 1
+                                UserImageStore.felt.clear()
+                                var next = appearance.wrappedValue
+                                next.felt.usesImage = false
+                                appearance.wrappedValue = next
+                            }
+                        }
+                        Picker("Lighting", selection: appearance.lighting) {
+                            ForEach(LightingPreset.allCases, id: \.self) {
+                                Text($0.rawValue.capitalized).tag($0)
+                            }
                         }
                     }
-                    Picker("Lighting", selection: appearance.lighting) {
-                        ForEach(LightingPreset.allCases, id: \.self) {
-                            Text($0.rawValue.capitalized).tag($0)
+                    Section {
+                        Picker("Style", selection: appearance.backdrop.preset) {
+                            ForEach(BackdropPreset.allCases, id: \.self) {
+                                Text($0.rawValue.capitalized).tag($0)
+                            }
                         }
+                        PhotosPicker(selection: $backdropItem, matching: .images) {
+                            Label("Use photo as backdrop", systemImage: "photo")
+                        }
+                        if appearance.wrappedValue.backdrop.usesImage {
+                            Button("Remove backdrop photo", role: .destructive) {
+                                backdropItem = nil
+                                backdropImportGeneration += 1
+                                UserImageStore.backdrop.clear()
+                                var next = appearance.wrappedValue
+                                next.backdrop.usesImage = false
+                                appearance.wrappedValue = next
+                            }
+                        }
+                    } header: {
+                        Text("Backdrop")
+                    } footer: {
+                        Text("The backdrop doubles as the scene's light source where the engine supports image-based lighting.")
                     }
                 }
             }
@@ -93,21 +145,39 @@ struct AppearanceEditor<Table: DiceTable>: View {
         .onChange(of: photoItem) { _, item in
             importGeneration += 1
             let generation = importGeneration
-            Task {
-                guard let data = try? await item?.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data) else { return }
-                // The import is async — a Remove or a newer pick while it
-                // was in flight must win over the stale load.
-                guard generation == importGeneration else { return }
-                FeltImageStore.save(image)
-                // One write: usesImage + revision both flip — a replaced
-                // photo differs only by revision, and two writes would
-                // re-materialize the table twice for one pick.
-                var next = appearance.wrappedValue
-                next.felt.usesImage = true
-                next.felt.revision += 1
-                appearance.wrappedValue = next
+            importPhoto(item, into: .felt, isCurrent: { generation == importGeneration }) {
+                $0.felt.usesImage = true
+                $0.felt.revision += 1
             }
+        }
+        .onChange(of: backdropItem) { _, item in
+            backdropImportGeneration += 1
+            let generation = backdropImportGeneration
+            importPhoto(item, into: .backdrop,
+                        isCurrent: { generation == backdropImportGeneration }) {
+                $0.backdrop.usesImage = true
+                $0.backdrop.revision += 1
+            }
+        }
+    }
+
+    /// A picked photo goes to disk via its store, then one write flips
+    /// `usesImage` + bumps `revision` — a replaced photo differs only by
+    /// revision, and two writes would re-materialize the table twice for
+    /// one pick. `isCurrent` is the stale-load guard: a Remove or a newer
+    /// pick while the load was in flight must win.
+    private func importPhoto(_ item: PhotosPickerItem?,
+                             into store: UserImageStore,
+                             isCurrent: @escaping () -> Bool,
+                             update: @escaping (inout Appearance) -> Void) {
+        Task {
+            guard let data = try? await item?.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else { return }
+            guard isCurrent() else { return }
+            store.save(image)
+            var next = appearance.wrappedValue
+            update(&next)
+            appearance.wrappedValue = next
         }
     }
 
@@ -120,9 +190,10 @@ struct AppearanceEditor<Table: DiceTable>: View {
     }
 
     private func sliderRow(_ title: String,
-                           _ binding: Binding<Double>) -> some View {
+                           _ binding: Binding<Double>,
+                           in range: ClosedRange<Double> = 0...1) -> some View {
         LabeledContent(title) {
-            Slider(value: binding, in: 0...1)
+            Slider(value: binding, in: range)
                 .frame(maxWidth: 200)
         }
     }

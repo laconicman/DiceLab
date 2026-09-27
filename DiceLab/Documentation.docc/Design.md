@@ -163,6 +163,43 @@ inside `applyLighting` never port, same lesson as physics constants.
   `settings.engine`: a setting the scene doesn't touch doesn't belong on
   the controller.
 
+M9d grows the model by the two channels presets couldn't express —
+emission and backdrop — and *seals* the presets: the material dials now
+exist only under `.custom`, because a slider that silently mutates
+"Ivory" lies about what a preset is. Choosing Custom snapshots the
+preset's fields first; the footer says so. Both new payloads decode
+leniently (`decodeIfPresent` + defaults), so an M8c-era `settings.theme`
+JSON still loads.
+
+- **Emission is packed, not per-part.** One channel must express both
+  "glowing pips on a dark body" and its inverse. The face texture
+  carries each part's tint × intensity ÷ peak (the *ratio*); the
+  material's scalar intensity carries the peak (the *magnitude*).
+  `texture × intensity` reconstructs each side — the only way both
+  directions fit one emission channel. `EmissionAppearance.maxIntensity`
+  caps the peak so a stored value can't outrange the runtime.
+- **Backdrop doubles as light — differently per engine.** SceneKit:
+  `scene.background` draws the image behind the felt and
+  `lightingEnvironment` feeds it to PBR shading — two scene properties.
+  RealityKit has no scene-level backdrop: the visible backdrop is an
+  inside-out unlit sphere (`faceCulling = .front`, no mirrored-scale
+  hack), and the light is a `VirtualEnvironmentProbeComponent` built
+  async (equirect → cube `TextureResource` → `EnvironmentResource`,
+  generation-guarded like the photo imports). A user photo is LDR — it
+  lights on both engines, but carries none of the over-range dynamic
+  range a real `.hdr` probe has. The asymmetry is the *mechanism*, not
+  the quality ceiling.
+- **`EmissiveColor` adds, not tints.** RealityKit's
+  `init(color:texture:)` renders `color` as a flat emission term on top
+  of the texture — measured on simulator: `color: .white` whites out the
+  whole face. The working binding is `init(texture:)` alone. SceneKit's
+  `emission.contents` takes the image with no such trap.
+- **User images share one store.** `UserImageStore` (née
+  `FeltImageStore`) writes to Documents keyed by channel (`felt`,
+  `backdrop`); the model keeps only `usesImage` + `revision` — a
+  replaced photo differs only by revision, and each async `PhotosPicker`
+  import is generation-guarded per channel as felt's was.
+
 ## Shake-to-roll rides the responder chain
 
 SwiftUI has no shake gesture, and `UIDevice.deviceDidShakeNotification` only
