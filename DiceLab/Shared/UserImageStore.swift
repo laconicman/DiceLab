@@ -1,31 +1,41 @@
 import UIKit
 
-/// Persists the user's custom felt photo — one file in Documents, kept out
-/// of `UserDefaults` (which is for settings, not textures) and out of the
-/// asset catalog (user content isn't a build-time asset).
-enum FeltImageStore {
-    private static let fileName = "felt.jpg"
+/// Persists a user-picked photo — one file in Documents per slot (`felt`,
+/// `backdrop`), kept out of `UserDefaults` (which is for settings, not
+/// textures) and out of the asset catalog (user content isn't a build-time
+/// asset). M8b stored only the felt; M9d generalized to a named file.
+struct UserImageStore: Sendable {
+    let fileName: String
+
     /// The picker hands us whatever the photo library holds — downscale so a
     /// 12 MP portrait doesn't become a texture.
     private static let maxSide: CGFloat = 1024
 
-    private static var url: URL {
+    private var url: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appending(path: fileName)
     }
 
-    static func save(_ image: UIImage) {
-        let scaled = image.scaled(toFit: maxSide)
+    func save(_ image: UIImage) {
+        let scaled = image.scaled(toFit: Self.maxSide)
         try? scaled.jpegData(compressionQuality: 0.8)?.write(to: url)
     }
 
-    static func load() -> UIImage? {
+    func load() -> UIImage? {
         UIImage(contentsOfFile: url.path)
     }
 
-    static func clear() {
+    func clear() {
         try? FileManager.default.removeItem(at: url)
     }
+}
+
+extension UserImageStore {
+    /// The table surface's custom photo.
+    static let felt = UserImageStore(fileName: "felt.jpg")
+    /// The scene backdrop's custom photo — also feeds IBL where the engine
+    /// supports it.
+    static let backdrop = UserImageStore(fileName: "backdrop.jpg")
 }
 
 private extension UIImage {

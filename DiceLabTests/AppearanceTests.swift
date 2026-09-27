@@ -68,7 +68,8 @@ struct AppearanceTests {
 
     /// Payloads written before `revision` existed must still decode — a
     /// stored custom theme that bounced to default would silently lose the
-    /// user's look on upgrade.
+    /// user's look on upgrade. M9d added `emission` and `backdrop`; the same
+    /// M8-era payload must still decode, with the new channels defaulted.
     @Test("felt payloads without revision still decode")
     func legacyFeltPayload() throws {
         let json = #"{"custom":{"_0":{"die":{"faceColor":{"red":1,"green":1,"blue":1,"alpha":1},"pipColor":{"red":0,"green":0,"blue":0,"alpha":1},"roughness":0.35,"metalness":0,"clearcoat":0},"felt":{"color":{"red":0.05,"green":0.3,"blue":0.15,"alpha":1},"usesImage":true},"lighting":"studio"}}}"#
@@ -78,6 +79,10 @@ struct AppearanceTests {
             return
         }
         #expect(appearance.felt.usesImage && appearance.felt.revision == 0)
+        // Fields that didn't exist when the payload was written land on
+        // their defaults, not on a decode failure.
+        #expect(appearance.die.emission == EmissionAppearance())
+        #expect(appearance.backdrop == BackdropAppearance())
     }
 
     /// Presets resolve to real appearances — the editor's pickers bind
@@ -114,19 +119,97 @@ struct AppearanceTests {
         #expect(appearance.lighting == .dramatic)
     }
 
-    /// The felt photo store round-trips through Documents — save → load →
-    /// clear — and a cleared store must actually report empty.
-    @Test("felt image store round-trips and clears")
-    func feltStoreRoundTrip() {
-        FeltImageStore.clear()
-        #expect(FeltImageStore.load() == nil)
-        let pixel = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
-            UIColor.red.setFill()
-            ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+    /// Emission packing is the contract the material code depends on:
+    /// texture pixels carry each part's share of the peak, the material
+    /// scalar carries the clamped peak. Face-vs-pip ratios must survive.
+    @Test("emission packs ratio into texture and magnitude into intensity")
+    func emissionPacking() {
+        // Equal intensities: packed colors are the raw tints.
+        var emission = EmissionAppearance(
+            faceColor: CodableColor(red: 0.5, green: 0.5, blue: 0.5), faceIntensity: 1,
+            pipColor: CodableColor(red: 1, green: 1, blue: 1), pipIntensity: 1)
+        #expect(emission.peak == 1 && emission.intensity == 1)
+        #expect(emission.packedPips == CodableColor(red: 1, green: 1, blue: 1))
+
+        // Glowing pips on a dark body: face ratio 0 → packed black.
+        emission = EmissionAppearance(faceIntensity: 0, pipIntensity: 1.5)
+        #expect(emission.packedFace == CodableColor(red: 0, green: 0, blue: 0))
+        #expect(emission.packedPips == CodableColor(red: 1, green: 1, blue: 1))
+        #expect(emission.intensity == 1.5)
+
+        // Asymmetric: face at 4× the pips — the texture holds 1:0.25 while
+        // the scalar clamps at maxIntensity, so 4:1 still lands on screen.
+        emission = EmissionAppearance(
+            faceColor: CodableColor(red: 1, green: 1, blue: 1), faceIntensity: 4,
+            pipColor: CodableColor(red: 1, green: 1, blue: 1), pipIntensity: 1)
+        #expect(emission.packedFace == CodableColor(red: 1, green: 1, blue: 1))
+        #expect(emission.packedPips == CodableColor(red: 0.25, green: 0.25, blue: 0.25))
+        #expect(emission.intensity == EmissionAppearance.maxIntensity)
+
+        // Nothing emits → peak and intensity are 0, no texture needed.
+        #expect(EmissionAppearance().peak == 0)
+        #expect(EmissionAppearance().intensity == 0)
+    }
+
+    /// `peak == 0` must not mint emission textures at all — the material
+    /// leaves the channel off; above zero, the emission image is drawn and
+    /// is *not* the diffuse image.
+    @Test("emission images exist only when something emits")
+    func emissionImagesGate() {
+        #expect(DieFaceTexture.emissionImages(for: Appearance.ivory.die) == nil)
+        var die = Appearance.ivory.die
+        die.emission.pipIntensity = 1
+        let emission = DieFaceTexture.emissionImages(for: die)
+        #expect(emission?.count == 6)
+        #expect(emission?[0].pngData()
+                != DieFaceTexture.images(for: die)[0].pngData())
+    }
+
+    /// The editor gates every material control on `theme.kind == .custom` —
+    /// pin the mapping it reads: presets report their own kind, custom
+    /// reports custom regardless of payload.
+    @Test("theme kind drives the editor's material-control visibility")
+    func themeKindGate() {
+        #expect(Theme.ivory.kind == .ivory)
+        #expect(Theme.onyx.kind == .onyx)
+        #expect(Theme.custom(.ivory).kind == .custom)
+    }
+
+    /// `.none` produces no image (flat-black look preserved), presets draw
+    /// a 2:1 equirect, and a picked-but-missing photo falls back to the
+    /// preset rather than a broken texture.
+    @Test("backdrop resolves to preset gradients, photo, or nil")
+    func backdropResolve() {
+        #expect(BackdropImage.resolve(BackdropAppearance()) == nil)
+        let graphite = BackdropImage.image(for: .graphite)
+        #expect(graphite != nil)
+        if let graphite {
+            #expect(graphite.size.width / graphite.size.height == 2)
         }
-        FeltImageStore.save(pixel)
-        #expect(FeltImageStore.load() != nil)
-        FeltImageStore.clear()
-        #expect(FeltImageStore.load() == nil)
+        // `usesImage` with no file on disk must degrade to the preset —
+        // same contract as the felt's missing-photo fallback. Clear first:
+        // an earlier run's leftover file would flip the fallback.
+        UserImageStore.backdrop.clear()
+        let missing = BackdropAppearance(preset: .dusk, usesImage: true)
+        #expect(BackdropImage.resolve(missing)?.pngData()
+                == BackdropImage.image(for: .dusk)?.pngData())
+    }
+
+    /// The user photo stores round-trip through Documents — save → load →
+    /// clear — and a cleared store must actually report empty.
+    @Test("user image stores round-trip and clear")
+    func imageStoreRoundTrip() {
+        for store in [UserImageStore.felt, UserImageStore.backdrop] {
+            store.clear()
+            #expect(store.load() == nil)
+            let pixel = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4)).image { ctx in
+                UIColor.red.setFill()
+                ctx.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+            }
+            store.save(pixel)
+            #expect(store.load() != nil)
+            store.clear()
+            #expect(store.load() == nil)
+        }
     }
 }
