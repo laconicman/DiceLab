@@ -5,6 +5,11 @@ import Foundation
 /// RealityKit's ECS — without knowing which. Everything a view may observe or
 /// a setting may toggle is spelled out here; everything engine-shaped stays
 /// inside the concrete controllers.
+///
+/// `@MainActor` because the contract's only callers are views: engine
+/// callbacks that run on other queues hop to main before touching it —
+/// declaring the isolation here is what makes that rule checkable.
+@MainActor
 protocol DiceTable: AnyObject, Observable {
     /// True from a throw until the physics settle.
     var isRolling: Bool { get }
@@ -63,10 +68,10 @@ enum TableSettings {
     static let engine = "settings.engine"
 
     /// UserDefaults returns 0 for a missing Int — distinguish "never set"
-    /// (default 3) from a stored value, then clamp into the supported range.
+    /// (default 2) from a stored value, then clamp into the supported range.
     static func storedDieCount(defaults: UserDefaults = .standard) -> Int {
         let raw = defaults.integer(forKey: dieCount)
-        return raw == 0 ? 3 : min(max(raw, 1), 6)
+        return raw == 0 ? 2 : min(max(raw, 1), 6)
     }
 
     /// Sound predates its own toggle: users who muted the old combined

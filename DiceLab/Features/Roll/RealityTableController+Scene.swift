@@ -204,8 +204,8 @@ extension RealityTableController {
     private static func feltMaterial(for felt: FeltAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
         if felt.usesImage, let cgImage = FeltImageStore.load()?.cgImage,
-           let texture = try? TextureResource.generate(
-               from: cgImage, options: .init(semantic: .color)) {
+           let texture = try? TextureResource(
+               image: cgImage, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white, texture: .init(texture))
         } else {
             material.baseColor = .init(tint: felt.color.uiColor)
@@ -310,8 +310,8 @@ extension RealityTableController {
                                      appearance: DieAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
         if let image = DieFaceTexture.images(for: appearance)[value - 1].cgImage,
-           let texture = try? TextureResource.generate(
-               from: image, options: .init(semantic: .color)) {
+           let texture = try? TextureResource(
+               image: image, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white,
                                        texture: .init(texture))
         } else {
