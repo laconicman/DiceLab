@@ -24,6 +24,8 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
     /// View-layer setting for view-layer feedback — `@AppStorage`, same
     /// slot the settings sheet writes.
     @AppStorage(TableSettings.speech) private var speechEnabled = true
+    /// Same class as `speech`: chrome visibility, not scene state.
+    @AppStorage(TableSettings.history) private var historyEnabled = true
 
     var body: some View {
         scene
@@ -77,30 +79,30 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                 .padding(.trailing, 12)
             }
             .overlay(alignment: .bottom) {
-                VStack(spacing: 16) {
-                    // Session history: last five settled rolls, newest first.
-                    // Scrolled — six-die results overflow a portrait row.
-                    if !table.history.isEmpty {
-                        ScrollView(.horizontal) {
-                            HStack(spacing: 6) {
-                                ForEach(table.history.suffix(5).reversed()) { roll in
-                                    Text(roll.faces.map(String.init).joined(separator: "+")
-                                         + "=\(roll.total)")
-                                        .font(.caption.monospacedDigit())
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(.regularMaterial, in: .capsule)
-                                }
-                            }
-                            .padding(.horizontal)
+                // The panel's caps are fractions of the screen — the
+                // reader is scoped to this overlay and pinned bottom so
+                // it measures the screen without reshaping the layout.
+                GeometryReader { geo in
+                    VStack(spacing: 12) {
+                        // M9c: the optional session record — collapsed to
+                        // a quarter of the screen, expandable up to just
+                        // under the result banner (banner ~50 + button
+                        // row ~60 + padding ≈ 160 reserved).
+                        if historyEnabled, !table.history.isEmpty {
+                            HistoryPanel(
+                                rolls: table.history,
+                                collapsedHeight: geo.size.height / 4,
+                                expandedHeight: geo.size.height
+                                    - geo.safeAreaInsets.top - 160)
+                                .padding(.horizontal, 12)
                         }
-                        .scrollIndicators(.hidden)
+                        Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
                     }
-                    Button(table.isRolling ? "Rolling…" : "Roll", action: table.roll)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, 32)
                 }
-                .padding(.bottom, 32)
             }
             // Shake-to-roll: an invisible first responder, because SwiftUI has
             // no shake gesture — see ShakeDetector.
@@ -108,13 +110,19 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             .sheet(isPresented: $showingSettings) {
                 // Dev driver: `-appearanceeditor` lands directly in the
                 // editor so its live preview is screenshotable via simctl.
-                if DevFlags.appearanceEditor {
-                    NavigationStack {
-                        AppearanceEditor(table: table, preview: preview)
+                Group {
+                    if DevFlags.appearanceEditor {
+                        NavigationStack {
+                            AppearanceEditor(table: table, preview: preview)
+                        }
+                    } else {
+                        SettingsView(table: table, preview: preview)
                     }
-                } else {
-                    SettingsView(table: table, preview: preview)
                 }
+                // Detents live on the sheet, not inside SettingsView, so
+                // the dev-flag path gets them too. .medium reads as a
+                // quick toggle panel; .large gives the editor room.
+                .presentationDetents([.medium, .large])
             }
     }
 }
