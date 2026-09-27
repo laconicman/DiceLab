@@ -87,6 +87,39 @@ final class RealityTableController: DiceTable {
         didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: TableSettings.cameraControl) }
     }
 
+    /// Scripted framing while a roll is in flight — the mirror of the
+    /// SceneKit fit, re-tuned for meters. Orbit controls stay attached
+    /// regardless: the fit owns the camera while writing, `fitConverged`
+    /// hands it back once the settled pose arrives. Re-enabling clears
+    /// the latch so a moved camera pulls back to the fitted pose.
+    var cameraFitEnabled = UserDefaults.standard.object(forKey: TableSettings.cameraFit) as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(cameraFitEnabled, forKey: TableSettings.cameraFit)
+            // Only a real off→on transition unlatches: `reloadSettings`
+            // rewrites the unchanged value on every activation, and
+            // clearing the latch then would steal the user's orbit.
+            if cameraFitEnabled && !oldValue { fitConverged = false }
+        }
+    }
+
+    /// Viewport aspect (width/height) fed by the view — horizontal FOV
+    /// binds in portrait, so the fit math needs the real ratio.
+    var viewAspect: Double = 1
+
+    /// The table camera entity — the fit pass writes its transform every
+    /// update tick, so it's a ref, not a name lookup.
+    var cameraEntity: Entity?
+
+    /// The camera's rest orientation, captured after `look(at:)` at setup —
+    /// the fit slides position along the view axis and eases orientation
+    /// back to this pose (undoing any between-rolls orbit).
+    var cameraHomeOrientation: simd_quatf = .init()
+
+    /// Once the fitted pose has converged after a settle, the fit stops
+    /// writing: the camera hands back to the user's orbit (if enabled)
+    /// without a per-frame tug-of-war, until the next `roll()` unlatches it.
+    var fitConverged = false
+
     var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(hapticsEnabled, forKey: TableSettings.haptics)
@@ -147,9 +180,10 @@ final class RealityTableController: DiceTable {
                 haptics.collision(impulse: event.impulse)
             }
         })
-        subscriptions.append(content.subscribe(to: SceneEvents.Update.self) { [weak self] _ in
+        subscriptions.append(content.subscribe(to: SceneEvents.Update.self) { [weak self] event in
             let generation = self?.rollID ?? 0
-            Task { @MainActor in self?.update(generation: generation) }
+            let dt = Float(event.deltaTime)
+            Task { @MainActor in self?.update(generation: generation, dt: dt) }
         })
     }
 
@@ -169,6 +203,7 @@ final class RealityTableController: DiceTable {
         isRolling = false
         lastRoll = nil
         history = []
+        fitConverged = false // refit to the fresh spawn cluster
         spawnDice(dieCount)
     }
 
@@ -179,6 +214,7 @@ final class RealityTableController: DiceTable {
         rollID += 1
         steadyFrames = 0
         isRolling = true
+        fitConverged = false // a fresh throw re-owns the camera
         if DevFlags.impulseLog {
             rollImpulses = []
             rollStartedAt = Date()
@@ -200,22 +236,27 @@ final class RealityTableController: DiceTable {
     /// linear and angular velocity below threshold, sustained `requiredFrames`
     /// consecutive updates. `SceneEvents.Update` already ticks on main; the
     /// generation guard rejects callbacks queued before a re-roll.
-    private func update(generation: Int) {
-        guard isRolling, rollID == generation else { return }
-        let settled = dice.allSatisfy { die in
-            guard let motion = die.components[PhysicsMotionComponent.self] else { return false }
-            return simd_length(motion.linearVelocity) < Rest.linear
-                && simd_length(motion.angularVelocity) < Rest.angular
+    private func update(generation: Int, dt: Float) {
+        if isRolling, rollID == generation {
+            let settled = dice.allSatisfy { die in
+                guard let motion = die.components[PhysicsMotionComponent.self] else { return false }
+                return simd_length(motion.linearVelocity) < Rest.linear
+                    && simd_length(motion.angularVelocity) < Rest.angular
+            }
+            steadyFrames = settled ? steadyFrames + 1 : 0
+            if steadyFrames >= Rest.requiredFrames {
+                steadyFrames = 0
+                let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation) })
+                lastRoll = result
+                history.append(result)
+                if history.count > 20 { history.removeFirst() }
+                isRolling = false
+                if let started = rollStartedAt { logImpulseSummary(since: started) }
+            }
         }
-        steadyFrames = settled ? steadyFrames + 1 : 0
-        guard steadyFrames >= Rest.requiredFrames else { return }
-        steadyFrames = 0
-        let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation) })
-        lastRoll = result
-        history.append(result)
-        if history.count > 20 { history.removeFirst() }
-        isRolling = false
-        if let started = rollStartedAt { logImpulseSummary(since: started) }
+        // Outside the settle gate on purpose: the fit keeps easing after
+        // the flag clears — that's what "stays fitted" means.
+        updateCameraFit(dt: dt)
     }
 
     /// The `-impulseLog` summary: one line per settled roll — enough to

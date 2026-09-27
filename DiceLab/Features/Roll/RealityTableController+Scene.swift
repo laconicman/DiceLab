@@ -27,14 +27,105 @@ extension RealityTableController {
         applyLighting(theme.appearance.lighting, in: previewRoot)
     }
 
+    /// The camera's rest pose (meters). `axis` — the direction fitting
+    /// slides along — is the normalized home offset, so the view axis
+    /// always passes exactly through the cluster centroid without ever
+    /// re-aiming (orientation stays fixed; no `look(at:)` gimbal edge).
+    private enum CameraHome {
+        static let position = SIMD3<Float>(0, 0.42, 0.03)
+        static let fieldOfView: Float = 55
+        static var axis: SIMD3<Float> { simd_normalize(position) }
+        static var distance: Float { simd_length(position) }
+    }
+
+    /// Scripted-fit tuning (M9b) — the SceneKit `Fit` in meters.
+    /// `speed` gates: above it dice are flying and the camera holds home;
+    /// the settle threshold is 0.02 m/s, so 0.10 is "final tumbling."
+    private enum Fit {
+        static let speed: Float = 0.10
+        /// Half a die's diagonal (~2.6 cm) plus margin.
+        static let padding: Float = 0.045
+        /// The far cap isn't a constant either: "the widest cluster the
+        /// volume can hold," computed per-frame. Centroid-centered spheres
+        /// worst-case at the *full* diagonal — a lopsided cluster sits the
+        /// centroid near one end, the outlier a diagonal away.
+        static let minDistance: Float = 0.18
+        static var volumeRadius: Float {
+            2 * sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
+                + padding
+        }
+        static let rate: Float = 5
+        /// Converged-pose epsilon — ~2 mm at meter scale.
+        static let epsilon: Float = 0.002
+        /// A paused renderer resumes with the whole pause inside `dt`
+        /// (damp ≈ 1 → snap). Capping at 100 ms keeps resumes gliding.
+        static let maxDt: Float = 0.1
+    }
+
+    /// Per-frame camera framing, called from `update`. Target flips
+    /// home↔fitted on the speed gate; the damped glide between them is the
+    /// "one animation eases into another" the feature calls for. Once the
+    /// fitted pose converges after a settle, `fitConverged` latches and the
+    /// fit stops writing — between-rolls orbit gestures are then free,
+    /// with no per-frame tug-of-war. `roll()` clears the latch.
+    func updateCameraFit(dt rawDt: Float) {
+        guard cameraFitEnabled, !fitConverged,
+              let camera = cameraEntity else { return }
+        let dt = min(rawDt, Fit.maxDt)
+        let positions = dice.map { $0.position }
+        let fastest = dice.compactMap { die -> Float? in
+            guard let motion = die.components[PhysicsMotionComponent.self] else { return nil }
+            return simd_length(motion.linearVelocity)
+        }.max() ?? 0
+        let sphere = CameraFit.boundingSphere(of: positions, padding: Fit.padding)
+        var distance = CameraFit.requiredDistance(
+            radius: sphere.radius,
+            verticalFieldOfView: CameraHome.fieldOfView,
+            aspect: Float(viewAspect))
+        let maxDistance = CameraFit.requiredDistance(
+            radius: Fit.volumeRadius,
+            verticalFieldOfView: CameraHome.fieldOfView,
+            aspect: Float(viewAspect))
+        distance = min(max(distance, Fit.minDistance), maxDistance)
+        let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
+        let target = fitting
+            ? sphere.center + CameraHome.axis * distance
+            : CameraHome.position
+        // NaN transforms never recover — snap instead of damping poison.
+        if !camera.position.x.isFinite {
+            camera.position = CameraHome.position
+        }
+        // Settled + arrived: snap the last millimeters and hand the camera
+        // back to the user. Only when not rolling — dice may still drift
+        // while the settle gate runs.
+        if !isRolling, fitting,
+           simd_distance(camera.position, target) < Fit.epsilon,
+           abs(simd_dot(camera.orientation, cameraHomeOrientation)) > 0.9999 {
+            camera.position = target
+            camera.orientation = cameraHomeOrientation
+            fitConverged = true
+            return
+        }
+        camera.position = CameraFit.damp(
+            camera.position, toward: target, rate: Fit.rate, dt: dt)
+        // Orientation isn't the fit's knob — but a between-rolls orbit
+        // should ease back to the rest pose, not linger. `CameraFit.damp`
+        // guards the identical-quat NaN `simd_slerp` hits.
+        camera.orientation = CameraFit.damp(
+            camera.orientation, toward: cameraHomeOrientation,
+            rate: Fit.rate, dt: dt)
+    }
+
     private func setUpCamera() {
         let camera = Entity()
         camera.components.set(PerspectiveCameraComponent(
-            near: 0.01, far: 10, fieldOfViewInDegrees: 55))
+            near: 0.01, far: 10, fieldOfViewInDegrees: CameraHome.fieldOfView))
         // ~45 cm above the felt, pulled slightly toward the viewer for the
         // same gentle tilt the SceneKit camera uses.
-        camera.look(at: .zero, from: [0, 0.42, 0.03], relativeTo: nil)
+        camera.look(at: .zero, from: CameraHome.position, relativeTo: nil)
         root.addChild(camera)
+        cameraEntity = camera
+        cameraHomeOrientation = camera.orientation
     }
 
     /// Entities the appearance pass reaches for by name — the alternative
@@ -119,9 +210,13 @@ extension RealityTableController {
         felt.position = [0, Bounds.floorY - Bounds.thickness / 2, 0]
         root.addChild(felt)
 
-        // Walls + ceiling: collision-only entities — no ModelComponent, so
-        // nothing renders. With per-body CCD on the dice, the 4-unit margin
-        // the SceneKit walls needed shrinks to a formality.
+        // Walls + ceiling: collision-only entities — no ModelComponent on
+        // the colliders themselves. With per-body CCD on the dice, the
+        // 4-unit margin the SceneKit walls needed shrinks to a formality.
+        // The visible bounds are thin translucent panels on the inner
+        // faces — matching the SceneKit walls' faint-glass treatment: the
+        // user asked to *see* where dice stop, and unlit-translucent is
+        // the RealityKit way to get glass that doesn't light up.
         let wallY = (Bounds.floorY + Bounds.ceilingY) / 2
         func bound(_ size: SIMD3<Float>, at position: SIMD3<Float>) {
             let shape = ShapeResource.generateBox(size: size)
@@ -144,6 +239,20 @@ extension RealityTableController {
               at: [0, wallY, Bounds.halfZ + Bounds.thickness / 2])         // +z
         bound([Bounds.span, Bounds.span, Bounds.thickness],
               at: [0, wallY, -Bounds.halfZ - Bounds.thickness / 2])        // −z
+
+        var panel = UnlitMaterial(color: .gray)
+        panel.blending = .transparent(opacity: .init(floatLiteral: 0.10))
+        let wallHeight = Bounds.ceilingY - Bounds.floorY
+        func pane(_ size: SIMD3<Float>, at position: SIMD3<Float>) {
+            let pane = ModelEntity(mesh: .generateBox(size: size),
+                                   materials: [panel])
+            pane.position = position
+            root.addChild(pane)
+        }
+        pane([0.001, wallHeight, 2 * Bounds.halfZ], at: [Bounds.halfX, wallY, 0])
+        pane([0.001, wallHeight, 2 * Bounds.halfZ], at: [-Bounds.halfX, wallY, 0])
+        pane([2 * Bounds.halfX, wallHeight, 0.001], at: [0, wallY, Bounds.halfZ])
+        pane([2 * Bounds.halfX, wallHeight, 0.001], at: [0, wallY, -Bounds.halfZ])
     }
 
     /// Spawn geometry in meters — same spread rule as SceneKit, scaled ÷100.
