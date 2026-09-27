@@ -276,9 +276,15 @@ shrinks the dice, and the dice are the content.
 ## Roll history is a session record, not a log
 
 `history` holds the last 20 `RollResult`s (cleared when `dieCount` changes —
-a result from a different dice set is meaningless). The strip shows the last
-five, newest first; `RollResult` gained `Identifiable` so rows key by event
-identity — identical totals are still distinct rolls.
+a result from a different dice set is meaningless). M9c replaced the
+horizontal chip strip with `HistoryPanel` — an `.ultraThinMaterial` panel
+above the Roll button, capped at a quarter of the screen collapsed and
+expandable toward the safe area by tapping its header. Optional via
+`settings.history` (`@AppStorage` — chrome visibility is view-layer state,
+not scene state), and hidden entirely while the history is empty. Rows key
+by `RollResult.id` — identical totals are still distinct rolls — and carry
+a `rowTint` scaffold: today it returns nil, later a settings-driven
+per-player color maps each roll to the player who threw it.
 
 ## Where state lives, after M7
 
