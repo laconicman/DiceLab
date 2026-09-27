@@ -80,6 +80,39 @@ final class DiceTableController: NSObject {
         didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: TableSettings.cameraControl) }
     }
 
+    /// Scripted framing while a roll is in flight — see `updateCameraFit`
+    /// in `+Scene`. Orbit controls stay attached regardless: the fit owns
+    /// the camera while writing, and `fitConverged` hands it back once the
+    /// settled pose arrives. Re-enabling clears the latch so a camera the
+    /// user moved while fit was off pulls back to the fitted pose.
+    var cameraFitEnabled = UserDefaults.standard.object(forKey: TableSettings.cameraFit) as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(cameraFitEnabled, forKey: TableSettings.cameraFit)
+            // Only a real off→on transition unlatches: `reloadSettings`
+            // rewrites the unchanged value on every activation, and
+            // clearing the latch then would steal the user's orbit.
+            if cameraFitEnabled && !oldValue { fitConverged = false }
+        }
+    }
+
+    /// Viewport aspect (width/height) fed by the view — the fit math needs
+    /// it because horizontal FOV, not vertical, binds in portrait.
+    var viewAspect: Double = 1
+
+    /// The table camera — a stored ref rather than the name lookup the
+    /// lights use, because the fit pass writes it every frame.
+    /// Internal so `+Scene` populates it during construction.
+    var cameraNode: SCNNode?
+
+    /// `updateCameraFit`'s frame-to-frame delta source — `now` arrives as
+    /// an absolute timestamp, the damp needs a delta.
+    var lastFitTime: TimeInterval?
+
+    /// Once the fitted pose has converged after a settle, the fit stops
+    /// writing: orbit gestures are then free, with no per-frame
+    /// tug-of-war, until the next `roll()` or dice respawn unlatches it.
+    var fitConverged = false
+
     /// Gates haptic taps — the engine exists either way.
     var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
@@ -137,6 +170,7 @@ final class DiceTableController: NSObject {
         isRolling = false
         lastRoll = nil
         history = []
+        fitConverged = false // refit to the fresh spawn cluster
         spawnDice(dieCount)
     }
 
@@ -149,6 +183,7 @@ final class DiceTableController: NSObject {
     func roll() {
         sync.withLock { $0.rollID += 1; $0.rolling = true }
         isRolling = true
+        fitConverged = false // a fresh throw re-owns the camera
         if DevFlags.impulseLog {
             rollImpulses = []
             rollStartedAt = Date()
@@ -200,8 +235,6 @@ extension DiceTableController: SCNSceneRendererDelegate {
     /// only the `sync` Mutex — `rolling` lives there, never as the plain
     /// `isRolling` — then hops to main for everything dice-related.
     nonisolated func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-        guard let generation = sync.withLock({ $0.rolling ? $0.rollID : nil })
-        else { return }
         Task { @MainActor in
             // Everything dice-related happens here, not on the render
             // thread: `respawnDice` mutates the array on main, so iterating
@@ -210,15 +243,21 @@ extension DiceTableController: SCNSceneRendererDelegate {
             // or clear the new roll's flag — the generation guard covers
             // invalidation, the isResting re-check covers an impulse that
             // landed after it.
-            guard isRolling, sync.withLock({ $0.rollID == generation }),
-                  dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
-            let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
-            lastRoll = result
-            history.append(result)
-            if history.count > 20 { history.removeFirst() }
-            isRolling = false
-            sync.withLock { $0.rolling = false }
-            if let started = rollStartedAt { logImpulseSummary(since: started) }
+            if let generation = sync.withLock({ $0.rolling ? $0.rollID : nil }),
+               isRolling, sync.withLock({ $0.rollID == generation }),
+               dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) {
+                let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
+                lastRoll = result
+                history.append(result)
+                if history.count > 20 { history.removeFirst() }
+                isRolling = false
+                sync.withLock { $0.rolling = false }
+                if let started = rollStartedAt { logImpulseSummary(since: started) }
+            }
+            // The camera fit must keep easing *after* the rolling flag
+            // clears — the settle publish above is what lands it — so it
+            // can't sit behind a `rolling` early-out.
+            updateCameraFit(now: time)
         }
     }
 

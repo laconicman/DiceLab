@@ -48,8 +48,13 @@ struct SettingsView<Table: DiceTable>: View {
                     Toggle("Sound", isOn: $table.soundEnabled)
                     Toggle("Speak results", isOn: $speechEnabled)
                 }
-                Section("Debug") {
+                Section {
+                    Toggle("Automatic framing", isOn: $table.cameraFitEnabled)
                     Toggle("Camera control", isOn: $table.cameraControlEnabled)
+                } header: {
+                    Text("Camera")
+                } footer: {
+                    Text("Automatic framing eases the camera to keep all dice in view while they settle. Camera control lets you orbit freely between rolls.")
                 }
             }
             .navigationTitle("Settings")
