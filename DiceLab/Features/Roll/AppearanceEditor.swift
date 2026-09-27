@@ -28,49 +28,63 @@ struct AppearanceEditor<Table: DiceTable>: View {
                 set: { table.theme = .custom($0) })
     }
 
+    /// The picker binds the payload-free `Kind` — a `.custom` selection
+    /// stays selected no matter how the fields mutate under it.
+    private var themeKind: Binding<Theme.Kind> {
+        Binding(get: { table.theme.kind },
+                set: { kind in
+                    switch kind {
+                    case .ivory: table.theme = .ivory
+                    case .onyx: table.theme = .onyx
+                    // Selecting Custom snapshots the current fields.
+                    case .custom: table.theme = .custom(table.theme.appearance)
+                    }
+                })
+    }
+
     var body: some View {
-        Form {
-            Section {
-                preview
-                    .frame(height: 150)
-                    .listRowInsets(EdgeInsets())
-            }
-            Section("Theme") {
-                Picker("Preset", selection: $table.theme) {
-                    Text("Ivory").tag(Theme.ivory)
-                    Text("Onyx").tag(Theme.onyx)
-                    // Selecting Custom snapshots the current fields — the
-                    // appearance binding then edits inside it.
-                    Text("Custom").tag(Theme.custom(table.theme.appearance))
-                }
-            }
-            Section("Die") {
-                ColorPicker("Face", selection: color(appearance.die.faceColor))
-                ColorPicker("Pips", selection: color(appearance.die.pipColor))
-                sliderRow("Roughness", appearance.die.roughness)
-                sliderRow("Metalness", appearance.die.metalness)
-                sliderRow("Clearcoat", appearance.die.clearcoat)
-            }
-            Section("Table") {
-                ColorPicker("Felt color", selection: color(appearance.felt.color))
-                PhotosPicker(selection: $photoItem, matching: .images) {
-                    Label("Use photo as felt", systemImage: "photo")
-                }
-                if appearance.wrappedValue.felt.usesImage {
-                    Button("Remove photo", role: .destructive) {
-                        // Clear the selection first — an in-flight import
-                        // checks it and must not resurrect the removed file.
-                        photoItem = nil
-                        importGeneration += 1
-                        FeltImageStore.clear()
-                        var next = appearance.wrappedValue
-                        next.felt.usesImage = false
-                        appearance.wrappedValue = next
+        // The preview is pinned above the scrollable form — at the sheet's
+        // medium detent an in-form row scrolls away, and editing blind
+        // defeats the point of a live preview.
+        VStack(spacing: 0) {
+            preview
+                .frame(height: 140)
+            Form {
+                Section("Theme") {
+                    Picker("Preset", selection: themeKind) {
+                        Text("Ivory").tag(Theme.Kind.ivory)
+                        Text("Onyx").tag(Theme.Kind.onyx)
+                        Text("Custom").tag(Theme.Kind.custom)
                     }
                 }
-                Picker("Lighting", selection: appearance.lighting) {
-                    ForEach(LightingPreset.allCases, id: \.self) {
-                        Text($0.rawValue.capitalized).tag($0)
+                Section("Die") {
+                    ColorPicker("Face", selection: color(appearance.die.faceColor))
+                    ColorPicker("Pips", selection: color(appearance.die.pipColor))
+                    sliderRow("Roughness", appearance.die.roughness)
+                    sliderRow("Metalness", appearance.die.metalness)
+                    sliderRow("Clearcoat", appearance.die.clearcoat)
+                }
+                Section("Table") {
+                    ColorPicker("Felt color", selection: color(appearance.felt.color))
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Label("Use photo as felt", systemImage: "photo")
+                    }
+                    if appearance.wrappedValue.felt.usesImage {
+                        Button("Remove photo", role: .destructive) {
+                            // Clear the selection first — an in-flight import
+                            // checks it and must not resurrect the removed file.
+                            photoItem = nil
+                            importGeneration += 1
+                            FeltImageStore.clear()
+                            var next = appearance.wrappedValue
+                            next.felt.usesImage = false
+                            appearance.wrappedValue = next
+                        }
+                    }
+                    Picker("Lighting", selection: appearance.lighting) {
+                        ForEach(LightingPreset.allCases, id: \.self) {
+                            Text($0.rawValue.capitalized).tag($0)
+                        }
                     }
                 }
             }
