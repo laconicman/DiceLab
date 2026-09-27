@@ -71,6 +71,22 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   device log's `Picker: invalid selection` spam was also fixed here
   (`Theme.Kind`, a payload-free selection). (PR #13)
 
+- **M9d — Appearance II.** Material controls sealed unless
+  `theme.kind == .custom`; per-part emission (face + pip color/intensity —
+  the packed texture carries tint ratios, the material scalar carries the
+  peak); backdrop channel: procedural equirect presets or a photo via the
+  felt's `PhotosPicker` pattern (`FeltImageStore` → `UserImageStore`).
+  SceneKit takes the backdrop as `scene.background` +
+  `lightingEnvironment`; RealityKit has no scene backdrop — an inside-out
+  `UnlitMaterial` dome (`faceCulling = .front`) plus a
+  `VirtualEnvironmentProbeComponent` built async from the equirect image.
+  Engine findings recorded in Design.md: `EmissiveColor(color:texture:)`
+  adds a flat wash — bind `init(texture:)` alone; a photo is LDR, so the
+  probe lights without HDR range. Review caught: style picks must retire
+  the photo, mid-flight photo imports must not resurrect `.custom`,
+  failed conversion must drop the stale probe, the die preview needs the
+  same environment, and backdrop rebuilds must dedupe. (PR #15)
+
 ## Planned — M9, device-feedback round
 
 Decisions taken with the user after the first device session: camera stays
@@ -78,14 +94,6 @@ fitted on the dice after settling; backdrop is presets *plus* a user photo;
 emission is a full per-part editor; voice roll is deferred until after the
 string catalog exists.
 
-- **M9d — Appearance II.** Editor hides material controls unless the theme
-  is `.custom` (detents already shipped in M9c); per-part emission (face
-  color+intensity and pip color+intensity — "glowing pips" and "glowing
-  body, dark pips" are both expressible); backdrop channel with procedural
-  presets and an optional photo. On RealityKit the backdrop doubles as
-  the IBL source —
-  the real fix for the flat plastic look: `PhysicallyBasedMaterial` was
-  designed to be lit by an environment, not two analytic lights.
 - **M9e — Localization prep.** `.xcstrings` catalog, every user-facing
   string extracted. Voice-roll ("Say roll!") is deliberately deferred —
   mic permission + locale handling is a milestone of its own.
