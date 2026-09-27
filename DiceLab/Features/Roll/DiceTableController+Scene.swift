@@ -69,10 +69,13 @@ extension DiceTableController {
     /// latches and the fit stops writing — the orbit gesture is then free
     /// instead of fighting a per-frame write.
     func updateCameraFit(now: TimeInterval) {
-        guard cameraFitEnabled, !fitConverged,
-              let camera = cameraNode else { return }
+        // dt bookkeeping runs unconditionally: early-returning on a
+        // disabled fit would leave `lastFitTime` stale, and re-enabling
+        // would then snap (huge dt → damp ≈ 1) instead of gliding.
         let dt = lastFitTime.map { Float(now - $0) } ?? 0
         lastFitTime = now
+        guard cameraFitEnabled, !fitConverged,
+              let camera = cameraNode else { return }
 
         let positions = dice.map { $0.presentation.simdPosition }
         let fastest = dice.compactMap { die -> Float? in
