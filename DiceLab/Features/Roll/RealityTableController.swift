@@ -43,6 +43,17 @@ final class RealityTableController: DiceTable {
     /// can't be completed by the previous roll's in-flight frame callback.
     private var rollID = 0
 
+    /// Backdrop IBL builds are async (equirect → cube → EnvironmentResource),
+    /// so a slower build must not overwrite a newer backdrop — completions
+    /// compare against this counter, the same stale-event rule as the
+    /// editor's `importGeneration`.
+    var backdropGeneration = 0
+
+    /// The last backdrop `applyBackdrop` built — `applyAppearance` re-applies
+    /// every channel on any edit, and a slider drag shouldn't pay an
+    /// equirect→cube→EnvironmentResource conversion per tick.
+    var appliedBackdrop: BackdropAppearance?
+
     /// Consecutive frames every die stayed under the rest thresholds —
     /// RealityKit exposes velocities but no `isResting`, so "settled" is a
     /// definition we hold, not a flag we read.
