@@ -60,8 +60,11 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             }
             .overlay(alignment: .top) {
                 if let roll = table.lastRoll {
-                    Text(roll.faces.map(String.init).joined(separator: " + ")
-                         + " = \(roll.total)")
+                    // An equation needs an explicit catalog key — a joined
+                    // `String` would render verbatim and extract nothing.
+                    Text(String(localized: "roll.equation",
+                                defaultValue: "\(roll.faces.map(String.init).joined(separator: " + ")) = \(roll.total)",
+                                comment: "Result banner — faces joined by ' + ', then the total"))
                         .font(.title2.monospacedDigit().bold())
                         .padding(8)
                         .background(.regularMaterial, in: .capsule)
@@ -75,6 +78,7 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                         .padding(10)
                         .background(.regularMaterial, in: .circle)
                 }
+                .accessibilityLabel("Settings")
                 .padding(.top, 8)
                 .padding(.trailing, 12)
             }

@@ -35,8 +35,14 @@ struct SettingsView<Table: DiceTable>: View {
                     Text("SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures.")
                 }
                 Section("Dice") {
-                    Stepper("Count: \(table.dieCount)",
-                            value: $table.dieCount, in: 1...6)
+                    // Explicit catalog key — the count is a numeric
+                    // substitution future locales can pluralize, and an
+                    // English-text key would break if the wording moved.
+                    Stepper(value: $table.dieCount, in: 1...6) {
+                        Text(String(localized: "settings.dieCount",
+                                    defaultValue: "Count: \(table.dieCount)",
+                                    comment: "Dice-count stepper label"))
+                    }
                     NavigationLink {
                         AppearanceEditor(table: table, preview: preview)
                     } label: {
