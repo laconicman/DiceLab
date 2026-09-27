@@ -115,7 +115,7 @@ struct AppearanceEditor<Table: DiceTable>: View {
                         }
                     }
                     Section {
-                        Picker("Style", selection: appearance.backdrop.preset) {
+                        Picker("Style", selection: backdropPreset) {
                             ForEach(BackdropPreset.allCases, id: \.self) {
                                 Text($0.rawValue.capitalized).tag($0)
                             }
@@ -161,11 +161,26 @@ struct AppearanceEditor<Table: DiceTable>: View {
         }
     }
 
+    /// Style and photo are exclusive: picking a style retires the photo,
+    /// or "None" could never remove a visible backdrop. The file stays on
+    /// disk — re-picking the photo is the explicit way back.
+    private var backdropPreset: Binding<BackdropPreset> {
+        Binding(get: { appearance.wrappedValue.backdrop.preset },
+                set: { preset in
+                    var next = appearance.wrappedValue
+                    next.backdrop.preset = preset
+                    next.backdrop.usesImage = false
+                    appearance.wrappedValue = next
+                })
+    }
+
     /// A picked photo goes to disk via its store, then one write flips
     /// `usesImage` + bumps `revision` — a replaced photo differs only by
     /// revision, and two writes would re-materialize the table twice for
     /// one pick. `isCurrent` is the stale-load guard: a Remove or a newer
-    /// pick while the load was in flight must win.
+    /// pick while the load was in flight must win. The `kind` check covers
+    /// the other stale case — a preset picked mid-load sealed the theme,
+    /// and the landing write must not resurrect `.custom`.
     private func importPhoto(_ item: PhotosPickerItem?,
                              into store: UserImageStore,
                              isCurrent: @escaping () -> Bool,
@@ -173,7 +188,7 @@ struct AppearanceEditor<Table: DiceTable>: View {
         Task {
             guard let data = try? await item?.loadTransferable(type: Data.self),
                   let image = UIImage(data: data) else { return }
-            guard isCurrent() else { return }
+            guard isCurrent(), table.theme.kind == .custom else { return }
             store.save(image)
             var next = appearance.wrappedValue
             update(&next)
