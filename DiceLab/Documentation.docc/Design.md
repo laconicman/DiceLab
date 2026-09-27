@@ -133,8 +133,10 @@ stays engine-free — the rule that made the M7 port a controller swap.
 Each controller translates the model into its own material vocabulary:
 `SCNMaterial` properties (`clearCoat` included — polished resin reads
 lacquered, not printed) vs `PhysicallyBasedMaterial` scalar parameters;
-`SCNFloor` diffuse vs the felt box's `baseColor`; omni/ambient intensities
-vs directional/point intensities. The *model* is identical; the *numbers*
+both engines' felt is now a thin box (`SCNFloor` spawned a `FloorPass`
+reflection pass it never wired up — logged every frame even at
+`reflectivity = 0`), so `diffuse` vs `baseColor` compare on equal
+geometry; omni/ambient intensities vs directional/point intensities. The *model* is identical; the *numbers*
 inside `applyLighting` never port, same lesson as physics constants.
 
 - **Migration:** `settings.skin` resolves once into the matching preset; the
@@ -207,10 +209,16 @@ The port's real findings, SceneKit → RealityKit:
 - **Impulses need `ModelEntity`.** `applyLinearImpulse`/`applyAngularImpulse`
   hang off `HasPhysicsBody` — bare `Entity` doesn't conform. In SceneKit any
   node takes a body; in ECS the *capability* is a type-level fact.
-- **Isolation flipped.** The SceneKit controller is an `NSObject` defending
-  `@Observable` state from the render thread with `Task { @MainActor }`
-  hops. The RealityKit controller is `@MainActor` throughout — RealityKit
-  itself is (`MeshResource` included); there is no foreign thread to defend.
+- **Isolation converged.** Both controllers and the `DiceTable` protocol
+  itself are `@MainActor` — the contract's only callers are views, so the
+  annotation makes the truth checkable (and silences the conformance
+  warning Swift 6 promotes to an error). The SceneKit controller still has
+  a foreign thread to defend against: SceneKit fires the physics-contact
+  and renderer callbacks on the render queue, so those two methods are
+  `nonisolated`, read only the `Mutex` (rollID *and* `rolling` live inside
+  it — a plain `isRolling` read would race the same way), and hop to main
+  for everything else. RealityKit has no foreign thread — scene events
+  pump on main, `MeshResource` included.
 - **The measured-mapping rule held.** `generateBox(splitFaces: true)` gives
   one `MeshResource.Part` per face; each part's vertex centroid is its face
   normal — the same centroid trick that decoded `SCNBox`'s index buffer in
