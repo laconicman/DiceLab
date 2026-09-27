@@ -45,11 +45,20 @@ extension RealityTableController {
         static let speed: Float = 0.10
         /// Half a die's diagonal (~2.6 cm) plus margin.
         static let padding: Float = 0.045
+        /// The far cap isn't a constant either: "the whole play volume
+        /// fits," computed per-frame — opposite-wall dice must still land
+        /// inside a narrow viewport.
         static let minDistance: Float = 0.18
-        static let maxDistance: Float = 0.8
+        static var volumeRadius: Float {
+            sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
+                + padding
+        }
         static let rate: Float = 5
         /// Converged-pose epsilon — ~2 mm at meter scale.
         static let epsilon: Float = 0.002
+        /// A paused renderer resumes with the whole pause inside `dt`
+        /// (damp ≈ 1 → snap). Capping at 100 ms keeps resumes gliding.
+        static let maxDt: Float = 0.1
     }
 
     /// Per-frame camera framing, called from `update`. Target flips
@@ -58,9 +67,10 @@ extension RealityTableController {
     /// fitted pose converges after a settle, `fitConverged` latches and the
     /// fit stops writing — between-rolls orbit gestures are then free,
     /// with no per-frame tug-of-war. `roll()` clears the latch.
-    func updateCameraFit(dt: Float) {
+    func updateCameraFit(dt rawDt: Float) {
         guard cameraFitEnabled, !fitConverged,
               let camera = cameraEntity else { return }
+        let dt = min(rawDt, Fit.maxDt)
         let positions = dice.map { $0.position }
         let fastest = dice.compactMap { die -> Float? in
             guard let motion = die.components[PhysicsMotionComponent.self] else { return nil }
@@ -71,7 +81,11 @@ extension RealityTableController {
             radius: sphere.radius,
             verticalFieldOfView: CameraHome.fieldOfView,
             aspect: Float(viewAspect))
-        distance = min(max(distance, Fit.minDistance), Fit.maxDistance)
+        let maxDistance = CameraFit.requiredDistance(
+            radius: Fit.volumeRadius,
+            verticalFieldOfView: CameraHome.fieldOfView,
+            aspect: Float(viewAspect))
+        distance = min(max(distance, Fit.minDistance), maxDistance)
         let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
         let target = fitting
             ? sphere.center + CameraHome.axis * distance

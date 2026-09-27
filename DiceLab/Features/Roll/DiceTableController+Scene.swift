@@ -50,14 +50,22 @@ extension DiceTableController {
         /// the 3-unit box) plus margin so pips never kiss the frame edge.
         static let padding: Float = 4
         /// Never zoom closer than this — a single die shouldn't fill the
-        /// screen; and never farther than the ceiling allows.
+        /// screen. The far cap isn't a constant: it's "the whole play
+        /// volume fits," computed per-frame from `Bounds` — dice at
+        /// opposite walls must still land inside a narrow viewport.
         static let minDistance: Float = 14
-        static let maxDistance: Float = 40
+        static var volumeRadius: Float {
+            sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
+                + padding
+        }
         /// Exponential damp rate: ~99% converged in one second, and tracks
         /// a moving target without animation restarts.
         static let rate: Float = 5
         /// Converged-pose epsilon — a fraction of a die's edge (3 units).
         static let epsilon: Float = 0.05
+        /// A paused renderer resumes with the whole pause inside `dt`
+        /// (damp ≈ 1 → snap). Capping at 100 ms keeps resumes gliding.
+        static let maxDt: Float = 0.1
     }
 
     /// Per-frame camera framing, called from the renderer hop. The target
@@ -72,7 +80,7 @@ extension DiceTableController {
         // dt bookkeeping runs unconditionally: early-returning on a
         // disabled fit would leave `lastFitTime` stale, and re-enabling
         // would then snap (huge dt → damp ≈ 1) instead of gliding.
-        let dt = lastFitTime.map { Float(now - $0) } ?? 0
+        let dt = min(lastFitTime.map { Float(now - $0) } ?? 0, Fit.maxDt)
         lastFitTime = now
         guard cameraFitEnabled, !fitConverged,
               let camera = cameraNode else { return }
@@ -88,7 +96,11 @@ extension DiceTableController {
             radius: sphere.radius,
             verticalFieldOfView: Float(fov),
             aspect: Float(viewAspect))
-        distance = min(max(distance, Fit.minDistance), Fit.maxDistance)
+        let maxDistance = CameraFit.requiredDistance(
+            radius: Fit.volumeRadius,
+            verticalFieldOfView: Float(fov),
+            aspect: Float(viewAspect))
+        distance = min(max(distance, Fit.minDistance), maxDistance)
         // Only reach for the cluster once the dice are nearly down; while
         // they fly (or before the first roll) the target is simply home.
         let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)

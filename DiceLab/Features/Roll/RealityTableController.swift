@@ -95,7 +95,10 @@ final class RealityTableController: DiceTable {
     var cameraFitEnabled = UserDefaults.standard.object(forKey: TableSettings.cameraFit) as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(cameraFitEnabled, forKey: TableSettings.cameraFit)
-            if cameraFitEnabled { fitConverged = false }
+            // Only a real off→on transition unlatches: `reloadSettings`
+            // rewrites the unchanged value on every activation, and
+            // clearing the latch then would steal the user's orbit.
+            if cameraFitEnabled && !oldValue { fitConverged = false }
         }
     }
 
