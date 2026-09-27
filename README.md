@@ -23,3 +23,14 @@ and RealityKit (ECS) — switchable in Settings, the M7 comparison exercise.
 Direction docs — architecture decisions, the M1–M7 milestone roadmap, and the
 tech-debt register — live in `DiceLab/Documentation.docc/` and render via
 **Product ▸ Build Documentation** in Xcode. `Design.md` there is authoritative.
+
+## Versioning & releases
+
+Milestone merges get an annotated `v<major>.<sub>` tag — `v0.9.2` is M9c — and a
+GitHub release with generated notes. `MARKETING_VERSION` in `project.yml` tracks
+the latest tag; bump it in the milestone's closeout commit.
+
+## License
+
+Apache-2.0 — see `LICENSE`. Fresh-authored; carries no code verbatim from the
+unlicensed upstream projects (see `TechDebt.md` TD-2).
