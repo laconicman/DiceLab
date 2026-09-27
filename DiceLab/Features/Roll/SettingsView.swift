@@ -16,6 +16,9 @@ struct SettingsView<Table: DiceTable>: View {
     /// Speech is view-layer feedback, so its toggle is `@AppStorage` like
     /// `engine` — see `TableSettings.speech`.
     @AppStorage(TableSettings.speech) private var speechEnabled = true
+    /// History-panel visibility is chrome, not scene state — same
+    /// `@AppStorage` slot class as `speech`.
+    @AppStorage(TableSettings.history) private var historyEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -56,10 +59,16 @@ struct SettingsView<Table: DiceTable>: View {
                 } footer: {
                     Text("Automatic framing eases the camera to keep all dice in view while they settle. Camera control lets you orbit freely between rolls.")
                 }
+                Section {
+                    Toggle("Roll history", isOn: $historyEnabled)
+                } header: {
+                    Text("History")
+                } footer: {
+                    Text("A session roll list on the table screen — tap its header to expand it toward the safe area.")
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium])
     }
 }
