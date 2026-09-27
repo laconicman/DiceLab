@@ -50,12 +50,14 @@ extension DiceTableController {
         /// the 3-unit box) plus margin so pips never kiss the frame edge.
         static let padding: Float = 4
         /// Never zoom closer than this — a single die shouldn't fill the
-        /// screen. The far cap isn't a constant: it's "the whole play
-        /// volume fits," computed per-frame from `Bounds` — dice at
-        /// opposite walls must still land inside a narrow viewport.
+        /// screen. The far cap isn't a constant: it's "the widest cluster
+        /// the volume can hold," computed per-frame. The sphere is centered
+        /// on the *centroid*, not the table — a lopsided cluster (most
+        /// dice in one corner, an outlier opposite) sits the centroid near
+        /// one end, so the true worst case is the full diagonal, not half.
         static let minDistance: Float = 14
         static var volumeRadius: Float {
-            sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
+            2 * sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
                 + padding
         }
         /// Exponential damp rate: ~99% converged in one second, and tracks
@@ -136,6 +138,9 @@ extension DiceTableController {
     private func setUpCamera() {
         let camera = SCNNode()
         camera.camera = SCNCamera()
+        // The fit can retreat the camera ~150 units out in a narrow
+        // viewport; the default zFar (100) would clip the dice itself.
+        camera.camera?.zFar = 300
         // Top-down view onto the table: 20 units up, tilted straight down.
         camera.position = SCNVector3(CameraHome.position)
         camera.rotation = SCNVector4(x: 1, y: 0, z: 0, w: -.pi / 2)

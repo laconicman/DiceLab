@@ -45,12 +45,13 @@ extension RealityTableController {
         static let speed: Float = 0.10
         /// Half a die's diagonal (~2.6 cm) plus margin.
         static let padding: Float = 0.045
-        /// The far cap isn't a constant either: "the whole play volume
-        /// fits," computed per-frame — opposite-wall dice must still land
-        /// inside a narrow viewport.
+        /// The far cap isn't a constant either: "the widest cluster the
+        /// volume can hold," computed per-frame. Centroid-centered spheres
+        /// worst-case at the *full* diagonal — a lopsided cluster sits the
+        /// centroid near one end, the outlier a diagonal away.
         static let minDistance: Float = 0.18
         static var volumeRadius: Float {
-            sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
+            2 * sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
                 + padding
         }
         static let rate: Float = 5
