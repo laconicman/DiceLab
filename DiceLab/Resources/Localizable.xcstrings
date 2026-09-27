@@ -1,0 +1,666 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Appearance" : {
+      "comment" : "Navigation link to the appearance editor, and its navigation title",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        }
+      }
+    },
+    "Automatic framing" : {
+      "comment" : "Camera-fit toggle",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic framing"
+          }
+        }
+      }
+    },
+    "Automatic framing eases the camera to keep all dice in view while they settle. Camera control lets you orbit freely between rolls." : {
+      "comment" : "Camera section footer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic framing eases the camera to keep all dice in view while they settle. Camera control lets you orbit freely between rolls."
+          }
+        }
+      }
+    },
+    "A session roll list on the table screen — tap its header to expand it toward the safe area." : {
+      "comment" : "History section footer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A session roll list on the table screen — tap its header to expand it toward the safe area."
+          }
+        }
+      }
+    },
+    "Backdrop" : {
+      "comment" : "Backdrop section header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backdrop"
+          }
+        }
+      }
+    },
+    "Camera" : {
+      "comment" : "Settings section header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera"
+          }
+        }
+      }
+    },
+    "Camera control" : {
+      "comment" : "Free-orbit toggle",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera control"
+          }
+        }
+      }
+    },
+    "Clearcoat" : {
+      "comment" : "Material slider: lacquer-like top coat",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clearcoat"
+          }
+        }
+      }
+    },
+    "Collapse roll history" : {
+      "comment" : "VoiceOver label for the expanded history panel header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapse roll history"
+          }
+        }
+      }
+    },
+    "Custom" : {
+      "comment" : "Theme option: user-edited appearance",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        }
+      }
+    },
+    "Dice" : {
+      "comment" : "Settings section header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dice"
+          }
+        }
+      }
+    },
+    "Die" : {
+      "comment" : "Singular of dice — appearance-editor section for the die itself",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die"
+          }
+        }
+      }
+    },
+    "Dramatic" : {
+      "comment" : "Lighting preset name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dramatic"
+          }
+        }
+      }
+    },
+    "Dusk" : {
+      "comment" : "Backdrop preset name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dusk"
+          }
+        }
+      }
+    },
+    "Ember" : {
+      "comment" : "Backdrop preset name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ember"
+          }
+        }
+      }
+    },
+    "Emission" : {
+      "comment" : "Appearance-editor section header: self-illumination of die parts",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emission"
+          }
+        }
+      }
+    },
+    "Engine" : {
+      "comment" : "Settings section header for the renderer picker",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine"
+          }
+        }
+      }
+    },
+    "Expand roll history" : {
+      "comment" : "VoiceOver label for the collapsed history panel header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expand roll history"
+          }
+        }
+      }
+    },
+    "Face" : {
+      "comment" : "Color picker: the die's body color",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Face"
+          }
+        }
+      }
+    },
+    "Face glow" : {
+      "comment" : "Color picker: emissive tint of the die's body",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Face glow"
+          }
+        }
+      }
+    },
+    "Face intensity" : {
+      "comment" : "Slider: emissive strength of the die's body",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Face intensity"
+          }
+        }
+      }
+    },
+    "Feedback" : {
+      "comment" : "Settings section header for haptics/sound/speech toggles",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback"
+          }
+        }
+      }
+    },
+    "Felt color" : {
+      "comment" : "Color picker: the table surface",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Felt color"
+          }
+        }
+      }
+    },
+    "Graphite" : {
+      "comment" : "Backdrop preset name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Graphite"
+          }
+        }
+      }
+    },
+    "Haptics" : {
+      "comment" : "Toggle for haptic taps on collisions",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haptics"
+          }
+        }
+      }
+    },
+    "History" : {
+      "comment" : "Settings section header and history panel title",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "History"
+          }
+        }
+      }
+    },
+    "Ivory" : {
+      "comment" : "Theme preset name: white die, black pips",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ivory"
+          }
+        }
+      }
+    },
+    "Lighting" : {
+      "comment" : "Picker: lighting rig preset",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lighting"
+          }
+        }
+      }
+    },
+    "Metalness" : {
+      "comment" : "Material slider",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metalness"
+          }
+        }
+      }
+    },
+    "None" : {
+      "comment" : "Backdrop preset: no backdrop",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "Onyx" : {
+      "comment" : "Theme preset name: black die, white pips",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onyx"
+          }
+        }
+      }
+    },
+    "Pips" : {
+      "comment" : "Color picker: the die's pip color",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pips"
+          }
+        }
+      }
+    },
+    "Pip glow" : {
+      "comment" : "Color picker: emissive tint of the pips",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pip glow"
+          }
+        }
+      }
+    },
+    "Pip intensity" : {
+      "comment" : "Slider: emissive strength of the pips",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pip intensity"
+          }
+        }
+      }
+    },
+    "Preset" : {
+      "comment" : "Theme picker label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset"
+          }
+        }
+      }
+    },
+    "Presets are sealed looks — choose Custom to edit materials." : {
+      "comment" : "Theme section footer explaining sealed presets",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presets are sealed looks — choose Custom to edit materials."
+          }
+        }
+      }
+    },
+    "Remove backdrop photo" : {
+      "comment" : "Destructive button: clears the user-picked backdrop image",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove backdrop photo"
+          }
+        }
+      }
+    },
+    "Remove photo" : {
+      "comment" : "Destructive button: clears the user-picked felt image",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove photo"
+          }
+        }
+      }
+    },
+    "Renderer" : {
+      "comment" : "Picker label choosing the 3D engine",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderer"
+          }
+        }
+      }
+    },
+    "Roll" : {
+      "comment" : "Roll button, idle state",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roll"
+          }
+        }
+      }
+    },
+    "Roll history" : {
+      "comment" : "Toggle for the history panel",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roll history"
+          }
+        }
+      }
+    },
+    "Rolling…" : {
+      "comment" : "Roll button while a throw is in flight",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rolling…"
+          }
+        }
+      }
+    },
+    "Roughness" : {
+      "comment" : "Material slider",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roughness"
+          }
+        }
+      }
+    },
+    "SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures." : {
+      "comment" : "Engine section footer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures."
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "comment" : "Settings sheet title and settings button accessibility label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "Soft" : {
+      "comment" : "Lighting preset name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soft"
+          }
+        }
+      }
+    },
+    "Sound" : {
+      "comment" : "Toggle for the synthesized collision knock",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sound"
+          }
+        }
+      }
+    },
+    "Speak results" : {
+      "comment" : "Toggle for spoken roll totals",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak results"
+          }
+        }
+      }
+    },
+    "Studio" : {
+      "comment" : "Lighting preset name",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Studio"
+          }
+        }
+      }
+    },
+    "Style" : {
+      "comment" : "Picker: backdrop preset",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Style"
+          }
+        }
+      }
+    },
+    "Table" : {
+      "comment" : "Appearance-editor section header for the felt surface",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Table"
+          }
+        }
+      }
+    },
+    "The backdrop doubles as the scene's light source where the engine supports image-based lighting." : {
+      "comment" : "Backdrop section footer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The backdrop doubles as the scene's light source where the engine supports image-based lighting."
+          }
+        }
+      }
+    },
+    "Theme" : {
+      "comment" : "Appearance-editor section header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme"
+          }
+        }
+      }
+    },
+    "Use photo as backdrop" : {
+      "comment" : "Photos picker button: backdrop image",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use photo as backdrop"
+          }
+        }
+      }
+    },
+    "Use photo as felt" : {
+      "comment" : "Photos picker button: felt image",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use photo as felt"
+          }
+        }
+      }
+    },
+    "history.equation" : {
+      "comment" : "A history row's compact equation — %1$@ is the die faces joined by '+', %2$lld the total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ = %2$lld"
+          }
+        }
+      }
+    },
+    "roll.equation" : {
+      "comment" : "Result banner equation — %1$@ is the die faces joined by ' + ', %2$lld the total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ = %2$lld"
+          }
+        }
+      }
+    },
+    "settings.dieCount" : {
+      "comment" : "Dice-count stepper label — %lld is the count; add plural variations per locale (English shows the bare number)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Count: %lld"
+          }
+        }
+      }
+    },
+    "speech.plus" : {
+      "comment" : "Spoken joiner between die face values — keep the surrounding spaces",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " plus "
+          }
+        }
+      }
+    },
+    "speech.result" : {
+      "comment" : "Spoken roll result — %1$@ is the face values joined by the ' plus ' joiner, %2$lld the total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ equals %2$lld"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
