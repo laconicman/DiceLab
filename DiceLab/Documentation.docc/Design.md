@@ -323,6 +323,40 @@ by `RollResult.id` — identical totals are still distinct rolls — and carry
 a `rowTint` scaffold: today it returns nil, later a settings-driven
 per-player color maps each roll to the player who threw it.
 
+## Strings flow through one catalog
+
+M9e added `Resources/Localizable.xcstrings` — Xcode's String Catalog —
+with `SWIFT_EMIT_LOC_STRINGS`/`LOCALIZATION_PREFERS_STRING_CATALOGS` set
+in `project.yml` (XcodeGen doesn't set them itself). English is the only
+locale; the point is the funnel: a second language becomes a data change,
+not a code audit.
+
+- **Literal keys by default.** `Text("Roll")` extracts the literal as its
+  own key — self-documenting and free. Dotted keys (`roll.equation`,
+  `history.equation`, `settings.dieCount`, `speech.result`,
+  `speech.plus`) exist where the default is fragile: runtime-built text
+  (a joined `String` renders *verbatim*, invisible to extraction) and
+  interpolations whose key shouldn't die if the English wording moves.
+  `settings.dieCount` keeps the bare "Count: %lld" — English shows no
+  noun — but the numeric substitution lets a future locale add plural
+  variations without a code change.
+- **Speech goes through the same catalog.** `SpeechController` resolves
+  "N plus M equals T" via the `speech.*` keys, so a translated string
+  reads aloud in that language and `AVSpeechUtterance`'s default voice
+  follows the resolved locale. Pinning voices per locale is the deferred
+  voice-roll milestone's design question — extracting now means the
+  spoken string already sits where translation tooling sees it.
+- **Enum display names are model properties.** `LightingPreset.title`/
+  `BackdropPreset.title` return `String(localized:)` — Foundation-only,
+  so `Model/` stays engine-free; the old `rawValue.capitalized` label
+  could never reach the catalog. `DiceEngine.title` is the deliberate
+  exception: "SceneKit"/"RealityKit" are brand nouns Apple's own
+  localizations keep Latin.
+- **Pass-through params take `LocalizedStringKey`, not `String`.**
+  `sliderRow(_ title:)` forwards to `LabeledContent`; typed `String`, the
+  call-site literal would compile to a verbatim value and extract
+  nothing. The Key type is what keeps the literal catalog-reachable.
+
 ## Where state lives, after M7
 
 - `DiceLabApp.engine` — `@AppStorage("settings.engine")`, the app-level
