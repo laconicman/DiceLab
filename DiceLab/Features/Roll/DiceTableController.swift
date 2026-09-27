@@ -6,6 +6,12 @@ import Synchronization
 /// Owns the dice table: the SceneKit scene, the dice on it, and the state the
 /// physics world reports back. Views bind to this controller; they never touch
 /// SceneKit themselves.
+///
+/// `@MainActor` — every mutation already ran there (roll, respawn, settle
+/// publish); the annotation makes it real. The two delegate callbacks that
+/// SceneKit fires on the render thread opt back out with `nonisolated` and
+/// read nothing outside the `sync` Mutex before hopping.
+@MainActor
 @Observable
 final class DiceTableController: NSObject {
     /// The rendered world. A `let` reference owned here because a scene must
@@ -38,7 +44,9 @@ final class DiceTableController: NSObject {
     /// can't be completed by the previous roll's queued publish. Behind a
     /// `Mutex` because two readers live off-main — the physics contact
     /// delegate and the renderer callback both run on the render thread.
-    private let rollID = Mutex(0)
+    /// `rolling` shares the lock: `isRolling` is the main-actor mirror the
+    /// views observe, this is the value the render thread may read.
+    private let sync = Mutex((rollID: 0, rolling: false))
 
     /// Collision feel — owned here so views never hear about Core Haptics.
     /// `maxImpulse` 15 from `-impulseLog`: the estimate's observed ceiling
@@ -124,7 +132,8 @@ final class DiceTableController: NSObject {
     private func respawnDice() {
         for die in dice { die.removeFromParentNode() }
         dice = []
-        _ = rollID.withLock { $0 += 1 } // a settle queued for the old dice must not publish
+        // A settle queued for the old dice must not publish.
+        sync.withLock { $0.rollID += 1; $0.rolling = false }
         isRolling = false
         lastRoll = nil
         history = []
@@ -138,7 +147,7 @@ final class DiceTableController: NSObject {
     /// `(1, 24, 2)` to every die — correlated, repeatable rolls. Randomizing
     /// per die is what makes consecutive rolls differ.
     func roll() {
-        _ = rollID.withLock { $0 += 1 }
+        sync.withLock { $0.rollID += 1; $0.rolling = true }
         isRolling = true
         if DevFlags.impulseLog {
             rollImpulses = []
@@ -176,7 +185,8 @@ final class DiceTableController: NSObject {
 }
 
 /// The shared table contract — every member already exists; conformance is
-/// free because M1–M6 defined exactly this surface.
+/// free because M1–M6 defined exactly this surface and the class is already
+/// main-actor.
 extension DiceTableController: DiceTable {}
 
 extension DiceTableController: SCNSceneRendererDelegate {
@@ -186,9 +196,12 @@ extension DiceTableController: SCNSceneRendererDelegate {
     ///
     /// The callback isn't documented as main-thread, and SwiftUI reads the
     /// published state on main — so publishing hops to `MainActor`.
-    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-        guard isRolling else { return }
-        let generation = rollID.withLock { $0 }
+    /// `nonisolated`: SceneKit calls this on the render thread. It reads
+    /// only the `sync` Mutex — `rolling` lives there, never as the plain
+    /// `isRolling` — then hops to main for everything dice-related.
+    nonisolated func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+        guard let generation = sync.withLock({ $0.rolling ? $0.rollID : nil })
+        else { return }
         Task { @MainActor in
             // Everything dice-related happens here, not on the render
             // thread: `respawnDice` mutates the array on main, so iterating
@@ -197,13 +210,14 @@ extension DiceTableController: SCNSceneRendererDelegate {
             // or clear the new roll's flag — the generation guard covers
             // invalidation, the isResting re-check covers an impulse that
             // landed after it.
-            guard isRolling, rollID.withLock({ $0 == generation }),
+            guard isRolling, sync.withLock({ $0.rollID == generation }),
                   dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) else { return }
             let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
             lastRoll = result
             history.append(result)
             if history.count > 20 { history.removeFirst() }
             isRolling = false
+            sync.withLock { $0.rolling = false }
             if let started = rollStartedAt { logImpulseSummary(since: started) }
         }
     }
@@ -219,15 +233,21 @@ extension DiceTableController: SCNSceneRendererDelegate {
     }
 }
 
+/// Closing speed → impulse estimate: mass-1 dice at ~0.5 restitution.
+/// File-scoped, not a class member: `physicsWorld(didBegin:)` is
+/// `nonisolated`, and a `static let` on a `@MainActor` class would be
+/// actor-isolated where it doesn't need to be.
+private enum ImpulseEstimate {
+    static let scale: Float = 1.5
+}
+
 extension DiceTableController: SCNPhysicsContactDelegate {
-    /// Closing speed → impulse estimate: mass-1 dice at ~0.5 restitution.
-    private static let impulseScale: Float = 1.5
 
 
-    /// Fires on SceneKit's physics queue, not main — the only thing done here
-    /// is read the impulse and hop; all mutation happens on the main actor.
-    /// (That's REVIEW.md's rule, kept.)
-    func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
+    /// `nonisolated`: fires on SceneKit's physics queue, not main — the only
+    /// thing done here is read the contact velocities and `sync`, then hop;
+    /// all mutation happens on the main actor. (REVIEW.md's rule, kept.)
+    nonisolated func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
         // `collisionImpulse` is deprecated and returns 0 on current SDKs —
         // measured via `-impulseLog`: 121 contacts, all 0.000. The impulse
         // is estimated instead as the closing speed along the contact
@@ -240,16 +260,18 @@ extension DiceTableController: SCNPhysicsContactDelegate {
         let closing = abs(Float(a.x - b.x) * Float(n.x)
                           + Float(a.y - b.y) * Float(n.y)
                           + Float(a.z - b.z) * Float(n.z))
-        let impulse = closing * Self.impulseScale
-        // Render-thread capture — `rollID` is a Mutex precisely because
-        // this delegate and `roll()` don't share a thread.
-        let generation = rollID.withLock { $0 }
-        Task { @MainActor [haptics] in
+        let impulse = closing * ImpulseEstimate.scale
+        // Render-thread capture — `rollID` is inside the Mutex precisely
+        // because this delegate and `roll()` don't share a thread.
+        let generation = sync.withLock { $0.rollID }
+        Task { @MainActor in
             // Generation pins the sample to its roll — a contact queued
             // before settle but run after the next `roll()` would pass an
             // `isRolling`-only gate and contaminate the new stats.
+            // `haptics` reads here, not in a capture list: the property is
+            // main-actor, so touching it at capture time would race.
             if DevFlags.impulseLog, isRolling,
-               rollID.withLock({ $0 == generation }) {
+               sync.withLock({ $0.rollID == generation }) {
                 rollImpulses.append(impulse)
             }
             haptics.collision(impulse: impulse)

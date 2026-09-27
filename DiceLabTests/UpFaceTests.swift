@@ -71,6 +71,9 @@ struct PhysicsCategoryTests {
     }
 }
 
+/// `DiceTableController` is `@MainActor` — so the suite is, same rule as
+/// RealityTableTests.
+@MainActor
 struct SpawnPositionTests {
     @Test("N dice → N positions, centered on the table midline")
     func countsAndSymmetry() {
