@@ -1,0 +1,12 @@
+changelog:
+  categories:
+    - title: Engine work
+      labels: ["engine:scenekit", "engine:realitykit"]
+    - title: Model & shared
+      labels: ["model"]
+    - title: UI & editor
+      labels: ["ui"]
+    - title: Docs & hygiene
+      labels: ["documentation", "hygiene"]
+    - title: Other
+      labels: ["*"]
