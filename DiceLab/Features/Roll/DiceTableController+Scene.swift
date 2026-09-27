@@ -82,17 +82,29 @@ extension DiceTableController {
     }
 
     private func setUpTable() {
-        let felt = SCNFloor()
-        felt.reflectivity = 0 // TD-4: FloorPass warning is harmless at 0
+        // A thin box, not SCNFloor: the floor's reflection pass (FloorPass)
+        // spams the log every frame even at reflectivity = 0 — the geometry
+        // alone opts into the pass. A box never creates it, and gives the
+        // felt a real UV-mapped surface for texture work. TD-4 discharged.
+        let feltMaterial = SCNMaterial()
         let feltAppearance = theme.appearance.felt
-        felt.firstMaterial?.diffuse.contents =
+        feltMaterial.diffuse.contents =
             (feltAppearance.usesImage ? FeltImageStore.load() : nil)
             ?? feltAppearance.color.uiColor
-        felt.firstMaterial?.roughness.contents = NSNumber(1) // matte felt
-        felt.firstMaterial?.specular.contents = UIColor.black
+        feltMaterial.roughness.contents = NSNumber(1) // matte felt
+        feltMaterial.specular.contents = UIColor.black
+        let felt = SCNBox(width: CGFloat(Bounds.span),
+                          height: CGFloat(Bounds.thickness),
+                          length: CGFloat(Bounds.span), chamferRadius: 0)
+        // One shared instance across the six face slots: mutating it later
+        // (applyAppearance) updates every face at once.
+        felt.materials = Array(repeating: feltMaterial, count: 6)
         let floor = SCNNode(geometry: felt)
         floor.name = NodeName.felt
-        floor.position.y = Bounds.floorY
+        // Same convention as the walls: center sits half a thickness below,
+        // so the top face lands exactly on floorY — the contact plane the
+        // dice rest on is unchanged.
+        floor.position.y = Bounds.floorY - Bounds.thickness / 2
         floor.physicsBody = .tableBody()
         scene.rootNode.addChildNode(floor)
 
