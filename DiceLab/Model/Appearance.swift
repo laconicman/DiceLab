@@ -71,6 +71,22 @@ struct Appearance: Codable, Equatable, Hashable {
 enum Theme: Codable, Equatable, Hashable {
     case ivory, onyx, custom(Appearance)
 
+    /// Payload-free case identity — picker tags must be stable while a
+    /// custom theme's fields mutate under it. Binding a `Picker` to the
+    /// full `Theme` means every slider tick produces a selection that
+    /// equals no tag (SwiftUI logs "invalid selection" per tick).
+    enum Kind: String, CaseIterable {
+        case ivory, onyx, custom
+    }
+
+    var kind: Kind {
+        switch self {
+        case .ivory: .ivory
+        case .onyx: .onyx
+        case .custom: .custom
+        }
+    }
+
     var appearance: Appearance {
         switch self {
         case .ivory: .ivory
