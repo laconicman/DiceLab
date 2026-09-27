@@ -215,9 +215,11 @@ The port's real findings, SceneKit → RealityKit:
   warning Swift 6 promotes to an error). The SceneKit controller still has
   a foreign thread to defend against: SceneKit fires the physics-contact
   and renderer callbacks on the render queue, so those two methods are
-  `nonisolated`, read only the `Mutex` (rollID *and* `rolling` live inside
-  it — a plain `isRolling` read would race the same way), and hop to main
-  for everything else. RealityKit has no foreign thread — scene events
+  `nonisolated`, and the only controller state they touch off-main is the
+  `Mutex` (rollID *and* `rolling` live inside it — a plain `isRolling`
+  read would race the same way). `didBegin` additionally samples the
+  `SCNPhysicsContact` it was handed — velocities along the contact normal,
+  valid for the callback's duration — then everything hops to main. RealityKit has no foreign thread — scene events
   pump on main, `MeshResource` included.
 - **The measured-mapping rule held.** `generateBox(splitFaces: true)` gives
   one `MeshResource.Part` per face; each part's vertex centroid is its face
