@@ -5,7 +5,7 @@ Numbered register. `// TODO(TD-n)` markers in code reference these.
 | ID | Item | Cost | Discharge |
 |---|---|---|---|
 | TD-1 | ~~SceneKit is soft-deprecated (iOS 26): patches only, no new features~~ **discharged (M7):** the RealityKit engine ships alongside — the deprecation risk is a settings toggle, not a rewrite | — | — |
-| TD-2 | `profburke/DiceRollDemo` has **no LICENSE** — README promised one, never added | Our port carries no derived code verbatim, but the *design* descends from it; distributing anything closer would need Burke's blessing or a clean-room | Ask author to add a license, or keep derivation at idea level only |
+| TD-2 | `profburke/DiceRollDemo` has **no LICENSE** — README promised one, never added | Our port carries no derived code verbatim, but the *design* descends from it; distributing anything closer would need Burke's blessing or a clean-room. **DiceLab itself is Apache-2.0** (LICENSE) — the debt is upstream provenance only | Ask author to add a license, or keep derivation at idea level only |
 | TD-3 | ~~`.allowsCameraControl` enabled for development~~ **discharged (M6):** now a user-facing settings toggle, default on — deliberate for a learning toy; scripted camera framing would revisit it | — | — |
 | TD-4 | ~~`FloorPass is not linked to the rendering graph` logged every frame — SceneKit's internal reflection pass exists on `SCNFloor` even at `reflectivity = 0`~~ **discharged (M9a):** felt is a thin `SCNBox`, which never creates the pass — and gains a real UV surface for texture work | — | — |
 | TD-5 | A die wedged against a wall could stay awake forever, leaving `isRolling` stuck | Rare; UI shows "Rolling…" until it settles or the app restarts | Watch for it on device; add a settle timeout if observed |
