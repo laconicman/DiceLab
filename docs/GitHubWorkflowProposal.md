@@ -1,327 +1,265 @@
 # GitHub Workflow Proposal — DiceLab
 
-Surveyed 2026-09-27 against the live repo (`laconicman/DiceLab`) and local
-worktree. Every recommendation below is grounded in that survey — what's
-already present, what's missing, and what the repo's actual shape rewards.
+*Second survey — 2026-09-28.* The 2026-09-27 proposal (below, §History) was
+adopted and shipped: CI, labels, milestones-as-display, semver tags, releases,
+`release.yml`, PR template, `delete_branch_on_merge`, `allow_auto_merge`,
+Apache-2.0. This revision re-surveys the repo *after* that adoption and asks
+what's still unused — not what was missing then.
 
-## What exists today
+## What exists today (verified live)
 
 | Capability | State | Evidence |
 |---|---|---|
-| Tags | **None** | `git tag -l` empty across 13 merged milestones |
-| Releases | **None** | `gh release list` empty |
-| `.github/` | **Absent** — no templates, workflows, CODEOWNERS, dependabot | `ls .github/` → no such dir |
-| Milestones | **0 on GitHub** — milestone tracking lives in `DiceLab/Documentation.docc/Roadmap.md` (M0–M9e) | `gh api .../milestones` → `[]` |
-| Issues | **0 ever opened** — all planning rides in PR titles/bodies and Roadmap.md | `gh issue list --state all` empty |
-| Labels | **GitHub defaults only** (bug, enhancement, documentation, …) | `gh label list` |
-| Merge convention | **Merge commits**, branch deleted after each PR (`#1`–`#13` all `--merge`) | PR history + local branch hygiene |
-| `deleteBranchOnMerge` | **`false`** — remote branches pruned manually (8 stale refs cleaned post-M9b) | repo settings API |
-| `allow_auto_merge` | **`false`** | repo settings API |
-| Branch protection / rulesets | **None** — `main` accepts direct pushes and force-push | `GET .../branches/main/protection` → 404 |
-| CI | **None** — no Actions workflows; build+test run locally (`xcodegen` + `xcodebuild test`, 37 tests) | no `*.yml` outside `project.yml` |
-| Review automation | **Devin Review via MCP** (not Actions), fed by `REVIEW.md`; `scripts/check_review_md.py` validates that file but is run manually | `REVIEW.md`, `scripts/` |
-| License | **None** — public repo, `licenseInfo: null`; upstream lack of license recorded as TD-2 | repo API, TechDebt.md |
-| Discussions / Wiki | Available but unused; Discussions off | repo settings API |
+| Tags | **8 annotated tags** `v0.8.0`–`v0.9.4`, each pointing at its closeout merge carrying the `MARKETING_VERSION` bump | `git tag -l`, `git show v0.9.4` → `c0e4650` |
+| Releases | **8 GitHub releases**, hand-authored titles ("M9e: localization preparation"), generated notes | `gh release list` |
+| `.github/` | `workflows/ci.yml`, `release.yml` (label→changelog categories), `pull_request_template.md` | `ls .github/` |
+| CI | **Runs**: `macos-26`, `check_review_md.py` → `xcodegen generate` → `xcodebuild test` on a runtime-picked iPhone sim. Triggers: PRs + pushes to `main` | `.github/workflows/ci.yml` |
+| Milestones | 2 on GitHub, **both `open` with 0 open issues** — M9d and M9e finished but never closed | `gh api .../milestones` |
+| Labels | Custom set in use — `engine:scenekit`, `engine:realitykit`, `model`, `ui`, `hygiene`, `tech-debt` + defaults; applied to PRs #14,#15,#17,#19,#20 but **not** closeouts #16,#18 | `gh label list`, PR inspection |
+| Merge convention | Merge commits exclusively (#1–#20); `squashMergeAllowed`, `rebaseMergeAllowed` also enabled but unused | PR history |
+| `delete_branch_on_merge` | **`true`** | repo API |
+| `allow_auto_merge` | **`true`** — enabled 2026-09-27, **never used** (all PRs merged manually after CI) | repo API, PR history |
+| Branch protection / rulesets | **None** — `main` accepts direct pushes and force-push; the 2026-09-27 decision deferred this deliberately | `GET .../branches/main/protection` → 404, rulesets `[]` |
+| Issues | **0 ever opened** — planning rides in Roadmap.md + PR bodies | `gh issue list --state all` |
+| Issue templates | None | `ls .github/ISSUE_TEMPLATE` → absent |
+| Dependabot | None; only external dep is `actions/checkout@v5` | `.github/dependabot.yml` absent |
+| License | `LICENSE` Apache-2.0 added 2026-09-27 | repo |
+| `SECURITY.md` / `CONTRIBUTING.md` / `CODEOWNERS` | Absent | `ls` |
+| Discussions / Projects / Wiki | Discussions off (correct); Projects+Wiki on, unused | repo API |
 
-Notable repo-specific facts that shape the proposals:
+Facts that shape the proposals:
 
-- **Solo maintainer + AI pair**, milestone-driven (M-numbers), docs-as-source-of-truth
-  (`Roadmap.md`, `TechDebt.md`, `Design.md`).
-- **iOS app, no binary distribution** — no TestFlight/App Store pipeline; releases
-  would be *checkpoints* (device-QA snapshots), not distribution artifacts.
-- **xcodegen-generated `.xcodeproj`** — not committed; CI must run `xcodegen` first.
-- **No package dependencies** — xcodegen is a dev tool; there is nothing for
-  Dependabot/Renovate to watch.
-- **Doc closeouts push straight to `main`** post-merge (e.g. `f2411f7` roadmap
-  closeout) — branch protection must not break that habit or the habit must change.
+- **Solo maintainer, milestone-driven.** Docs-as-source-of-truth
+  (`Roadmap.md`, `TechDebt.md`, `Design.md`); PR template enforces the
+  doc-sync + dual-engine checklist.
+- **CI is green and real now** — the reason auto-merge/protection were
+  deferred ("nothing to wait on") no longer holds.
+- **Releases are checkpoints, not distribution** — no TestFlight/App Store
+  pipeline; a release anchors "build this on the iPhone," nothing more.
+- **Tag↔version contract is manual**: a tag must point at a closeout commit
+  whose `MARKETING_VERSION` was already bumped (v0.9.4 does). Nothing enforces
+  it — a tag on the wrong commit ships a release claiming a wrong version.
+- **Closeout commits still push straight to `main`** by design — the
+  2026-09-27 decision that deferred branch protection.
 
 ---
 
 ## Proposals — cheapest first
 
-### 1. Flip `deleteBranchOnMerge` (repo-agnostic) — 1 command, immediate payoff
+### 1. Close milestones at closeout (repo-agnostic habit) — 10 seconds, do now
 
-Milestone PRs are merged with `--merge` and the remote branch lingers until
-manually pruned (the M9b merge cleanup just deleted 8 stale tracking refs).
-One API call ends that chore forever:
-
-```bash
-gh api repos/laconicman/DiceLab -X PATCH -F delete_branch_on_merge=true
-```
-
-Zero workflow change: `git branch -d` still works locally; remote cleanup is
-now automatic. **Apply to every repo.**
-
-### 2. Tag milestone merges (repo-specific convention, pattern is agnostic) — minutes
-
-13 milestone merges have no recoverable anchor — `git log` archaeology is the
-only way back to "what did M8a ship as?". Milestone tags are free and serve the
-device-QA habit (checkout `m9c` → deploy to iPhone):
+M9d and M9e show `open` on GitHub with zero open items — they read as
+unfinished forever. The closeout PR already bumps the version and updates
+Roadmap.md; closing the GitHub milestone is one API call in the same step:
 
 ```bash
-git tag m9c 0e72905          # anchor the merge commit
-git push --tags
+gh api repos/laconicman/DiceLab/milestones/1 -X PATCH -f state=closed   # M9d
+gh api repos/laconicman/DiceLab/milestones/2 -X PATCH -f state=closed   # M9e
 ```
 
-Two naming options — decision needed:
+Fold it into the closeout convention (the PR template's `## Milestone`
+field already names the milestone — the closer just runs the call).
 
-- **`m<N>` tags** (`m8a`, `m9b`, `m9c`): matches the Roadmap vocabulary already
-  used in PR titles. Cheap, honest to the project's actual versioning (there
-  is no version number).
-- **Semver tags** (`v0.9.0`): only honest once the app has a version/marketing
-  number (`MARKETING_VERSION` is unset today — default `1.0`). Adopting it now
-  invents a numbering scheme the app doesn't have.
+### 2. Label closeout PRs (repo-specific convention) — 30 s/PR
 
-**Recommendation:** `m<N>` now; semver only if the app ever gains
-`MARKETING_VERSION` or ships to TestFlight.
+`#16` and `#18` carry no labels, so `.github/release.yml` files their
+changes under "Other" in generated notes. Label them `hygiene` (they're
+version bumps + doc moves — exactly what `hygiene` describes) or create a
+`release` label mapped to a "Releases" changelog category. Pick one —
+either is a habit, not infrastructure.
 
-### 3. Releases per milestone via `gh release create --generate-notes` (repo-agnostic mechanism, repo-specific payoff)
+### 3. Use `--auto` on merges (repo-agnostic mechanism, already enabled) — 0 setup
 
-PR titles are already clean and milestone-prefixed (`M9c: optional history
-panel + sheet detents`) — `--generate-notes` produces a usable changelog
-**today, for free**, off those merges:
+`allow_auto_merge=true` since 2026-09-27 and CI exists — every ingredient
+is in place; the flag has simply never been used:
 
 ```bash
-gh release create m9c --generate-notes --title "M9c — history panel + editor fixes"
+gh pr merge 21 --merge --auto   # merges itself the moment CI greens
 ```
 
-Payoff specific to this repo: **device validation**. The recurring "validate on
-the iPhone" step gets a named artifact instead of "build whatever main happens
-to be". Each milestone release is a fixed point the device runs against.
+Payoff solo: fire-and-forget instead of polling the check. Note the
+subtlety *without* required-status-checks protection: `--auto` waits for
+the checks that exist on the PR, which is exactly CI here. If CI is ever
+skipped on a PR (`[skip ci]` paths, docs-only changes still run the full
+workflow — fine), auto-merge lands immediately — acceptable at this scale.
 
-Optional upgrade once labels exist (proposal 4): `.github/release.yml` groups
-generated notes by label instead of a flat PR list:
+### 4. Release on tag push + version assert (repo-specific payoff) — ~20 lines of YAML, removes a manual step
+
+Today: closeout merge → `git tag -a vX.Y.Z` → `git push --tags` →
+`gh release create --generate-notes --title "M.."`. The middle two steps
+stay human (tagging is a decision); the last can be a workflow:
 
 ```yaml
-# .github/release.yml
-changelog:
-  categories:
-    - title: Engine work
-      labels: ["engine:scenekit", "engine:realitykit"]
-    - title: Model & shared
-      labels: ["model"]
-    - title: UI & editor
-      labels: ["ui"]
-    - title: Docs & hygiene
-      labels: ["documentation", "hygiene"]
-```
-
-Costs one file; only pays off if milestone releases actually happen.
-
-### 4. A small repo-specific label set — minutes, enables §3's grouping
-
-Defaults (`bug`, `enhancement`, …) don't describe this repo's axes. The
-meaningful split is *engine × layer*. A handful, not a taxonomy:
-
-```bash
-gh label create "engine:scenekit"  -d "SceneKit-side change"      -c 8b5cf6
-gh label create "engine:realitykit" -d "RealityKit-side change"   -c 0e8a16
-gh label create "model"            -d "Engine-free model layer"   -c bfdadc
-gh label create "ui"               -d "SwiftUI shell / editor"    -c fbca04
-gh label create "hygiene"          -d "Warnings, deprecation, cleanup" -c d4c5f9
-gh label create "tech-debt"        -d "TD-n register item"        -c 5319e7
-```
-
-Labeling is a habit, not infrastructure: 30 seconds per PR, or `--label` on
-`gh pr create`. Pays twice — release-notes grouping and searchable history
-("what touched RealityKit physics? `gh pr list --label engine:realitykit`").
-
-### 5. PR template (repo-agnostic) — one file, codifies an existing habit
-
-The merged PRs already follow a Summary/Test-plan format. Codifying it in
-`.github/pull_request_template.md` keeps the human-authored and agent-authored
-PRs identical, and puts the doc-sync rule (REVIEW.md already enforces
-`Design.md` updates) in the author's face rather than the reviewer's:
-
-```markdown
-## Summary
--
-
-## Milestone
-M__ — links to Roadmap.md section
-
-## Test plan
-- [ ] `xcodebuild test` green (37 tests, iOS Simulator)
-- [ ] Visual check — SceneKit engine
-- [ ] Visual check — RealityKit engine
-- [ ] Design.md / TechDebt.md updated if decisions changed
-```
-
-Cost: one file. Payoff: the engine-pair checklist is a real trap — M9b's
-RealityView wedge shipped *because* only one engine got checked. Making
-"both engines" a checkbox is cheap insurance.
-
-### 6. Protect `main` — decisions needed (see below), minutes to minutes+habit-change
-
-`main` currently accepts force-push, deletion, and direct commits. The actual
-exposure: the AI agent pushes doc closeouts to `main` routinely — a
-`push --force` typo or a bad rebase is unrecoverable upstream. Options:
-
-- **(a) Ruleset: block force-push + deletion only** — `gh api .../rulesets`
-  or Settings → Rules. Keeps direct pushes (doc closeouts unaffected). Catches
-  the catastrophic cases. **My pick for this repo.**
-- **(b) Require PRs for everything** — cleanest hygiene, but turns every
-  roadmap-closeout commit into a PR round-trip. On a solo repo that's ~5 extra
-  minutes per milestone for marginal gain.
-- **(c) Require PRs + allow maintainer bypass** — repo rulesets support
-  bypass actors; adds config complexity for a team of one.
-
-Minimal-ruleset config for (a):
-
-```json
-{ "name": "protect main",
-  "target": "branch",
-  "enforcement": "active",
-  "conditions": { "ref_name": { "include": ["refs/heads/main"], "exclude": [] } },
-  "rules": [
-    { "type": "non_fast_forward" },
-    { "type": "deletion" }
-  ] }
-```
-
-**Repo-specific caveat:** (b)/(c) only pay off if a second contributor appears.
-Flag as team-scale.
-
-### 7. CI: `xcodegen` + `xcodebuild test` on a macOS runner (repo-specific, medium cost)
-
-The 37-test suite already exists and is deterministic — this is the one
-infrastructure item worth its cost even solo. Sketch:
-
-```yaml
-# .github/workflows/ci.yml
-name: CI
+# .github/workflows/release.yml
+name: Release
 on:
-  pull_request:
-  push: { branches: [main] }
+  push:
+    tags: ["v*"]
 jobs:
-  test:
-    runs-on: macos-26            # Xcode 26 per README; verify image's Xcode
+  release:
+    runs-on: macos-26
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - run: brew install xcodegen
-      - run: xcodegen generate
-      - run: >
-          xcodebuild -project DiceLab.xcodeproj -scheme DiceLab
-          -destination 'platform=iOS Simulator,name=iPhone 17'
-          test
+      - uses: actions/checkout@v5
+      - name: Assert MARKETING_VERSION matches tag
+        run: |
+          TAG=${GITHUB_REF_NAME#v}
+          VER=$(sed -n 's/.*MARKETING_VERSION: *"\(.*\)".*/\1/p' project.yml)
+          [ "$VER" = "$TAG" ] || { echo "tag $TAG ≠ MARKETING_VERSION $VER"; exit 1; }
+      - name: Create release
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes \
+             --title "$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Honest costs for this repo:
+Two wins in one file:
 
-- **Setup:** ~20–40 min + inevitable runner flakiness (simulator boots, Xcode
-  version drift between `macos-*` images and the README's Xcode 26 requirement —
-  add a `- run: xcodebuild -version` step and `xcodes` if pinning is needed).
-- **Free:** Actions minutes are unmetered on public repos.
-- **What it can't test:** device-only paths (haptics, audio session, real
-  physics timing — TD-6 stays manual either way), and the Devin-Review workflow
-  stays MCP-side; CI doesn't replace it.
-- **Ordering:** lands *before* auto-merge makes sense; pairs with §6(b) if
-  PR-required protection is ever adopted (status check becomes the gate).
+- **The assert enforces the tag↔version contract** — a tag on a commit
+  that didn't bump `MARKETING_VERSION` fails loudly instead of publishing
+  a release that claims a wrong version. This is the exact trap the
+  closeout convention was built to avoid; today it relies on memory.
+- **The release title comes free** — tags are annotated with the milestone
+  title (`v0.9.4`'s subject is "M9e — localization preparation"), so
+  `--generate-notes` + the tag's own subject reproduce today's hand-typed
+  titles exactly.
 
-### 8. Auto-merge (repo-agnostic mechanism, value here is conditional) — 1 command, but only after CI
+Tradeoff, stated not chosen: a workflow means tags are now *published*
+artifacts — a typo'd tag push creates a public release that needs deleting.
+Mitigation: the version assert catches most typos (a `v0.95` tag fails
+against `0.9.5`); `gh release delete` cleans up the rest.
+
+### 5. Branch protection revisited (decision needed — context changed since the deferral)
+
+The 2026-09-27 call was correct *then*: no CI existed, and closeouts push
+directly to `main`. Two things changed: CI runs on PRs now, and every PR
+merge in the last 7 went through green CI anyway. Re-stating the options
+against today's facts:
+
+- **(a) Keep deferred** — direct closeout pushes stay frictionless. The
+  honest risk remains a `push --force`/rebase typo on `main` — rare, but
+  unrecoverable *remotely* (the local clone always has the objects; GitHub
+  just loses the ref and the PR linkage).
+- **(b) Narrow ruleset: block force-push + deletion only** — zero habit
+  change, direct pushes unaffected, kills the two catastrophic cases.
+  Ruleset config:
+  ```json
+  { "name": "protect main", "target": "branch", "enforcement": "active",
+    "conditions": { "ref_name": { "include": ["refs/heads/main"], "exclude": [] } },
+    "rules": [ { "type": "non_fast_forward" }, { "type": "deletion" } ] }
+  ```
+  Apply via `gh api repos/laconicman/DiceLab/rulesets -X POST --input ruleset.json`.
+- **(c) Require PRs + the CI check** — converts closeouts into PRs; the
+  cost the original deferral was avoiding. Still solo-scale-poor.
+
+**Recommendation shifted since v1:** (b). It didn't exist as an option
+then in this doc's framing (the choice was PRs-or-nothing); it now reads
+as the obviously-correct middle: the catastrophic surface closes, the
+closeout habit survives untouched. (a) remains defensible — the risk is
+theoretical — but (b) costs nothing now.
+
+### 6. Dependabot for GitHub Actions (repo-agnostic, tiny) — one file
+
+The repo's only external dependency is `actions/checkout@v5`. A monthly
+(near-silent) bot bump keeps it from rotting:
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule: { interval: "monthly" }
+```
+
+Payoff is small but the cost is one file. Marginal either way — list as
+optional.
+
+### 7. Disable unused merge methods (repo-agnostic, cosmetic) — optional
+
+Squash and rebase are enabled but never used (20/20 merge commits). Each
+enabled method adds a dropdown option on the merge button — a fat-finger
+target that rewrites a PR's history shape. One API call prunes the surface:
 
 ```bash
-gh api repos/laconicman/DiceLab -X PATCH -F allow_auto_merge=true
-# then per PR: gh pr merge <N> --merge --auto
+gh api repos/laconicman/DiceLab -X PATCH \
+  -F allow_squash_merge=false -F allow_rebase_merge=false
 ```
 
-Solo-payoff is small but real: "queue the merge once CI greens" instead of
-polling. **Without CI there is nothing to wait on** — the flag does nothing.
-Enable when §7 lands; skip until then.
+Purely cosmetic — keep or drop, no real stakes.
 
-### 9. Issues + milestones — decision needed; currently duplicated, not missing
+### 8. Small hygiene files (repo-agnostic) — minutes each, low priority
 
-This is the one category where "add the platform feature" may be *wrong*.
-`Roadmap.md` is already the milestone tracker and `TechDebt.md` the debt
-register — both live in the repo, versioned with the code they describe.
-GitHub milestones/issues would duplicate that, and on a solo repo the
-synchronization tax lands on one person.
-
-Options:
-
-- **(a) Keep docs canonical; use GitHub milestones as a *display* layer** —
-  create `M9d`, `M9e`… milestones, attach PRs to them. Zero bookkeeping
-  (one dropdown on `gh pr create --milestone`), payoff: milestone pages show
-  progress + releases can filter by milestone. Light duplication.
-- **(b) Migrate to issues/milestones as canonical** — pays only if the repo
-  gains external contributors or the user wants web-side planning. Adds an
-  issues habit the project has demonstrably not needed (0 issues in 13 PRs).
-- **(c) Status quo** — Roadmap.md remains the only tracker. Also fine.
-
-**Recommendation:** (a) if anything — milestone-on-PR is nearly free and
-feeds release notes. (b) is team-scale.
-
-Issue templates: defer entirely — they matter when someone other than the
-author files bugs. `isBlankIssuesEnabled` already permits ad-hoc issues.
+- **`SECURITY.md`** — 5 lines ("report via issues/Discussions-off → email").
+  Standard public-repo hygiene; not urgent for a dice app with no attack
+  surface, costs nothing.
+- **`CONTRIBUTING.md`** — the one thing it would say is "run `xcodegen`
+  after cloning or editing `project.yml`" — README already says it. The
+  stale-generated-project trap bit locally this week (a `.xcodeproj`
+  generated before a `bundleIdPrefix` change kept installing the old ID).
+  A pointer file helps nobody the README didn't already reach — **skip
+  unless the README note grows into a real contributor guide.**
 
 ---
 
-## Explicitly skipped — team-scale or inapplicable here
+## Reaffirmed deferrals — re-checked, still team-scale or inapplicable
 
-| Feature | Why it doesn't pay here |
+| Feature | Why it still doesn't pay |
 |---|---|
-| **CODEOWNERS** | Solo repo; review routing is meaningless with one maintainer. |
-| **Dependabot / Renovate** | No dependency manifests — xcodegen is a dev tool, not an SPM/CocoaPods dep. |
-| **Issue templates / forms** | Zero external reporters; blank issues already allowed. |
-| **GitHub Projects** | Roadmap.md already does this; a board duplicates it. Revisit if collaborating. |
-| **Discussions** | No community to discuss with; off is correct. |
-| **Required status checks on `main`** | Needs CI first (§7) and breaks the direct doc-closeout habit (§6). |
-| **Signed commits / required signing** | Value is contributor-authenticity at scale; solo repo gains little. Local signing is still good hygiene, unrelated to repo settings. |
-| **License / `LICENSE` file** | Not a workflow feature, but worth naming: public repo, `licenseInfo: null`, TD-2 documents the upstream-no-license entanglement. DiceLab is fresh-authored ("no derived code verbatim") — the author *can* license it (MIT/CC0). Decision belongs to the user; it affects how "releaseable" the releases are. |
-| **SECURITY.md** | Public repo; worth a 5-line file if issues ever open. Low priority. |
+| Issues as canonical tracker | Still 0 issues ever; Roadmap.md + TechDebt.md in-repo remain the working system. The v1 "(a) milestones as display" decision already captured the useful part. |
+| Issue templates / forms | No external reporters; blank issues allowed if one appears. |
+| CODEOWNERS | One maintainer; review routing is meaningless. |
+| Required reviews | Can't review your own PR; Devin Review via MCP is the de-facto reviewer and already runs per-PR. |
+| GitHub Projects | Roadmap.md is the board; a second board duplicates it. |
+| Discussions | Off is correct — no community. |
+| Wiki | Enabled-but-unused; could be turned off (`-F has_wiki=false`) to reduce surface — cosmetic. |
+| Signed commits / required signing | Contributor-authenticity is the payoff; solo repo gains little. |
+| SwiftLint in CI | Optional; this codebase's conventions are comment-driven, not lint-driven. Revisit if style drift becomes visible. |
+| Device/sim split in CI | CI stays simulator-only — haptics, audio session, real physics timing can't run there (TD-6 stays manual either way). The PR template's dual-engine visual checklist is the guard. |
 
 ---
 
 ## Rollout
 
-**Now (total ~10 min, all reversible):**
+**Now (~15 min, all reversible):**
 
 ```bash
-gh api repos/laconicman/DiceLab -X PATCH -F delete_branch_on_merge=true   # §1
-git tag m9c 0e72905 && git push --tags                                   # §2
-gh release create m9c --generate-notes --title "M9c — history panel + editor fixes"  # §3
-# labels via §4 commands
-# .github/pull_request_template.md via §5
-# main ruleset (a) via §6
+gh api repos/laconicman/DiceLab/milestones/1 -X PATCH -f state=closed   # §1
+gh api repos/laconicman/DiceLab/milestones/2 -X PATCH -f state=closed   # §1
+gh label list                                                          # §2: confirm `hygiene` exists
+# pick §5(b) or (a); if (b):
+gh api repos/laconicman/DiceLab/rulesets -X POST --input ruleset.json   # §5(b)
 ```
 
-**Next milestone (M9d lands):** tag `m9d`, release it, label the PR, confirm
-the template renders. That's the whole habit — everything in "Now" paid for.
+**Next milestone (habits, not setup):**
 
-**After CI lands (§7):** enable `allow_auto_merge` (§8), optionally move §6
-from ruleset-(a) to a required-checks model if direct-pushing to main starts
-feeling wrong.
+- `gh pr create --milestone ...` (existing) + `--label hygiene` on closeouts (§2)
+- `gh pr merge N --merge --auto` once CI is seen green before (§3)
+- Commit `.github/workflows/release.yml` + `dependabot.yml` (§4, §6) — then
+  the *following* closeout tag exercises the release automation end-to-end
 
-**Defer until non-solo:** milestones-as-display (§9a is optional anyway),
-issue templates, Projects, CODEOWNERS, required reviews.
+**Watch for breakage:** the first tag-pushed release asserts
+`MARKETING_VERSION` — `project.yml` stores it as `MARKETING_VERSION: "X.Y.Z"`,
+which the sed line matches verbatim today; if that line ever moves to
+plist-style `=` syntax, update the pattern.
 
-## Decisions — resolved 2026-09-27
+**Defer until non-solo:** required reviews, CODEOWNERS, issue templates,
+Projects, mandatory PRs for closeouts.
 
-1. **Tag scheme:** semver/`MARKETING_VERSION`, not `m<N>`. Mapping
-   `v<major milestone>.<sub-letter index>` (a=0): M8a→`v0.8.0` … M9c→`v0.9.2`.
-   Retroactive tags + releases published; `MARKETING_VERSION` added to
-   `project.yml` and tracks the latest tag.
-2. **Branch protection: deferred entirely.** Direct pushes to `main` stay —
-   avoiding a PR + paid review round-trip on low-risk closeouts is worth more
-   than the protection. Revisit if force-push becomes a real risk.
-3. **Milestones:** accepted as display layer — `M9d`, `M9e` created on GitHub;
-   attach via `gh pr create --milestone`. Roadmap.md stays canonical.
-4. **License: Apache-2.0** — copyright held by `laconicman` (public git
-   identity). Resolves the "releases mean something legally" question;
-   TD-2's upstream debt is unaffected.
-5. **Auto-merge:** flag enabled (`allow_auto_merge=true`); habit adoption
-   deferred until CI proves useful.
-6. **CI:** adopted — `.github/workflows/ci.yml` on `macos-26` (Xcode 26.6
-   default ≥ README's Xcode 26 requirement): `check_review_md.py` →
-   `xcodegen generate` → `xcodebuild test` on an iOS Simulator picked at
-   runtime.
+---
 
-### Applied (2026-09-27)
+## History — the 2026-09-27 proposal and its resolutions
 
-- `delete_branch_on_merge=true`, `allow_auto_merge=true` (repo API)
-- Labels: `engine:scenekit`, `engine:realitykit`, `model`, `ui`, `hygiene`, `tech-debt`
-- Tags `v0.8.0`–`v0.9.2` on milestone merge commits; releases with
-  `--generate-notes` for each
-- `.github/`: `workflows/ci.yml`, `pull_request_template.md`, `release.yml`
-- `LICENSE` (Apache-2.0), README license/versioning sections, `project.yml`
-  `MARKETING_VERSION`, TechDebt TD-2 note
+*(Verbatim record — superseded states marked ↷.)*
+
+v1 surveyed an empty `.github/`, no tags, no CI, default labels, and
+proposed: `deleteBranchOnMerge` ↷ **adopted**, milestone tags ↷ adopted as
+semver `v*` + `MARKETING_VERSION`, `gh release create --generate-notes`
+↷ adopted per milestone, custom label set ↷ adopted, PR template ↷
+adopted, `.github/release.yml` grouping ↷ adopted, narrow-branch-protection
+ruleset ↷ **deferred** (revisited in §5), CI ↷ adopted (`macos-26`,
+validator + xcodegen + sim tests), `allow_auto_merge` ↷ adopted-but-unused
+(revisited in §3), milestones-as-display ↷ adopted, issues/templates/
+Projects/CODEOWNERS ↷ deferred (still deferred above), Apache-2.0 license
+↷ adopted.
