@@ -3,16 +3,32 @@ import SwiftUI
 
 @main
 struct DiceLabApp: App {
-    /// Engine choice is app-level state — it decides which controller
-    /// instance exists, so it can't live inside one. Same persistence
-    /// mechanism (`settings.engine`) the controllers use for their settings.
-    @AppStorage(TableSettings.engine) private var engine: DiceEngine = .sceneKit
-
     /// Both tables are constructed eagerly — an entity graph and an SCNScene
     /// are cheap until rendered, and keeping both alive preserves per-engine
     /// session state (history, dice) across a switch.
     @State private var sceneKitTable = DiceTableController()
     @State private var realityTable = RealityTableController()
+
+    var body: some Scene {
+        WindowGroup {
+            WindowRoot(sceneKitTable: sceneKitTable, realityTable: realityTable)
+        }
+    }
+}
+
+/// One instance per WindowGroup window — anything that should be per-window
+/// lives here rather than on the shared App struct: `@State` on `App` is
+/// vendored once and shared by every window, so a sheet flag there would
+/// open in all of them. (Multi-window is off today; the scoping stays right
+/// if iPad ever enables it.)
+private struct WindowRoot: View {
+    let sceneKitTable: DiceTableController
+    let realityTable: RealityTableController
+
+    /// Engine choice is app-level state — it decides which controller
+    /// instance exists, so it can't live inside one. Same persistence
+    /// mechanism (`settings.engine`) the controllers use for their settings.
+    @AppStorage(TableSettings.engine) private var engine: DiceEngine = .sceneKit
 
     /// The sheet hangs off the window root, not the roll screen: an engine
     /// swap destroys the roll screen, and a sheet presented from the dying
@@ -22,25 +38,23 @@ struct DiceLabApp: App {
     /// takes one tap.
     @State private var showingSettings = false
 
-    var body: some Scene {
-        WindowGroup {
-            Group {
-                switch engine {
-                case .sceneKit:
-                    SceneKitRollView(showingSettings: $showingSettings)
-                        .environment(sceneKitTable)
-                case .realityKit:
-                    RealityRollView(showingSettings: $showingSettings)
-                        .environment(realityTable)
-                }
+    var body: some View {
+        Group {
+            switch engine {
+            case .sceneKit:
+                SceneKitRollView(showingSettings: $showingSettings)
+                    .environment(sceneKitTable)
+            case .realityKit:
+                RealityRollView(showingSettings: $showingSettings)
+                    .environment(realityTable)
             }
-            .sheet(isPresented: $showingSettings) {
-                settingsContent
-                    // Detents live on the sheet, not inside SettingsView,
-                    // so the dev-flag path gets them too. .medium reads as
-                    // a quick toggle panel; .large gives the editor room.
-                    .presentationDetents([.medium, .large])
-            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            settingsContent
+                // Detents live on the sheet, not inside SettingsView,
+                // so the dev-flag path gets them too. .medium reads as
+                // a quick toggle panel; .large gives the editor room.
+                .presentationDetents([.medium, .large])
         }
     }
 
