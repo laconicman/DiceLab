@@ -1,3 +1,4 @@
+import os
 import SceneKit
 
 /// Scene construction, kept out of the main file: how the table is built
@@ -149,6 +150,38 @@ extension DiceTableController {
         cameraNode = camera
     }
 
+    /// `-boundsProbe` diagnostics: flags the first position a die is seen
+    /// outside the play volume (naming the face it crossed) and dumps rest
+    /// positions at settle.
+    private static let probeLog = Logger(subsystem: "DiceLab", category: "bounds")
+
+    func probeBounds() {
+        guard DevFlags.boundsProbe else { return }
+        for (i, die) in dice.enumerated() {
+            let p = die.presentation.simdPosition
+            let out: String
+            if p.y > Bounds.ceilingY { out = "ceiling" }
+            else if p.y < Bounds.floorY { out = "floor" }
+            else if abs(p.x) > Bounds.halfX { out = "x-wall" }
+            else if abs(p.z) > Bounds.halfZ { out = "z-wall" }
+            else { continue }
+            if probeEscaped.insert("\(i)-\(out)").inserted {
+                let m = "escape via \(out): die \(i) at \(p.x),\(p.y),\(p.z)"
+                Self.probeLog.error("\(m)")
+                print("[DiceLab] \(m)")
+            }
+        }
+    }
+
+    func probeRest() {
+        guard DevFlags.boundsProbe else { return }
+        for (i, die) in dice.enumerated() {
+            let p = die.presentation.simdPosition
+            Self.probeLog.notice("rest: die \(i) at \(p.x),\(p.y),\(p.z)")
+            print("[DiceLab] rest: die \(i) at \(p.x),\(p.y),\(p.z)")
+        }
+    }
+
     /// Nodes the appearance pass reaches for by name — the alternative is
     /// stored refs on the main class, and a name is honest enough for three
     /// fixed nodes.
@@ -247,17 +280,19 @@ extension DiceTableController {
         // measured), and a solver step can carry it ~1 unit — 4 units of
         // thickness is a margin, not a guarantee. What bounds the speed is
         // `roll()` clearing velocity before each impulse.
-        // Fully invisible again — M9b's translucent glass read as a glass
-        // box, but the ask is bounds the eye can't find. `isHidden` hides
-        // the node from rendering while its physics body keeps colliding;
-        // no material needed at all.
+        // Invisible colliders done the safe way: a node with no geometry
+        // renders nothing, and the body carries an explicit shape instead of
+        // deriving one. `isHidden` was measured to drop the static bodies
+        // from the simulation on current SDKs (dice escaped every face —
+        // see PR notes), so visibility and collision stay decoupled by
+        // construction rather than by flag.
         func bound(_ size: SCNVector3, at position: SCNVector3) {
-            let node = SCNNode(geometry: SCNBox(
-                width: CGFloat(size.x), height: CGFloat(size.y),
-                length: CGFloat(size.z), chamferRadius: 0))
+            let node = SCNNode()
             node.position = position
-            node.isHidden = true
-            node.physicsBody = .tableBody()
+            node.physicsBody = .tableBody(shape: SCNPhysicsShape(
+                geometry: SCNBox(
+                    width: CGFloat(size.x), height: CGFloat(size.y),
+                    length: CGFloat(size.z), chamferRadius: 0)))
             scene.rootNode.addChildNode(node)
         }
 
