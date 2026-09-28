@@ -1,3 +1,4 @@
+import os
 import RealityKit
 import UIKit
 
@@ -129,6 +130,38 @@ extension RealityTableController {
         cameraHomeOrientation = camera.orientation
     }
 
+    /// `-boundsProbe` diagnostics: flags the first position a die is seen
+    /// outside the play volume (naming the face it crossed) and dumps rest
+    /// positions at settle.
+    private static let probeLog = Logger(subsystem: "DiceLab", category: "bounds")
+
+    func probeBounds() {
+        guard DevFlags.boundsProbe else { return }
+        for (i, die) in dice.enumerated() {
+            let p = die.position
+            let out: String
+            if p.y > Bounds.ceilingY { out = "ceiling" }
+            else if p.y < Bounds.floorY { out = "floor" }
+            else if abs(p.x) > Bounds.halfX { out = "x-wall" }
+            else if abs(p.z) > Bounds.halfZ { out = "z-wall" }
+            else { continue }
+            if probeEscaped.insert("\(i)-\(out)").inserted {
+                let m = "escape via \(out): die \(i) at \(p.x),\(p.y),\(p.z)"
+                Self.probeLog.error("\(m)")
+                print("[DiceLab] \(m)")
+            }
+        }
+    }
+
+    func probeRest() {
+        guard DevFlags.boundsProbe else { return }
+        for (i, die) in dice.enumerated() {
+            let p = die.position
+            Self.probeLog.notice("rest: die \(i) at \(p.x),\(p.y),\(p.z)")
+            print("[DiceLab] rest: die \(i) at \(p.x),\(p.y),\(p.z)")
+        }
+    }
+
     /// Entities the appearance pass reaches for by name — the alternative
     /// is stored refs on the main class, and a name is honest enough for
     /// five fixed entities.
@@ -167,7 +200,14 @@ extension RealityTableController {
         static let halfZ: Float = 0.15     // z ∈ −0.15…0.15
         static let floorY: Float = -0.08
         static let ceilingY: Float = 0.12
-        static let thickness: Float = 0.04
+        /// Collider thickness — a *tunneling* margin, not a visual one.
+        /// RealityKit's discrete check runs once per rendered frame: a die
+        /// tossed at ~6 m/s travels ~0.10 m at 60 Hz (0.20 at a 30 fps dip),
+        /// so a 0.04 slab is inside one step's reach whenever CCD misses.
+        /// The inner face stays put regardless — each bound's position is
+        /// `inner + thickness/2` — so the margin is free. 0.24 keeps a
+        /// ~7 m/s solver spike inside at 30 fps.
+        static let thickness: Float = 0.24
         static let span: Float = 0.60
         /// The felt's *visible* reach: past the backdrop dome's radius, so
         /// every sightline to its rim exits the dome first and the edge
