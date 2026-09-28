@@ -109,7 +109,8 @@ binds through `@Bindable` and holds zero state itself. State lives in
 deliberately distinct kinds: `DiceLabApp`'s `@State` controllers — app-root
 object ownership, Apple's documented pattern for keeping a reference type
 alive — `DiceLabApp.engine` (`@AppStorage`, picks which controller exists),
-and `RollScreen.showingSettings`, the textbook transient-UI `@State`.
+and `DiceLabApp.showingSettings` — `@State` at the root, bound into
+`RollScreen`, because the sheet must outlive the screen that opened it.
 
 - *Consequence:* changing `dieCount` rebuilds the dice. `respawnDice` bumps
   `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
@@ -185,7 +186,10 @@ JSON still loads.
   inside-out unlit sphere (`faceCulling = .front`, no mirrored-scale
   hack), and the light is a `VirtualEnvironmentProbeComponent` built
   async (equirect → cube `TextureResource` → `EnvironmentResource`,
-  generation-guarded like the photo imports). A user photo is LDR — it
+  generation-guarded like the photo imports). The dome never disables:
+  with no image it renders plain opaque black, because a disabled dome
+  leaves `RealityView` transparent where the felt doesn't reach — a
+  white screen, not a scene. A user photo is LDR — it
   lights on both engines, but carries none of the over-range dynamic
   range a real `.hdr` probe has. The asymmetry is the *mechanism*, not
   the quality ceiling.
@@ -305,10 +309,18 @@ shrinks the dice, and the dice are the content.
   *forever* (NaN+x=NaN). `CameraFit.damp` short-circuits identical quats,
   and both engines snap a non-finite camera back to the home pose. A
   0/0 viewport aspect is guarded the same way.
-- **Walls became visible.** The legacy bounds were `.clear` — fully
-  invisible. Now: faint translucent `SCNMaterial` on SceneKit, unlit
-  translucent panels flush on the colliders' inner faces on RealityKit.
-  Both read as a glass box; the ceiling stays invisible either way.
+- **Walls are invisible again.** M9b's translucent glass (faint
+  `SCNMaterial`, unlit RealityKit panels flush on the colliders) reverted
+  to renderless bounds — the ask was bounds the eye can't find. SceneKit
+  `isHidden`s the nodes — visibility is a node property, collision a body
+  property — and RealityKit's colliders simply carry no `ModelComponent`.
+- **The felt outgrew the table.** Both engines keep collision at
+  `Bounds.span` but draw the *visual* surface far past it: SceneKit a
+  500-unit box (the fitted camera can't retreat past `Fit.volumeRadius`
+  ≈ 90, so the rim never enters frame), RealityKit a 20 m mesh whose rim
+  sits behind the 4 m backdrop dome — an opaque wall between the camera
+  and the edge. A photo felt tiles via a UV scale instead of stretching
+  (`contentsTransform` / `textureCoordinateTransform.scale`).
 
 ## Roll history is a session record, not a log
 
@@ -318,7 +330,9 @@ horizontal chip strip with `HistoryPanel` — an `.ultraThinMaterial` panel
 above the Roll button, capped at a quarter of the screen collapsed and
 expandable toward the safe area by tapping its header. Optional via
 `settings.history` (`@AppStorage` — chrome visibility is view-layer state,
-not scene state), and hidden entirely while the history is empty. Rows key
+not scene state), and hidden entirely while the history is empty. The
+header's close button writes the same key — off without a Settings
+round-trip, and the toggle stays in sync. Rows key
 by `RollResult.id` — identical totals are still distinct rolls — and carry
 a `rowTint` scaffold: today it returns nil, later a settings-driven
 per-player color maps each roll to the player who threw it.
@@ -367,5 +381,9 @@ not a code audit.
   shared keys across engines.
 - `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
   view-layer feedback reads a view-layer key (same slot as `engine`).
-- `RollScreen.showingSettings` — `@State`, the textbook transient case.
-  `speech` is `@State` too — a service object that must outlive rebuilds.
+- `DiceLabApp.showingSettings` — `@State` at the window root, bound into
+  `RollScreen`: an engine swap destroys the roll screen, and a sheet
+  presented from the dying view would force-dismiss inside the same
+  transaction that mounts the new scene view — TD-10's neighborhood.
+  `speech` stays `@State` on the screen — a service object that must
+  outlive rebuilds.
