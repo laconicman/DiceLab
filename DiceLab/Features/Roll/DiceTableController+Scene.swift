@@ -218,7 +218,7 @@ extension DiceTableController {
         feltMaterial.diffuse.wrapT = .repeat
         feltMaterial.diffuse.mipFilter = .linear
         feltMaterial.diffuse.contentsTransform = SCNMatrix4MakeScale(
-            Bounds.feltSpan / Bounds.span, 1, Bounds.feltSpan / Bounds.span)
+            Bounds.feltSpan / Bounds.span, Bounds.feltSpan / Bounds.span, 1)
         let felt = SCNBox(width: CGFloat(Bounds.feltSpan),
                           height: CGFloat(Bounds.thickness),
                           length: CGFloat(Bounds.feltSpan), chamferRadius: 0)
