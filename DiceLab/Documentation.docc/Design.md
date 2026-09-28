@@ -239,8 +239,13 @@ The port's real findings, SceneKit → RealityKit:
   and it survives an engine swap.
 - **CCD exists on RealityKit.** `isContinuousCollisionDetectionEnabled` is
   the per-body tunneling guard SceneKit withholds (Bullet has it, the API
-  doesn't surface it). The walls' thickness becomes a formality; on SceneKit
-  it was the whole defense.
+  doesn't surface it). It is a mitigation, not a guarantee: the discrete
+  check runs once per rendered frame, and a ~6 m/s toss covers ~0.10 m at
+  60 fps — 0.20 if the rate dips to 30 — past a 0.04 m slab in one step.
+  Collider `thickness` is therefore 0.24 on every bound; each inner face
+  stays put because positions ride on `thickness/2`, so the margin costs
+  nothing to look at. SceneKit's margin is structural instead — `timeStep`
+  is fixed at 1/120 s regardless of frame rate.
 - **Physics tuning never ports.** Meters vs SceneKit units (÷100), real-time
   gravity vs `physicsWorld.speed = 3`, gram-scale masses vs mass 1.0. The
   impulse *shape* ported; every constant was re-tuned — and re-tuned again
@@ -311,11 +316,17 @@ shrinks the dice, and the dice are the content.
   *forever* (NaN+x=NaN). `CameraFit.damp` short-circuits identical quats,
   and both engines snap a non-finite camera back to the home pose. A
   0/0 viewport aspect is guarded the same way.
-- **Walls are invisible again.** M9b's translucent glass (faint
-  `SCNMaterial`, unlit RealityKit panels flush on the colliders) reverted
-  to renderless bounds — the ask was bounds the eye can't find. SceneKit
-  `isHidden`s the nodes — visibility is a node property, collision a body
-  property — and RealityKit's colliders simply carry no `ModelComponent`.
+- **Walls are invisible again — structurally.** M9b's translucent glass
+  (faint `SCNMaterial`, unlit RealityKit panels flush on the colliders)
+  reverted to renderless bounds — the ask was bounds the eye can't find.
+  The first attempt reached for `isHidden`, and it measured *wrong*:
+  hidden nodes' static bodies don't collide on current SDKs — dice
+  escaped through every face and fell off the felt's edge, confirmed by
+  `-boundsProbe` on simulator and device. The working recipe carries no
+  rendering at all: SceneKit nodes have *no geometry* (the body gets an
+  explicit `SCNPhysicsShape` instead of deriving one), RealityKit
+  colliders carry no `ModelComponent`. Invisibility by construction —
+  nothing to regress, nothing to draw.
 - **The felt outgrew the table.** Both engines keep collision at
   `Bounds.span` but draw the *visual* surface far past it: SceneKit a
   500-unit box (the fitted camera can't retreat past `Fit.volumeRadius`
