@@ -16,4 +16,12 @@ enum DevFlags {
     /// tap through the settings sheet to reach it.
     static let appearanceEditor =
         ProcessInfo.processInfo.arguments.contains("-appearanceeditor")
+
+    /// Log dice that leave the play volume — the containment check the
+    /// other flags can't see: an escaped die falls forever and never
+    /// settles, which reads as a hang, not a leak. Escapes go to `os_log`
+    /// (sim `log show`, Console.app on device) and stdout (`devicectl …
+    /// --console`), since `print` alone doesn't reach `log show`.
+    static let boundsProbe =
+        ProcessInfo.processInfo.arguments.contains("-boundsProbe")
 }
