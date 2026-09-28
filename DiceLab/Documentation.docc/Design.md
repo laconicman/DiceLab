@@ -288,13 +288,15 @@ reframes instead of widening the FOV — bigger FOV fits the bounds but
 shrinks the dice, and the dice are the content.
 
 - **Fit = translation + orientation recovery, never re-aiming.** The
-  camera slides along its fixed view axis to `centroid + axis·d` where
-  `d` comes from the cluster's bounding sphere and the smaller of the
-  vertical/horizontal half-FOVs (`Model/CameraFit.swift` — engine-free,
-  unit-tested; horizontal FOV is derived from the viewport aspect the
-  view feeds in). Orientation damps back to the captured home pose, so
-  a between-rolls orbit unwinds on the next roll — without `lookAt`,
-  which has a gimbal edge looking straight down.
+  camera slides along its fixed view axis to `center + axis·d` where `d`
+  comes from the cluster's *bounding box* — per-axis x/z half-extents,
+  each charged against its own half-FOV (`Model/CameraFit.swift` —
+  engine-free, unit-tested; horizontal FOV is derived from the viewport
+  aspect the view feeds in). The earlier bounding *sphere* forced the
+  widest span to fit the narrower FOV axis: a line-shaped pair paid for
+  empty radius and dice landed tiny. Orientation damps back to the
+  captured home pose, so a between-rolls orbit unwinds on the next roll
+  — without `lookAt`, which has a gimbal edge looking straight down.
 - **One damped target, no animation phases.** Per frame the target flips:
   dice fast → home pose; dice slow or settled → fitted pose; next roll →
   home again. An exponential damp toward the moving target turns those
@@ -305,6 +307,15 @@ shrinks the dice, and the dice are the content.
   the fit snaps the remainder and stops writing — the camera belongs to
   the user's orbit until `roll()` or a dice respawn clears the latch.
   Without the latch every orbit gesture would fight a per-frame write.
+- **SceneKit only draws when asked — keep asking until the latch.**
+  `SCNView` is event-driven: physics motion dirties frames during the
+  roll, but the instant every die rests the pump sleeps — mid-glide,
+  before the damped fit converges (and `fitConverged` never latches, so
+  the half-finished fit still rubber-bands the next orbit). While the
+  fit is unlatched the delegate calls `setNeedsDisplay()` each frame —
+  one dirty flag per frame keeps the glide alive and lets the view idle
+  cleanly after convergence. RealityKit's `update` fires continuously,
+  so it never had the hole.
 - **Do not gate the scene view on `isRolling`.** Flipping
   `realityViewCameraControls` (or `SceneView`'s `options`) mid-roll
   rebuilds the view — and `RealityView` wedges its render graph on
