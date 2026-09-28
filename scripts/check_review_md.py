@@ -41,7 +41,7 @@ def main() -> int:
     for lineno, body in bullets:
         loc = f"{review}:{lineno}"
 
-        spans = PATHISH.findall(line)
+        spans = PATHISH.findall(body)
         paths = [s for s in spans if looks_like_path(s)]
         if not paths:
             print(f"{loc}: warn: [unanchored] rule names no file/path")
