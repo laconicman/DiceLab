@@ -265,3 +265,9 @@ validator + xcodegen + sim tests), `allow_auto_merge` ↷ adopted-but-unused
 (revisited in §3), milestones-as-display ↷ adopted, issues/templates/
 Projects/CODEOWNERS ↷ deferred (still deferred above), Apache-2.0 license
 ↷ adopted.
+
+v2 resolutions, same-day: §1 milestones closed (M9d, M9e); §4 landed as
+`.github/workflows/release.yml` — deviates from the drafted YAML only in
+runner (`ubuntu-latest`; the job needs no Xcode) and an added annotated-tag
+assert; §5(b) applied as ruleset `protect main` — `non_fast_forward` +
+`deletion` on `refs/heads/main`, enforcement `active`.

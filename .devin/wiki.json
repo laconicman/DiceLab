@@ -1,7 +1,7 @@
 {
   "repo_notes": [
     {
-      "content": "DiceLab is a personal learning project: a SceneKit + SwiftUI dice roller rebuilt from scratch, descending from the DiceRollDemo project by profburke on GitHub and a sibling local rewrite RollingDice (the ancestors are not in this repo). Direction docs — design decisions, milestone roadmap M1–M7 (including a later RealityKit port), and the tech-debt register — live in DiceLab/Documentation.docc/ and are authoritative over code comments.",
+      "content": "DiceLab is a personal learning project: a SceneKit + SwiftUI dice roller rebuilt from scratch, descending from the DiceRollDemo project by profburke on GitHub and a sibling local rewrite RollingDice (the ancestors are not in this repo). Direction docs — design decisions, milestone roadmap M1–M9 (including a later RealityKit port), and the tech-debt register — live in DiceLab/Documentation.docc/ and are authoritative over code comments.",
       "author": "laconicman"
     },
     {

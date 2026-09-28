@@ -26,9 +26,11 @@ tech-debt register — live in `DiceLab/Documentation.docc/` and render via
 
 ## Versioning & releases
 
-Milestone merges get an annotated `v<major>.<sub>` tag — `v0.9.4` is M9e — and a
-GitHub release with generated notes. `MARKETING_VERSION` in `project.yml` tracks
-the latest tag; bump it in the milestone's closeout commit.
+Milestone merges get an annotated `v<major>.<sub>` tag — `v0.9.4` is M9e — and
+pushing it runs the release workflow, which asserts the tag matches
+`MARKETING_VERSION` and publishes a GitHub release with generated notes.
+`MARKETING_VERSION` in `project.yml` tracks the latest tag; bump it in the
+milestone's closeout commit.
 
 ## License
 
