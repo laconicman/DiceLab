@@ -48,19 +48,21 @@ extension DiceTableController {
     /// ~0, so anything under a few units/s means "final tumbling."
     private enum Fit {
         static let speed: Float = 4
-        /// Bounding-sphere breathing room: a die's half-diagonal (~2.6 for
-        /// the 3-unit box) plus margin so pips never kiss the frame edge.
-        static let padding: Float = 4
-        /// Never zoom closer than this — a single die shouldn't fill the
-        /// screen. The far cap isn't a constant: it's "the widest cluster
-        /// the volume can hold," computed per-frame. The sphere is centered
-        /// on the *centroid*, not the table — a lopsided cluster (most
-        /// dice in one corner, an outlier opposite) sits the centroid near
-        /// one end, so the true worst case is the full diagonal, not half.
-        static let minDistance: Float = 14
-        static var volumeRadius: Float {
-            2 * sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
-                + padding
+        /// Per-axis breathing room: a die's silhouette half-diagonal
+        /// (~2.6 for the 3-unit box) plus ~2 units of visible felt, so
+        /// the extreme die sits well inside the frame instead of flush
+        /// against it.
+        static let padding: Float = 4.5
+        /// Never zoom closer than this — the floor keeps a compact
+        /// cluster (or a lone die) from filling the screen; at this range
+        /// a die is ~a quarter of the viewport width. The far cap isn't a
+        /// constant: it's "the widest cluster the volume can hold,"
+        /// computed per-frame. The box is centered on the cluster
+        /// midpoint, and each axis's worst case is a die center pinned at
+        /// that wall — half-extent + padding.
+        static let minDistance: Float = 22
+        static var volumeExtents: SIMD2<Float> {
+            .init(Bounds.halfX + padding, Bounds.halfZ + padding)
         }
         /// Exponential damp rate: ~99% converged in one second, and tracks
         /// a moving target without animation restarts.
@@ -80,28 +82,34 @@ extension DiceTableController {
     /// Once the fitted pose converges after a settle, `fitConverged`
     /// latches and the fit stops writing — the orbit gesture is then free
     /// instead of fighting a per-frame write.
-    func updateCameraFit(now: TimeInterval) {
+    ///
+    /// Returns whether the camera is still en route — the delegate uses
+    /// it to keep the event-driven `SCNView` drawing until the glide
+    /// lands (see the call site). `false` when the fit is off, latched,
+    /// or the camera already sits on the current target.
+    @discardableResult
+    func updateCameraFit(now: TimeInterval) -> Bool {
         // dt bookkeeping runs unconditionally: early-returning on a
         // disabled fit would leave `lastFitTime` stale, and re-enabling
         // would then snap (huge dt → damp ≈ 1) instead of gliding.
         let dt = min(lastFitTime.map { Float(now - $0) } ?? 0, Fit.maxDt)
         lastFitTime = now
         guard cameraFitEnabled, !fitConverged,
-              let camera = cameraNode else { return }
+              let camera = cameraNode else { return false }
 
         let positions = dice.map { $0.presentation.simdPosition }
         let fastest = dice.compactMap { die -> Float? in
             guard let v = die.physicsBody?.velocity else { return nil }
             return simd_length(simd_float3(v))
         }.max() ?? 0
-        let sphere = CameraFit.boundingSphere(of: positions, padding: Fit.padding)
+        let box = CameraFit.boundingBox(of: positions, padding: Fit.padding)
         let fov = camera.camera?.fieldOfView ?? 60
         var distance = CameraFit.requiredDistance(
-            radius: sphere.radius,
+            xExtent: box.extents.x, zExtent: box.extents.y,
             verticalFieldOfView: Float(fov),
             aspect: Float(viewAspect))
         let maxDistance = CameraFit.requiredDistance(
-            radius: Fit.volumeRadius,
+            xExtent: Fit.volumeExtents.x, zExtent: Fit.volumeExtents.y,
             verticalFieldOfView: Float(fov),
             aspect: Float(viewAspect))
         distance = min(max(distance, Fit.minDistance), maxDistance)
@@ -109,7 +117,7 @@ extension DiceTableController {
         // they fly (or before the first roll) the target is simply home.
         let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
         let target = fitting
-            ? sphere.center + CameraHome.axis * distance
+            ? box.center + CameraHome.axis * distance
             : CameraHome.position
         // A NaN transform blanks the frame *permanently* — the damp can't
         // recover because NaN + x = NaN. Snap back to sanity instead.
@@ -125,7 +133,7 @@ extension DiceTableController {
             camera.simdPosition = target
             camera.simdOrientation = CameraHome.orientation
             fitConverged = true
-            return
+            return false
         }
         camera.simdPosition = CameraFit.damp(
             camera.simdPosition, toward: target, rate: Fit.rate, dt: dt)
@@ -135,6 +143,8 @@ extension DiceTableController {
         camera.simdOrientation = CameraFit.damp(
             camera.simdOrientation, toward: CameraHome.orientation,
             rate: Fit.rate, dt: dt)
+        return simd_distance(camera.simdPosition, target) > Fit.epsilon
+            || abs(simd_dot(camera.simdOrientation, CameraHome.orientation)) <= 0.9999
     }
 
     private func setUpCamera() {
