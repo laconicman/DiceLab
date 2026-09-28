@@ -23,17 +23,6 @@ struct SettingsView<Table: DiceTable>: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("Renderer", selection: $engine) {
-                        ForEach(DiceEngine.allCases) {
-                            Text($0.title).tag($0)
-                        }
-                    }
-                } header: {
-                    Text("Engine")
-                } footer: {
-                    Text("SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures.")
-                }
                 Section("Dice") {
                     // Explicit catalog key — the count is a numeric
                     // substitution future locales can pluralize, and an
@@ -41,7 +30,7 @@ struct SettingsView<Table: DiceTable>: View {
                     Stepper(value: $table.dieCount, in: 1...6) {
                         Text(String(localized: "settings.dieCount",
                                     defaultValue: "Count: \(table.dieCount)",
-                                    comment: "Dice-count stepper label"))
+                                    comment: "Dice-count stepper label — %lld is the count; add plural variations per locale"))
                     }
                     NavigationLink {
                         AppearanceEditor(table: table, preview: preview)
@@ -71,6 +60,19 @@ struct SettingsView<Table: DiceTable>: View {
                     Text("History")
                 } footer: {
                     Text("A session roll list on the table screen — tap its header to expand it toward the safe area.")
+                }
+                // Last on purpose: the renderer is the deepest cut — the
+                // everyday dials sit above it.
+                Section {
+                    Picker("Renderer", selection: $engine) {
+                        ForEach(DiceEngine.allCases) {
+                            Text($0.title).tag($0)
+                        }
+                    }
+                } header: {
+                    Text("Engine")
+                } footer: {
+                    Text("SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures.")
                 }
             }
             .navigationTitle("Settings")
