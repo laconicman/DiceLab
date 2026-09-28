@@ -81,6 +81,9 @@ final class RealityTableController: DiceTable {
     /// controller's lifetime.
     private var subscriptions: [EventSubscription] = []
 
+    /// `-boundsProbe`: die/face pairs already reported this roll.
+    var probeEscaped: Set<String> = []
+
     // MARK: Settings — the keys are shared with the SceneKit controller via
     // `TableSettings`: a setting is the user's choice about the *table*, not
     // the engine — switching engines must not reset dice count or skin.
@@ -224,6 +227,7 @@ final class RealityTableController: DiceTable {
     func roll() {
         rollID += 1
         steadyFrames = 0
+        probeEscaped = []
         isRolling = true
         fitConverged = false // a fresh throw re-owns the camera
         if DevFlags.impulseLog {
@@ -263,11 +267,13 @@ final class RealityTableController: DiceTable {
                 if history.count > 20 { history.removeFirst() }
                 isRolling = false
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
+                probeRest()
             }
         }
         // Outside the settle gate on purpose: the fit keeps easing after
         // the flag clears — that's what "stays fitted" means.
         updateCameraFit(dt: dt)
+        probeBounds()
     }
 
     /// The `-impulseLog` summary: one line per settled roll — enough to

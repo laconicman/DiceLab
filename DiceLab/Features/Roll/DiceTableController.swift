@@ -63,6 +63,9 @@ final class DiceTableController: NSObject {
     /// redraw the equirect gradient per tick.
     var appliedBackdrop: BackdropAppearance?
 
+    /// `-boundsProbe`: die/face pairs already reported this roll.
+    var probeEscaped: Set<String> = []
+
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
@@ -187,6 +190,7 @@ final class DiceTableController: NSObject {
     /// per die is what makes consecutive rolls differ.
     func roll() {
         sync.withLock { $0.rollID += 1; $0.rolling = true }
+        probeEscaped = []
         isRolling = true
         fitConverged = false // a fresh throw re-owns the camera
         if DevFlags.impulseLog {
@@ -258,11 +262,13 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 isRolling = false
                 sync.withLock { $0.rolling = false }
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
+                probeRest()
             }
             // The camera fit must keep easing *after* the rolling flag
             // clears — the settle publish above is what lands it — so it
             // can't sit behind a `rolling` early-out.
             updateCameraFit(now: time)
+            probeBounds()
         }
     }
 
