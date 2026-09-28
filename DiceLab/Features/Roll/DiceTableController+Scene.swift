@@ -231,7 +231,13 @@ extension DiceTableController {
         // so the top face lands exactly on floorY — the contact plane the
         // dice rest on is unchanged.
         floor.position.y = Bounds.floorY - Bounds.thickness / 2
-        floor.physicsBody = .tableBody()
+        // The *visual* felt outspans the play volume; the collider stays
+        // table-sized — `shape: nil` would derive a 500-unit floor body
+        // from the node's geometry.
+        floor.physicsBody = .tableBody(shape: SCNPhysicsShape(
+            geometry: SCNBox(width: CGFloat(Bounds.span),
+                             height: CGFloat(Bounds.thickness),
+                             length: CGFloat(Bounds.span), chamferRadius: 0)))
         scene.rootNode.addChildNode(floor)
 
         // Thin boxes, not the ancestors' oriented planes: an axis-aligned box
@@ -446,8 +452,11 @@ extension SCNPhysicsBody {
     /// reports no contacts itself — the dice opt in, the table doesn't have to.
     /// (Contact delivery is asymmetric: one side's `contactTestBitMask`
     /// matching the other's category is enough.)
-    static func tableBody() -> SCNPhysicsBody {
-        let body = SCNPhysicsBody(type: .static, shape: nil)
+    /// `shape` defaults to nil — derive the collider from the node's own
+    /// geometry. The floor overrides it because its geometry is the
+    /// oversized visual felt, not the play volume.
+    static func tableBody(shape: SCNPhysicsShape? = nil) -> SCNPhysicsBody {
+        let body = SCNPhysicsBody(type: .static, shape: shape)
         body.categoryBitMask = PhysicsCategory.table.rawValue
         body.collisionBitMask = PhysicsCategory.die.rawValue
         return body
