@@ -104,7 +104,12 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                     }
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    // Full width so the Roll button centers on the screen
+                    // — not on the widest child. Without it the stack hugs
+                    // the history panel's width when present and the
+                    // button's own when not, shifting it off-center.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .bottom)
                     .padding(.bottom, 32)
                 }
             }
