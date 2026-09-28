@@ -109,7 +109,7 @@ world (`respawnDice`, `applyAppearance`, haptic gates). `SettingsView`
 binds through `@Bindable` and holds zero state itself. State lives in
 deliberately distinct kinds: `DiceLabApp`'s `@State` controllers — app-root
 object ownership, Apple's documented pattern for keeping a reference type
-alive — `DiceLabApp.engine` (`@AppStorage`, picks which controller exists),
+alive — `WindowRoot.engine` (`@AppStorage`, picks which controller exists),
 and `WindowRoot.showingSettings` — `@State` on the per-window root view,
 bound into `RollScreen`, because the sheet must outlive the screen that
 opened it (and a flag on `App` itself would be shared by every window).
