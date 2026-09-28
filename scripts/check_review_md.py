@@ -5,6 +5,7 @@ Usage: python3 scripts/check_review_md.py REVIEW.md --repo-root .
 Exit 1 on errors; warnings don't fail.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -41,13 +42,16 @@ def main() -> int:
     for lineno, body in bullets:
         loc = f"{review}:{lineno}"
 
-        spans = PATHISH.findall(line)
+        spans = PATHISH.findall(body)
         paths = [s for s in spans if looks_like_path(s)]
         if not paths:
             print(f"{loc}: warn: [unanchored] rule names no file/path")
             warnings += 1
         for p in paths:
-            if not (root / p).exists():
+            # Gitignored paths (generated output) may legitimately be absent.
+            if not (root / p).exists() and subprocess.run(
+                ["git", "check-ignore", "-q", p], cwd=root
+            ).returncode != 0:
                 print(f"{loc}: error: [missing-path] `{p}` does not exist")
                 errors += 1
 

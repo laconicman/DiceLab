@@ -1,6 +1,6 @@
 name: DiceLab
 options:
-  bundleIdPrefix: com.mrteller
+  bundleIdPrefix: com.learnable
   deploymentTarget:
     iOS: "18.0"
 targets:
@@ -12,7 +12,7 @@ targets:
         fileSystem: synchronized
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mrteller.DiceLab
+        PRODUCT_BUNDLE_IDENTIFIER: com.learnable.DiceLab
         MARKETING_VERSION: "0.9.4"
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: YES
@@ -32,7 +32,7 @@ targets:
       - target: DiceLab
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mrteller.DiceLabTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.learnable.DiceLabTests
         GENERATE_INFOPLIST_FILE: YES
 schemes:
   DiceLab:
