@@ -10,8 +10,9 @@ holds the dice-table screen (`RollScreen` — engine-agnostic chrome — plus on
 thin view per engine and the two controllers), `Model/` holds domain value
 types.
 
-No `RootView` exists yet — the engine `switch` in `DiceLabApp` is the whole
-top-level branch (YAGNI). `Model/` holds `DieFace` (pure face-up math on
+`DiceLabApp` composes `WindowRoot` — a per-window view, not a full
+`RootView` layer — and the engine `switch` is the whole top-level
+branch inside it. `Model/` holds `DieFace` (pure face-up math on
 `simd` quaternions), `RollResult`, `DiceTable` (the engine contract) and
 `DiceEngine` — engine-free, which is what let M7 be a controller-level swap.
 
@@ -109,8 +110,9 @@ binds through `@Bindable` and holds zero state itself. State lives in
 deliberately distinct kinds: `DiceLabApp`'s `@State` controllers — app-root
 object ownership, Apple's documented pattern for keeping a reference type
 alive — `DiceLabApp.engine` (`@AppStorage`, picks which controller exists),
-and `DiceLabApp.showingSettings` — `@State` at the root, bound into
-`RollScreen`, because the sheet must outlive the screen that opened it.
+and `WindowRoot.showingSettings` — `@State` on the per-window root view,
+bound into `RollScreen`, because the sheet must outlive the screen that
+opened it (and a flag on `App` itself would be shared by every window).
 
 - *Consequence:* changing `dieCount` rebuilds the dice. `respawnDice` bumps
   `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
@@ -373,7 +375,7 @@ not a code audit.
 
 ## Where state lives, after M7
 
-- `DiceLabApp.engine` — `@AppStorage("settings.engine")`, the app-level
+- `WindowRoot.engine` — `@AppStorage("settings.engine")`, the app-level
   choice of which controller exists. Plus two `@State` controllers — the
   documented Apple pattern for root-owned reference objects.
 - Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
@@ -381,9 +383,11 @@ not a code audit.
   shared keys across engines.
 - `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
   view-layer feedback reads a view-layer key (same slot as `engine`).
-- `DiceLabApp.showingSettings` — `@State` at the window root, bound into
-  `RollScreen`: an engine swap destroys the roll screen, and a sheet
-  presented from the dying view would force-dismiss inside the same
-  transaction that mounts the new scene view — TD-10's neighborhood.
-  `speech` stays `@State` on the screen — a service object that must
-  outlive rebuilds.
+- `WindowRoot.showingSettings` — `@State` on the per-window root view,
+  bound into `RollScreen`: an engine swap destroys the roll screen, and
+  a sheet presented from the dying view would force-dismiss inside the
+  same transaction that mounts the new scene view — TD-10's
+  neighborhood. The flag can't sit on `App` — `@State` there is shared
+  by every `WindowGroup` instance, so one flag would open the sheet in
+  all windows. `speech` stays `@State` on the screen — a service object
+  that must outlive rebuilds.
