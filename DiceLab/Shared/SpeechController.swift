@@ -15,10 +15,10 @@ final class SpeechController {
         let faces = result.faces.map(String.init).joined(
             separator: String(localized: "speech.plus",
                               defaultValue: " plus ",
-                              comment: "Spoken joiner between die face values"))
+                              comment: "Spoken joiner between die face values — keep the surrounding spaces"))
         return String(localized: "speech.result",
                       defaultValue: "\(faces) equals \(result.total)",
-                      comment: "Spoken roll result")
+                      comment: "Spoken roll result — %1$@ is the faces joined by the ' plus ' joiner, %2$lld the total")
     }
 
     /// A new roll interrupts the previous utterance — the stale readout of
