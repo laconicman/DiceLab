@@ -217,6 +217,7 @@ final class RealityTableController: DiceTable {
         isRolling = false
         lastRoll = nil
         history = []
+        probeEscaped = [] // a fresh dice set re-earns its escape reports
         fitConverged = false // refit to the fresh spawn cluster
         spawnDice(dieCount)
     }
