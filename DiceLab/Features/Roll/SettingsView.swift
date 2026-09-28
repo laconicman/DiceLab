@@ -30,7 +30,7 @@ struct SettingsView<Table: DiceTable>: View {
                     Stepper(value: $table.dieCount, in: 1...6) {
                         Text(String(localized: "settings.dieCount",
                                     defaultValue: "Count: \(table.dieCount)",
-                                    comment: "Dice-count stepper label"))
+                                    comment: "Dice-count stepper label — %lld is the count; add plural variations per locale"))
                     }
                     NavigationLink {
                         AppearanceEditor(table: table, preview: preview)

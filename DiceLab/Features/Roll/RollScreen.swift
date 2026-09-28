@@ -62,7 +62,7 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                     // `String` would render verbatim and extract nothing.
                     Text(String(localized: "roll.equation",
                                 defaultValue: "\(roll.faces.map(String.init).joined(separator: " + ")) = \(roll.total)",
-                                comment: "Result banner — faces joined by ' + ', then the total"))
+                                comment: "Result banner equation — %1$@ is the faces joined by ' + ', %2$lld the total"))
                         .font(.title2.monospacedDigit().bold())
                         .padding(8)
                         .background(.regularMaterial, in: .capsule)

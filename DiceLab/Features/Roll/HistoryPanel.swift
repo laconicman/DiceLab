@@ -64,7 +64,7 @@ struct HistoryPanel: View {
                         // its own explicit key, since the formats differ.
                         Text(String(localized: "history.equation",
                                     defaultValue: "\(roll.faces.map(String.init).joined(separator: "+")) = \(roll.total)",
-                                    comment: "History row — faces joined by '+', then the total"))
+                                    comment: "History row equation — %1$@ is the faces joined by '+', %2$lld the total"))
                             .font(.callout.monospacedDigit())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)
