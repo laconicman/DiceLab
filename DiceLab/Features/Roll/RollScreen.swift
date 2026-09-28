@@ -11,13 +11,11 @@ import SwiftUI
 struct RollScreen<Table: DiceTable, SceneContent: View>: View {
     let table: Table
     let scene: SceneContent
-    /// The appearance editor's live die preview — each engine builds its
-    /// own (`SceneView`/`RealityView`); the chrome only hosts it.
-    let preview: AnyView
+    /// The settings sheet's visibility — bound, not owned: the sheet itself
+    /// hangs off the app root so an engine swap can't force-dismiss it
+    /// mid-transaction (and so settings stay open across a renderer switch).
+    @Binding var showingSettings: Bool
     @Environment(\.scenePhase) private var scenePhase
-    /// Transient UI state — the correct home for `@State`: its lifetime
-    /// *should* match this view's, unlike the world (the Q2 lesson applied).
-    @State private var showingSettings = false
     /// Speech service — `@State` because it must outlive view rebuilds
     /// (synthesizer state), same discipline as the controllers' ownership.
     @State private var speech = SpeechController()
@@ -116,22 +114,5 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             // Shake-to-roll: an invisible first responder, because SwiftUI has
             // no shake gesture — see ShakeDetector.
             .background(ShakeDetector(onShake: table.roll))
-            .sheet(isPresented: $showingSettings) {
-                // Dev driver: `-appearanceeditor` lands directly in the
-                // editor so its live preview is screenshotable via simctl.
-                Group {
-                    if DevFlags.appearanceEditor {
-                        NavigationStack {
-                            AppearanceEditor(table: table, preview: preview)
-                        }
-                    } else {
-                        SettingsView(table: table, preview: preview)
-                    }
-                }
-                // Detents live on the sheet, not inside SettingsView, so
-                // the dev-flag path gets them too. .medium reads as a
-                // quick toggle panel; .large gives the editor room.
-                .presentationDetents([.medium, .large])
-            }
     }
 }

@@ -6,6 +6,7 @@ import SwiftUI
 /// delegate (per-frame settle check lives there).
 struct SceneKitRollView: View {
     @Environment(DiceTableController.self) private var table
+    @Binding var showingSettings: Bool
 
     var body: some View {
         RollScreen(table: table, scene: SceneView(
@@ -21,12 +22,6 @@ struct SceneKitRollView: View {
         // The fit's horizontal-FOV math needs the viewport shape.
         .onGeometryChange(for: CGFloat.self) { $0.size.width / $0.size.height }
             action: { table.viewAspect = $0 },
-        preview: AnyView(SceneView(
-            scene: table.previewScene,
-            // The preview's spin is an SCNAction — continuous rendering
-            // keeps it animating inside the settings sheet.
-            options: [.rendersContinuously],
-            antialiasingMode: .multisampling4X
-        )))
+        showingSettings: $showingSettings)
     }
 }
