@@ -268,7 +268,14 @@ extension DiceTableController: SCNSceneRendererDelegate {
             // The camera fit must keep easing *after* the rolling flag
             // clears — the settle publish above is what lands it — so it
             // can't sit behind a `rolling` early-out.
-            updateCameraFit(now: time)
+            let cameraEnRoute = updateCameraFit(now: time)
+            // The view is event-driven: it draws only while content
+            // changes, and physics-sleep is exactly when the fit still
+            // needs frames to converge and latch. Ask for one more frame
+            // per frame until it does — after the latch the pump can idle.
+            if cameraEnRoute {
+                (renderer as? SCNView)?.setNeedsDisplay()
+            }
             probeBounds()
         }
     }

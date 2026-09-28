@@ -45,16 +45,18 @@ extension RealityTableController {
     /// the settle threshold is 0.02 m/s, so 0.10 is "final tumbling."
     private enum Fit {
         static let speed: Float = 0.10
-        /// Half a die's diagonal (~2.6 cm) plus margin.
-        static let padding: Float = 0.045
-        /// The far cap isn't a constant either: "the widest cluster the
-        /// volume can hold," computed per-frame. Centroid-centered spheres
-        /// worst-case at the *full* diagonal — a lopsided cluster sits the
-        /// centroid near one end, the outlier a diagonal away.
-        static let minDistance: Float = 0.18
-        static var volumeRadius: Float {
-            2 * sqrt(Bounds.halfX * Bounds.halfX + Bounds.halfZ * Bounds.halfZ)
-                + padding
+        /// Per-axis breathing room: a die's silhouette half-diagonal
+        /// (~2.6 cm) plus ~1.5 cm of visible felt — the extreme die sits
+        /// inside the frame, not flush against it.
+        static let padding: Float = 0.04
+        /// Floor and far cap: the floor keeps a compact cluster or a lone
+        /// die from filling the screen; the cap isn't a constant — it's
+        /// "the widest cluster the volume can hold," computed per-frame.
+        /// Each axis's worst case is a die center pinned at that wall —
+        /// half-extent + padding.
+        static let minDistance: Float = 0.22
+        static var volumeExtents: SIMD2<Float> {
+            .init(Bounds.halfX + padding, Bounds.halfZ + padding)
         }
         static let rate: Float = 5
         /// Converged-pose epsilon — ~2 mm at meter scale.
@@ -79,19 +81,19 @@ extension RealityTableController {
             guard let motion = die.components[PhysicsMotionComponent.self] else { return nil }
             return simd_length(motion.linearVelocity)
         }.max() ?? 0
-        let sphere = CameraFit.boundingSphere(of: positions, padding: Fit.padding)
+        let box = CameraFit.boundingBox(of: positions, padding: Fit.padding)
         var distance = CameraFit.requiredDistance(
-            radius: sphere.radius,
+            xExtent: box.extents.x, zExtent: box.extents.y,
             verticalFieldOfView: CameraHome.fieldOfView,
             aspect: Float(viewAspect))
         let maxDistance = CameraFit.requiredDistance(
-            radius: Fit.volumeRadius,
+            xExtent: Fit.volumeExtents.x, zExtent: Fit.volumeExtents.y,
             verticalFieldOfView: CameraHome.fieldOfView,
             aspect: Float(viewAspect))
         distance = min(max(distance, Fit.minDistance), maxDistance)
         let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
         let target = fitting
-            ? sphere.center + CameraHome.axis * distance
+            ? box.center + CameraHome.axis * distance
             : CameraHome.position
         // NaN transforms never recover — snap instead of damping poison.
         if !camera.position.x.isFinite {
