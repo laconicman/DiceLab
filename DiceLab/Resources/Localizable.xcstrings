@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "A session roll list on the table screen — tap its header to expand it toward the safe area." : {
+      "comment" : "History section footer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A session roll list on the table screen — tap its header to expand it toward the safe area."
+          }
+        }
+      }
+    },
     "Appearance" : {
       "comment" : "Navigation link to the appearance editor, and its navigation title",
       "localizations" : {
@@ -30,17 +41,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Automatic framing eases the camera to keep all dice in view while they settle. Camera control lets you orbit freely between rolls."
-          }
-        }
-      }
-    },
-    "A session roll list on the table screen — tap its header to expand it toward the safe area." : {
-      "comment" : "History section footer",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A session roll list on the table screen — tap its header to expand it toward the safe area."
           }
         }
       }
@@ -298,6 +298,17 @@
         }
       }
     },
+    "history.equation" : {
+      "comment" : "History row equation — %1$@ is the faces joined by '+', %2$lld the total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ = %2$lld"
+          }
+        }
+      }
+    },
     "Ivory" : {
       "comment" : "Theme preset name: white die, black pips",
       "localizations" : {
@@ -353,17 +364,6 @@
         }
       }
     },
-    "Pips" : {
-      "comment" : "Color picker: the die's pip color",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pips"
-          }
-        }
-      }
-    },
     "Pip glow" : {
       "comment" : "Color picker: emissive tint of the pips",
       "localizations" : {
@@ -382,6 +382,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pip intensity"
+          }
+        }
+      }
+    },
+    "Pips" : {
+      "comment" : "Color picker: the die's pip color",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pips"
           }
         }
       }
@@ -463,6 +474,17 @@
         }
       }
     },
+    "roll.equation" : {
+      "comment" : "Result banner equation — %1$@ is the faces joined by ' + ', %2$lld the total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ = %2$lld"
+          }
+        }
+      }
+    },
     "Rolling…" : {
       "comment" : "Roll button while a throw is in flight",
       "localizations" : {
@@ -507,6 +529,17 @@
         }
       }
     },
+    "settings.dieCount" : {
+      "comment" : "Dice-count stepper label — %lld is the count; add plural variations per locale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Count: %lld"
+          }
+        }
+      }
+    },
     "Soft" : {
       "comment" : "Lighting preset name",
       "localizations" : {
@@ -536,6 +569,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speak results"
+          }
+        }
+      }
+    },
+    "speech.plus" : {
+      "comment" : "Spoken joiner between die face values — keep the surrounding spaces",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " plus "
+          }
+        }
+      }
+    },
+    "speech.result" : {
+      "comment" : "Spoken roll result — %1$@ is the faces joined by the ' plus ' joiner, %2$lld the total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ equals %2$lld"
           }
         }
       }
@@ -613,61 +668,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use photo as felt"
-          }
-        }
-      }
-    },
-    "history.equation" : {
-      "comment" : "A history row's compact equation — %1$@ is the die faces joined by '+', %2$lld the total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ = %2$lld"
-          }
-        }
-      }
-    },
-    "roll.equation" : {
-      "comment" : "Result banner equation — %1$@ is the die faces joined by ' + ', %2$lld the total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ = %2$lld"
-          }
-        }
-      }
-    },
-    "settings.dieCount" : {
-      "comment" : "Dice-count stepper label — %lld is the count; add plural variations per locale (English shows the bare number)",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Count: %lld"
-          }
-        }
-      }
-    },
-    "speech.plus" : {
-      "comment" : "Spoken joiner between die face values — keep the surrounding spaces",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " plus "
-          }
-        }
-      }
-    },
-    "speech.result" : {
-      "comment" : "Spoken roll result — %1$@ is the face values joined by the ' plus ' joiner, %2$lld the total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ equals %2$lld"
           }
         }
       }
