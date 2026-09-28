@@ -11,13 +11,11 @@ import SwiftUI
 struct RollScreen<Table: DiceTable, SceneContent: View>: View {
     let table: Table
     let scene: SceneContent
-    /// The appearance editor's live die preview — each engine builds its
-    /// own (`SceneView`/`RealityView`); the chrome only hosts it.
-    let preview: AnyView
+    /// The settings sheet's visibility — bound, not owned: the sheet itself
+    /// hangs off the app root so an engine swap can't force-dismiss it
+    /// mid-transaction (and so settings stay open across a renderer switch).
+    @Binding var showingSettings: Bool
     @Environment(\.scenePhase) private var scenePhase
-    /// Transient UI state — the correct home for `@State`: its lifetime
-    /// *should* match this view's, unlike the world (the Q2 lesson applied).
-    @State private var showingSettings = false
     /// Speech service — `@State` because it must outlive view rebuilds
     /// (synthesizer state), same discipline as the controllers' ownership.
     @State private var speech = SpeechController()
@@ -64,7 +62,7 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                     // `String` would render verbatim and extract nothing.
                     Text(String(localized: "roll.equation",
                                 defaultValue: "\(roll.faces.map(String.init).joined(separator: " + ")) = \(roll.total)",
-                                comment: "Result banner — faces joined by ' + ', then the total"))
+                                comment: "Result banner equation — %1$@ is the faces joined by ' + ', %2$lld the total"))
                         .font(.title2.monospacedDigit().bold())
                         .padding(8)
                         .background(.regularMaterial, in: .capsule)
@@ -104,29 +102,17 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                     }
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    // Full width so the Roll button centers on the screen
+                    // — not on the widest child. Without it the stack hugs
+                    // the history panel's width when present and the
+                    // button's own when not, shifting it off-center.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .bottom)
                     .padding(.bottom, 32)
                 }
             }
             // Shake-to-roll: an invisible first responder, because SwiftUI has
             // no shake gesture — see ShakeDetector.
             .background(ShakeDetector(onShake: table.roll))
-            .sheet(isPresented: $showingSettings) {
-                // Dev driver: `-appearanceeditor` lands directly in the
-                // editor so its live preview is screenshotable via simctl.
-                Group {
-                    if DevFlags.appearanceEditor {
-                        NavigationStack {
-                            AppearanceEditor(table: table, preview: preview)
-                        }
-                    } else {
-                        SettingsView(table: table, preview: preview)
-                    }
-                }
-                // Detents live on the sheet, not inside SettingsView, so
-                // the dev-flag path gets them too. .medium reads as a
-                // quick toggle panel; .large gives the editor room.
-                .presentationDetents([.medium, .large])
-            }
     }
 }

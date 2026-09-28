@@ -169,6 +169,11 @@ extension RealityTableController {
         static let ceilingY: Float = 0.12
         static let thickness: Float = 0.04
         static let span: Float = 0.60
+        /// The felt's *visible* reach: past the backdrop dome's radius, so
+        /// every sightline to its rim exits the dome first and the edge
+        /// hides behind the dome wall — RealityKit's stand-in for the
+        /// SceneKit fog dissolve. Collision stays `span`-sized.
+        static let feltSpan: Float = 20
         static let dieEdge: Float = 0.03
         static let dieMass: Float = 0.02   // kg — impulse tuning assumes it
     }
@@ -199,12 +204,14 @@ extension RealityTableController {
     private func setUpTable() {
         // Visible felt: a thin box whose top face sits on floorY. SCNFloor's
         // infinite plane has no direct RK analog; a box is honest geometry.
+        // The mesh overshoots the dome's radius so the rim is always hidden
+        // behind it; the collision shape stays table-sized.
         let felt = Entity()
         felt.name = EntityName.felt
         let feltShape = ShapeResource.generateBox(
             size: [Bounds.span, Bounds.thickness, Bounds.span])
         felt.components.set(ModelComponent(
-            mesh: .generateBox(size: [Bounds.span, Bounds.thickness, Bounds.span]),
+            mesh: .generateBox(size: [Bounds.feltSpan, Bounds.thickness, Bounds.feltSpan]),
             materials: [Self.feltMaterial(for: theme.appearance.felt)]))
         felt.components.set(CollisionComponent(shapes: [feltShape]))
         felt.components.set(PhysicsBodyComponent(
@@ -213,13 +220,10 @@ extension RealityTableController {
         felt.position = [0, Bounds.floorY - Bounds.thickness / 2, 0]
         root.addChild(felt)
 
-        // Walls + ceiling: collision-only entities — no ModelComponent on
-        // the colliders themselves. With per-body CCD on the dice, the
-        // 4-unit margin the SceneKit walls needed shrinks to a formality.
-        // The visible bounds are thin translucent panels on the inner
-        // faces — matching the SceneKit walls' faint-glass treatment: the
-        // user asked to *see* where dice stop, and unlit-translucent is
-        // the RealityKit way to get glass that doesn't light up.
+        // Walls + ceiling: collision-only entities — no ModelComponent, so
+        // nothing renders. That's the ECS version of `isHidden`: physics is
+        // a component, visuals are a component, and a wall needs only one.
+        // (The M9b translucent panels are gone — fully invisible is the ask.)
         let wallY = (Bounds.floorY + Bounds.ceilingY) / 2
         func bound(_ size: SIMD3<Float>, at position: SIMD3<Float>) {
             let shape = ShapeResource.generateBox(size: size)
@@ -243,33 +247,19 @@ extension RealityTableController {
         bound([Bounds.span, Bounds.span, Bounds.thickness],
               at: [0, wallY, -Bounds.halfZ - Bounds.thickness / 2])        // −z
 
-        var panel = UnlitMaterial(color: .gray)
-        panel.blending = .transparent(opacity: .init(floatLiteral: 0.10))
-        let wallHeight = Bounds.ceilingY - Bounds.floorY
-        func pane(_ size: SIMD3<Float>, at position: SIMD3<Float>) {
-            let pane = ModelEntity(mesh: .generateBox(size: size),
-                                   materials: [panel])
-            pane.position = position
-            root.addChild(pane)
-        }
-        pane([0.001, wallHeight, 2 * Bounds.halfZ], at: [Bounds.halfX, wallY, 0])
-        pane([0.001, wallHeight, 2 * Bounds.halfZ], at: [-Bounds.halfX, wallY, 0])
-        pane([2 * Bounds.halfX, wallHeight, 0.001], at: [0, wallY, Bounds.halfZ])
-        pane([2 * Bounds.halfX, wallHeight, 0.001], at: [0, wallY, -Bounds.halfZ])
-
         // The visible backdrop is geometry, not a scene property — iOS
         // RealityKit has no `scene.background` (that's SceneKit's
         // convenience). An inside-out unlit sphere plays skybox: front-face
         // culling leaves the inward surfaces, no winding-flip scale needed.
+        // It stays enabled even with no backdrop — a disabled dome leaves
+        // the `RealityView` transparent where the felt doesn't reach, and
+        // the window behind it renders as a blank white screen.
         // Radius keeps the camera (max retreat < 1 m) and its far plane
-        // (10 m) comfortably inside. Disabled until a backdrop applies.
-        var domeMaterial = UnlitMaterial(color: .black)
-        domeMaterial.faceCulling = .front
+        // (10 m) comfortably inside.
         let dome = ModelEntity(
             mesh: .generateSphere(radius: Backdrop.domeRadius),
-            materials: [domeMaterial])
+            materials: [Self.domeMaterial()])
         dome.name = EntityName.backdropDome
-        dome.isEnabled = false
         root.addChild(dome)
 
         // The IBL probe's host — an inert entity `applyBackdrop` sets and
@@ -284,6 +274,15 @@ extension RealityTableController {
     /// "the room," small enough to stay inside the 10 m far plane.
     private enum Backdrop {
         static let domeRadius: Float = 4
+    }
+
+    /// The dome's idle material — opaque black, inside-out. Any backdrop
+    /// image swaps it for the textured variant; `.none` lands here so the
+    /// view is never transparent.
+    private static func domeMaterial() -> UnlitMaterial {
+        var material = UnlitMaterial(color: .black)
+        material.faceCulling = .front
+        return material
     }
 
     /// Spawn geometry in meters — same spread rule as SceneKit, scaled ÷100.
@@ -349,7 +348,11 @@ extension RealityTableController {
         }
         guard let image = BackdropImage.resolve(backdrop),
               let cgImage = image.cgImage else {
-            dome?.isEnabled = false
+            // No backdrop → plain black dome, still enabled: disabling it
+            // would leave the RealityView transparent where the felt
+            // doesn't reach — a white screen in light mode.
+            dome?.components[ModelComponent.self]?.materials =
+                [Self.domeMaterial()]
             for probe in probes {
                 probe.components.remove(VirtualEnvironmentProbeComponent.self)
             }
@@ -361,7 +364,6 @@ extension RealityTableController {
             material.color = .init(tint: .white, texture: .init(texture))
             material.faceCulling = .front
             dome?.components[ModelComponent.self]?.materials = [material]
-            dome?.isEnabled = true
         }
         Task {
             var environment: EnvironmentResource?
@@ -406,6 +408,10 @@ extension RealityTableController {
            let texture = try? TextureResource(
                image: cgImage, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white, texture: .init(texture))
+            // The felt mesh outspans the photo — a UV transform tiles it at
+            // the old density instead of stretching it once across.
+            material.textureCoordinateTransform.scale =
+                SIMD2<Float>(repeating: Bounds.feltSpan / Bounds.span)
         } else {
             material.baseColor = .init(tint: felt.color.uiColor)
         }

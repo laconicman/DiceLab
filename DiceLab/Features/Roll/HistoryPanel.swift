@@ -13,29 +13,49 @@ struct HistoryPanel: View {
     var expandedHeight: CGFloat
 
     @State private var expanded = false
+    /// Close writes the same `settings.history` key `RollScreen` gates on —
+    /// the panel hides and Settings stays in sync, no settings round-trip
+    /// needed. `@AppStorage` because chrome visibility is view-layer state.
+    @AppStorage(TableSettings.history) private var historyEnabled = true
 
     var body: some View {
         VStack(spacing: 0) {
-            Button {
-                withAnimation(.snappy) { expanded.toggle() }
-            } label: {
-                HStack {
-                    Text("History")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Image(systemName: "chevron.up")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(expanded ? .degrees(180) : .zero)
+            HStack(spacing: 0) {
+                Button {
+                    withAnimation(.snappy) { expanded.toggle() }
+                } label: {
+                    HStack {
+                        Text("History")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: "chevron.up")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(expanded ? .degrees(180) : .zero)
+                    }
+                    .padding(.leading, 14)
+                    .padding(.vertical, 9)
+                    .contentShape(.rect)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .contentShape(.rect)
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(expanded ? "Collapse roll history"
+                                             : "Expand roll history")
+
+                Button {
+                    historyEnabled = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close roll history")
+                .padding(.trailing, 6)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(expanded ? "Collapse roll history"
-                                         : "Expand roll history")
 
             ScrollView {
                 LazyVStack(spacing: 2) {
@@ -44,7 +64,7 @@ struct HistoryPanel: View {
                         // its own explicit key, since the formats differ.
                         Text(String(localized: "history.equation",
                                     defaultValue: "\(roll.faces.map(String.init).joined(separator: "+")) = \(roll.total)",
-                                    comment: "History row — faces joined by '+', then the total"))
+                                    comment: "History row equation — %1$@ is the faces joined by '+', %2$lld the total"))
                             .font(.callout.monospacedDigit())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)

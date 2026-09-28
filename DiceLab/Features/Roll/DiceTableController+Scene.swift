@@ -192,6 +192,11 @@ extension DiceTableController {
         static let ceilingY: Float = 12
         static let thickness: Float = 4
         static let span: Float = 60
+        /// The felt's visible reach — far past the fitted camera's max
+        /// retreat (`Fit.volumeRadius` ≈ 90), so its rim can never enter
+        /// the frame. The "infinite table": geometry ends past visibility;
+        /// the omni's falloff has already dimmed it to black out there.
+        static let feltSpan: Float = 500
     }
 
     private func setUpTable() {
@@ -206,9 +211,17 @@ extension DiceTableController {
             ?? feltAppearance.color.uiColor
         feltMaterial.roughness.contents = NSNumber(1) // matte felt
         feltMaterial.specular.contents = UIColor.black
-        let felt = SCNBox(width: CGFloat(Bounds.span),
+        // A photo felt tiles at its old density across the bigger box:
+        // repeat-wrap + a UV scale factor instead of stretching — inert
+        // when `diffuse.contents` is a plain color.
+        feltMaterial.diffuse.wrapS = .repeat
+        feltMaterial.diffuse.wrapT = .repeat
+        feltMaterial.diffuse.mipFilter = .linear
+        feltMaterial.diffuse.contentsTransform = SCNMatrix4MakeScale(
+            Bounds.feltSpan / Bounds.span, Bounds.feltSpan / Bounds.span, 1)
+        let felt = SCNBox(width: CGFloat(Bounds.feltSpan),
                           height: CGFloat(Bounds.thickness),
-                          length: CGFloat(Bounds.span), chamferRadius: 0)
+                          length: CGFloat(Bounds.feltSpan), chamferRadius: 0)
         // One shared instance across the six face slots: mutating it later
         // (applyAppearance) updates every face at once.
         felt.materials = Array(repeating: feltMaterial, count: 6)
@@ -218,7 +231,13 @@ extension DiceTableController {
         // so the top face lands exactly on floorY — the contact plane the
         // dice rest on is unchanged.
         floor.position.y = Bounds.floorY - Bounds.thickness / 2
-        floor.physicsBody = .tableBody()
+        // The *visual* felt outspans the play volume; the collider stays
+        // table-sized — `shape: nil` would derive a 500-unit floor body
+        // from the node's geometry.
+        floor.physicsBody = .tableBody(shape: SCNPhysicsShape(
+            geometry: SCNBox(width: CGFloat(Bounds.span),
+                             height: CGFloat(Bounds.thickness),
+                             length: CGFloat(Bounds.span), chamferRadius: 0)))
         scene.rootNode.addChildNode(floor)
 
         // Thin boxes, not the ancestors' oriented planes: an axis-aligned box
@@ -228,21 +247,16 @@ extension DiceTableController {
         // measured), and a solver step can carry it ~1 unit — 4 units of
         // thickness is a margin, not a guarantee. What bounds the speed is
         // `roll()` clearing velocity before each impulse.
-        // Faintly visible on purpose — the legacy walls were `.clear`
-        // (fully invisible), but the user asked to *see* the bounds:
-        // a whisper of diffuse plus a specular sheen reads as glass,
-        // not fog.
-        let wallMaterial = SCNMaterial()
-        wallMaterial.diffuse.contents = UIColor.systemGray.withAlphaComponent(0.22)
-        wallMaterial.specular.contents = UIColor.white.withAlphaComponent(0.5)
-
-        func bound(_ size: SCNVector3, at position: SCNVector3, hidden: Bool = false) {
+        // Fully invisible again — M9b's translucent glass read as a glass
+        // box, but the ask is bounds the eye can't find. `isHidden` hides
+        // the node from rendering while its physics body keeps colliding;
+        // no material needed at all.
+        func bound(_ size: SCNVector3, at position: SCNVector3) {
             let node = SCNNode(geometry: SCNBox(
                 width: CGFloat(size.x), height: CGFloat(size.y),
                 length: CGFloat(size.z), chamferRadius: 0))
-            node.geometry?.materials = [wallMaterial]
             node.position = position
-            node.isHidden = hidden
+            node.isHidden = true
             node.physicsBody = .tableBody()
             scene.rootNode.addChildNode(node)
         }
@@ -252,8 +266,7 @@ extension DiceTableController {
         // the corners and the ceiling's top face.
         let wallY = (Bounds.floorY + Bounds.ceilingY) / 2
         bound(SCNVector3(Bounds.span, Bounds.thickness, Bounds.span),
-              at: SCNVector3(0, Bounds.ceilingY + Bounds.thickness / 2, 0),
-              hidden: true)                                                    // ceiling
+              at: SCNVector3(0, Bounds.ceilingY + Bounds.thickness / 2, 0)) // ceiling
         bound(SCNVector3(Bounds.thickness, Bounds.span, Bounds.span),
               at: SCNVector3(Bounds.halfX + Bounds.thickness / 2, wallY, 0))  // +x wall
         bound(SCNVector3(Bounds.thickness, Bounds.span, Bounds.span),
@@ -439,8 +452,11 @@ extension SCNPhysicsBody {
     /// reports no contacts itself — the dice opt in, the table doesn't have to.
     /// (Contact delivery is asymmetric: one side's `contactTestBitMask`
     /// matching the other's category is enough.)
-    static func tableBody() -> SCNPhysicsBody {
-        let body = SCNPhysicsBody(type: .static, shape: nil)
+    /// `shape` defaults to nil — derive the collider from the node's own
+    /// geometry. The floor overrides it because its geometry is the
+    /// oversized visual felt, not the play volume.
+    static func tableBody(shape: SCNPhysicsShape? = nil) -> SCNPhysicsBody {
+        let body = SCNPhysicsBody(type: .static, shape: shape)
         body.categoryBitMask = PhysicsCategory.table.rawValue
         body.collisionBitMask = PhysicsCategory.die.rawValue
         return body
