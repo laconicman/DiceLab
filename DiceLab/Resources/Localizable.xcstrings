@@ -89,6 +89,17 @@
         }
       }
     },
+    "Close roll history" : {
+      "comment" : "VoiceOver label for the button that hides the history panel",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close roll history"
+          }
+        }
+      }
+    },
     "Collapse roll history" : {
       "comment" : "VoiceOver label for the expanded history panel header",
       "localizations" : {
