@@ -8,6 +8,10 @@
   never affects physics; the ancestors carried this bug.
 - Reject `@Observable`/UI mutations in `SCNPhysicsContactDelegate` methods under
   `DiceLab/Features/` unless main-actor dispatched — callbacks run off-main.
+- Flag work under `DiceLab/Features/` that assumes `SceneView`/`SCNView` keeps
+  rendering after physics sleep — the view is event-driven; the pump stops.
+- Require unconverged work in `DiceLab/Features/Roll/` (e.g. camera fitting) to
+  re-dirty the view via `setNeedsDisplay()`, or it freezes mid-flight.
 
 ## Conventions
 
@@ -19,11 +23,10 @@
   inline literals under `DiceLab/Features/`; they belong as named constants.
 - Reject `import SceneKit`/`import RealityKit` under `DiceLab/Model/` — the
   model layer staying engine-free is what made the M7 port a controller swap.
-- Flag user-facing text built as a runtime `String` (joins, interpolation)
-  passed to `Text`/`Label`-style params — it renders verbatim, bypassing
-  `Localizable.xcstrings`; require `String(localized:)` with a dotted key.
-- Flag display names derived from `rawValue`/`capitalized` — unlocalizable;
-  add a `String(localized:)` `title` on the enum instead.
+- Flag runtime-built `String` in `Text`/`Label` under `DiceLab/Features/` —
+  it bypasses the string catalog; require `String(localized:)` + dotted key.
+- Flag `rawValue`/`capitalized` display names under `DiceLab/` — unlocalizable;
+  use a `String(localized:)` `title` on the enum instead.
 
 ## Anti-patterns to Flag
 
