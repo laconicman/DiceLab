@@ -77,11 +77,13 @@ is in place; the flag has simply never been used:
 gh pr merge 21 --merge --auto   # merges itself the moment CI greens
 ```
 
-Payoff solo: fire-and-forget instead of polling the check. Note the
-subtlety *without* required-status-checks protection: `--auto` waits for
-the checks that exist on the PR, which is exactly CI here. If CI is ever
-skipped on a PR (`[skip ci]` paths, docs-only changes still run the full
-workflow — fine), auto-merge lands immediately — acceptable at this scale.
+Payoff solo: fire-and-forget instead of polling the check. One honest
+caveat *without* required-status-checks protection: `--auto` waits only
+for the checks *reported on the PR* — it is not a CI gate. Enable it
+after CI's status has registered (any pending state is enough); enabling
+it on a PR with no reported checks merges immediately. Acceptable at
+this scale — the habit is just "queue after CI shows up," and §5(c) is
+where a real gate would live if wanted.
 
 ### 4. Release on tag push + version assert (repo-specific payoff) — ~20 lines of YAML, removes a manual step
 
