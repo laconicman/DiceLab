@@ -58,11 +58,11 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             }
             .overlay(alignment: .top) {
                 if let roll = table.lastRoll {
-                    // An equation needs an explicit catalog key — a joined
-                    // `String` would render verbatim and extract nothing.
-                    Text(String(localized: "roll.equation",
-                                defaultValue: "\(roll.faces.map(String.init).joined(separator: " + ")) = \(roll.total)",
-                                comment: "Result banner equation — %1$@ is the faces joined by ' + ', %2$lld the total"))
+                    // A runtime-built `String` renders verbatim — the
+                    // explicit key is what keeps the catalog reachable.
+                    Text(String(localized: "roll.total",
+                                defaultValue: "\(roll.total)",
+                                comment: "Result banner — the settled roll's total"))
                         .font(.title2.monospacedDigit().bold())
                         .padding(8)
                         .background(.regularMaterial, in: .capsule)
