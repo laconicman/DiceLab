@@ -121,6 +121,21 @@ final class DiceTableController: NSObject {
     /// tug-of-war, until the next `roll()` or dice respawn unlatches it.
     var fitConverged = false
 
+    /// Speed-gate hysteresis for `updateCameraFit`: `fitSawFlight` proves
+    /// the dice actually flew this roll (so a stale first sample can't
+    /// arm the fit), `fitArmed` latches once they slow — the target can't
+    /// flap home↔fitted while velocities hover at the threshold. Both
+    /// reset in `roll()`.
+    var fitSawFlight = false
+    var fitArmed = false
+
+    /// Previous frame's die positions — the speed-gate source, because
+    /// `SCNPhysicsBody.velocity` reads zero outside the solver's own
+    /// callbacks (observed throughout a visibly flying roll).
+    var lastFitPositions: [SIMD3<Float>] = []
+
+
+
     /// Gates haptic taps — the engine exists either way.
     var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
@@ -180,6 +195,7 @@ final class DiceTableController: NSObject {
         history = []
         probeEscaped = [] // a fresh dice set re-earns its escape reports
         fitConverged = false // refit to the fresh spawn cluster
+        lastFitPositions = [] // stale deltas would read as phantom speed
         spawnDice(dieCount)
     }
 
@@ -194,6 +210,8 @@ final class DiceTableController: NSObject {
         probeEscaped = []
         isRolling = true
         fitConverged = false // a fresh throw re-owns the camera
+        fitSawFlight = false // and the speed gate re-arms from scratch
+        fitArmed = false
         if DevFlags.impulseLog {
             rollImpulses = []
             rollStartedAt = Date()
