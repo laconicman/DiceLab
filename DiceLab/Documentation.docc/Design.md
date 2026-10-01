@@ -238,8 +238,8 @@ The port's real findings, SceneKit → RealityKit:
   |v| < 2 cm/s and |ω| < 0.3 rad/s sustained 15 frames. Honest bookkeeping —
   and it survives an engine swap.
 - **CCD exists on RealityKit.** `isContinuousCollisionDetectionEnabled` is
-  the per-body tunneling guard SceneKit withholds (Bullet has it, the API
-  doesn't surface it). It is a mitigation, not a guarantee: the discrete
+  the per-body tunneling guard SceneKit withholds (the API exists but is
+  sphere-shapes-only). It is a mitigation, not a guarantee: the discrete
   check runs once per rendered frame, and a ~6 m/s toss covers ~0.10 m at
   60 fps — 0.20 if the rate dips to 30 — past a 0.04 m slab in one step.
   Collider `thickness` is therefore 0.24 on every bound; each inner face
@@ -410,8 +410,8 @@ not a code audit.
   choice of which controller exists. Plus two `@State` controllers — the
   documented Apple pattern for root-owned reference objects.
 - Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
-  `cameraControl`, `cameraFit`) — controller `didSet` → `UserDefaults`,
-  shared keys across engines.
+  `cameraControl`, `cameraFit`, `dynamics`) — controller `didSet` →
+  `UserDefaults`, shared keys across engines.
 - `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
   view-layer feedback reads a view-layer key (same slot as `engine`).
 - `WindowRoot.showingSettings` — `@State` on the per-window root view,
@@ -422,3 +422,50 @@ not a code audit.
   by every `WindowGroup` instance, so one flag would open the sheet in
   all windows. `speech` stays `@State` on the screen — a service object
   that must outlive rebuilds.
+
+## Pace × viscosity — two dials, two engines
+
+Issues #25/#26 asked for the physics levers; the answer that shipped is a
+single shared pair — `RollDynamics` (`Model/`, engine-free): `pace`
+(0.5…1.5, default 1.0) × `viscosity` (0…1, default 0), Codable+clamped like
+`Appearance`, persisted to `settings.dynamics`. The *educational* point is
+that the dials are orthogonal **only because both are defined in
+simulation space**:
+
+- **Pace** scales simulated time — pure playback. A 24 u/s impulse stays
+  24 u/s in the solver at any pace; it just arrives sooner.
+- **Viscosity** bleeds velocity in sim-space — a different throw at any
+  pace. Normalizing it to wall time instead would make the pace slider
+  secretly retune the physics, and the axes would stop being independent.
+
+The same model lands on different hardware per engine:
+
+| | SceneKit | RealityKit |
+|---|---|---|
+| pace | `physicsWorld.speed = 3 × pace` | `CMTimebase.rate = pace` on `PhysicsSimulationComponent.clock` |
+| viscosity | `damping`/`angularDamping` = 0.1 + 0.25·v | `linearDamping`/`angularDamping` = 0.05 + 0.35·v |
+
+The asymmetries are the lesson. SceneKit's old `speed = 3` had quietly
+*already* been accelerating Bullet's per-sim-second damping — pace and
+viscosity were entangled before there were dials; the explicit baseline
+(0.1 = Bullet's implicit default, now named) preserves it. RealityKit's
+gain is larger because its baseline is smaller and meter-scale makes weak
+damping nearly invisible. RealityKit got its pace lever from iOS 18:
+`PhysicsSimulationComponent` on `root` (the component belongs on the
+*parent* of physics bodies) carries a `CMTimebase` sourced on the host
+clock — `CMTimebaseSetRate` rewrites it live, mid-roll. Measured on
+simulator (`-autoroll -impulseLog -pace N`): settle wall-time tracks
+roughly 1/rate — rate 0.25 settles in ~2.5–3.2 s vs ~1.6 s at baseline,
+rate 4 in ~0.7 s. The response is monotonic but clearly sub-linear, so the
+solver likely clamps per-frame dt; within the dial's 0.5–1.5 window the
+effect is gentler than the theory but unmistakable.
+
+What each engine's settle machinery does with pace is different by
+construction: Bullet's ~2-sim-second deactivation means a 0.5× pace
+*doubles* the real-time settle floor (intended — slow motion is slow),
+while RealityKit's 15-frame velocity detector is pace-invariant because
+its thresholds are velocities, not durations. Camera fit needed nothing:
+SceneKit's speed gate already divides by `world.speed`, and RealityKit's
+is a velocity threshold. For timing runs a transient `-pace` launch
+override (`DevFlags`) shadows the stored dial — unclamped, so stress tests
+can push past the UI range to probe wall-thickness and settle margins.
