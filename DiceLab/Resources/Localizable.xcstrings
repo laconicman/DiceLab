@@ -298,17 +298,6 @@
         }
       }
     },
-    "history.equation" : {
-      "comment" : "History row equation — %1$@ is the faces joined by '+', %2$lld the total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ = %2$lld"
-          }
-        }
-      }
-    },
     "Ivory" : {
       "comment" : "Theme preset name: white die, black pips",
       "localizations" : {
@@ -474,17 +463,6 @@
         }
       }
     },
-    "roll.equation" : {
-      "comment" : "Result banner equation — %1$@ is the faces joined by ' + ', %2$lld the total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ = %2$lld"
-          }
-        }
-      }
-    },
     "Rolling…" : {
       "comment" : "Roll button while a throw is in flight",
       "localizations" : {
@@ -573,28 +551,6 @@
         }
       }
     },
-    "speech.plus" : {
-      "comment" : "Spoken joiner between die face values — keep the surrounding spaces",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " plus "
-          }
-        }
-      }
-    },
-    "speech.result" : {
-      "comment" : "Spoken roll result — %1$@ is the faces joined by the ' plus ' joiner, %2$lld the total",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ equals %2$lld"
-          }
-        }
-      }
-    },
     "Studio" : {
       "comment" : "Lighting preset name",
       "localizations" : {
@@ -668,6 +624,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use photo as felt"
+          }
+        }
+      }
+    },
+    "roll.total" : {
+      "comment" : "Result banner — the settled roll's total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "history.total" : {
+      "comment" : "History row — the settled roll's total",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "speech.total" : {
+      "comment" : "Spoken roll result — the settled total alone",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
           }
         }
       }

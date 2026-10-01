@@ -1,0 +1,4 @@
+<!-- die face slab, corner radius ~21% of width — group "Die" (back) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect x="232" y="232" width="560" height="560" rx="120" fill="#F5F5F5"/>
+</svg>
