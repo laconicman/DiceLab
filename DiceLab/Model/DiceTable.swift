@@ -38,6 +38,9 @@ protocol DiceTable: AnyObject, Observable {
     /// M6 `DieSkin` enum: a theme resolves to a full `Appearance` (colors,
     /// finish, felt, lighting) that each engine translates its own way.
     var theme: Theme { get set }
+    /// The feel of a throw — pace × viscosity, normalized axes each engine
+    /// maps onto its own physics dials (see `RollDynamics`).
+    var dynamics: RollDynamics { get set }
     /// Throws every die.
     func roll()
     /// Called when `scenePhase` becomes `.active` — restart suspended systems.
@@ -57,6 +60,7 @@ extension DiceTable {
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
         soundEnabled = TableSettings.storedSound()
         theme = TableSettings.storedTheme()
+        dynamics = TableSettings.storedDynamics()
     }
 }
 
@@ -80,6 +84,7 @@ enum TableSettings {
     static let skin = "settings.skin"
     static let theme = "settings.theme"
     static let engine = "settings.engine"
+    static let dynamics = "settings.dynamics"
 
     /// UserDefaults returns 0 for a missing Int — distinguish "never set"
     /// (default 1) from a stored value, then clamp into the supported range.
@@ -109,6 +114,19 @@ enum TableSettings {
 
     static func persist(_ theme: Theme, defaults: UserDefaults = .standard) {
         defaults.set(try? JSONEncoder().encode(theme), forKey: TableSettings.theme)
+    }
+
+    /// An absent or corrupt payload reads as the tuned baseline — today's
+    /// feel is the default, not a degenerate zero.
+    static func storedDynamics(defaults: UserDefaults = .standard) -> RollDynamics {
+        guard let data = defaults.data(forKey: dynamics),
+              let stored = try? JSONDecoder().decode(RollDynamics.self, from: data)
+        else { return RollDynamics() }
+        return stored
+    }
+
+    static func persist(_ dynamics: RollDynamics, defaults: UserDefaults = .standard) {
+        defaults.set(try? JSONEncoder().encode(dynamics), forKey: TableSettings.dynamics)
     }
 }
 

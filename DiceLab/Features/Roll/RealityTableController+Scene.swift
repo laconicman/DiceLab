@@ -1,3 +1,4 @@
+import CoreMedia
 import os
 import RealityKit
 import UIKit
@@ -20,7 +21,9 @@ extension RealityTableController {
         setUpCamera()
         setUpLighting()
         setUpTable()
+        setUpSimulation()
         spawnDice(dieCount)
+        applyDynamics()
         setUpPreview()
         // Dice and felt already read the stored appearance at build —
         // the lighting rig is the one piece that waits for this pass.
@@ -232,15 +235,65 @@ extension RealityTableController {
     /// SceneKit's implicit defaults: real-time gravity gives each bounce less
     /// airtime than `speed = 3` physics, so the energy has to come back at
     /// contact rather than hang in the air.
-    private enum PhysicsTune {
+    enum PhysicsTune {
         static let tableFriction: Float = 0.6
         static let tableRestitution: Float = 0.45
         static let dieFriction: Float = 0.4
         static let dieRestitution: Float = 0.6
         /// Below SceneKit's implicit 0.1s — heavy damping reads as
         /// mid-air molasses at meter scale; felt friction does the stopping.
+        /// Also the `viscosity = 0` baseline for `applyDynamics`.
         static let linearDamping: Float = 0.05
         static let angularDamping: Float = 0.05
+        /// Viscosity 1 → damping 0.4 — the heavy end of the drag dial.
+        static let viscosityGain: Float = 0.35
+    }
+
+    /// Throw-feel tuning: a `PhysicsSimulationComponent` on `root` makes it
+    /// the simulation entity for everything below (community guidance is to
+    /// host it on the *parent* of physics bodies, not on a body itself —
+    /// odd behavior otherwise). `clock` is the dial the SceneKit table gets
+    /// from `physicsWorld.speed`: a `CMTimebase` sourced on the host clock,
+    /// whose `rate` scales simulated seconds per wall second. Verified on
+    /// simulator via `-impulseLog`: settle wall-time tracks ~1/rate —
+    /// monotonic but sub-linear, so the solver likely clamps per-frame dt.
+    /// `gravity` and `solverIterations` ride defaults.
+    private func setUpSimulation() {
+        var timebase: CMTimebase?
+        guard CMTimebaseCreateWithSourceClock(
+                allocator: nil,
+                sourceClock: CMClockGetHostTimeClock(),
+                timebaseOut: &timebase) == noErr,
+              let timebase
+        else { return }
+        simulationTimebase = timebase
+        var simulation = PhysicsSimulationComponent()
+        simulation.clock = timebase
+        root.components.set(simulation)
+    }
+
+    /// Re-tunes the live world in place. `CMTimebaseSetRate` rewrites the
+    /// clock in place — no component swap — and damping is a property on
+    /// each die's `PhysicsBodyComponent`; both are mid-roll safe. Pace and
+    /// viscosity stay orthogonal the same way the SceneKit side does:
+    /// damping is sim-space, so `pace` changes playback, `viscosity`
+    /// changes the trajectory.
+    func applyDynamics() {
+        let pace = DevFlags.paceOverride ?? dynamics.pace
+        if let timebase = simulationTimebase {
+            CMTimebaseSetRate(timebase, rate: Float64(pace))
+            if DevFlags.impulseLog {
+                print("[DiceLab] rk pace=\(pace) rate=\(CMTimebaseGetRate(timebase))")
+            }
+        }
+        let damping = PhysicsTune.linearDamping
+            + PhysicsTune.viscosityGain * Float(dynamics.viscosity)
+        for die in dice {
+            guard var body = die.components[PhysicsBodyComponent.self] else { continue }
+            body.linearDamping = damping
+            body.angularDamping = damping
+            die.components.set(body)
+        }
     }
 
     /// Physics material shared by table and dice — the SceneKit scene's
