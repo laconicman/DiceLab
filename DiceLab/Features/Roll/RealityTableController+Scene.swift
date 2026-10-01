@@ -91,7 +91,14 @@ extension RealityTableController {
             verticalFieldOfView: CameraHome.fieldOfView,
             aspect: Float(viewAspect))
         distance = min(max(distance, Fit.minDistance), maxDistance)
-        let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
+        // One-way gate per roll (SceneKit twin has the same latch): near the
+        // threshold the gate must not flap the camera target — once dice
+        // flew and slowed, `fitArmed` holds until the next throw.
+        if isRolling {
+            fitSawFlight = fitSawFlight || fastest >= Fit.speed
+            fitArmed = fitArmed || (fitSawFlight && fastest < Fit.speed)
+        }
+        let fitting = !positions.isEmpty && (!isRolling || fitArmed)
         let target = fitting
             ? box.center + CameraHome.axis * distance
             : CameraHome.position

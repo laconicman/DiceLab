@@ -60,11 +60,11 @@ struct HistoryPanel: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(rolls.reversed()) { roll in
-                        // Same shape as the banner but compact ("5+1+3 = 9") —
-                        // its own explicit key, since the formats differ.
-                        Text(String(localized: "history.equation",
-                                    defaultValue: "\(roll.faces.map(String.init).joined(separator: "+")) = \(roll.total)",
-                                    comment: "History row equation — %1$@ is the faces joined by '+', %2$lld the total"))
+                        // Same content as the banner — the settled total —
+                        // with its own key so the row can localize apart.
+                        Text(String(localized: "history.total",
+                                    defaultValue: "\(roll.total)",
+                                    comment: "History row — the settled roll's total"))
                             .font(.callout.monospacedDigit())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)

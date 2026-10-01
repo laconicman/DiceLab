@@ -82,10 +82,10 @@ enum TableSettings {
     static let engine = "settings.engine"
 
     /// UserDefaults returns 0 for a missing Int — distinguish "never set"
-    /// (default 2) from a stored value, then clamp into the supported range.
+    /// (default 1) from a stored value, then clamp into the supported range.
     static func storedDieCount(defaults: UserDefaults = .standard) -> Int {
         let raw = defaults.integer(forKey: dieCount)
-        return raw == 0 ? 2 : min(max(raw, 1), 6)
+        return raw == 0 ? 1 : min(max(raw, 1), 6)
     }
 
     /// Sound predates its own toggle: users who muted the old combined
