@@ -1,0 +1,8 @@
+<!-- face-5 quincunx pips — group "Pips" (front); separate layer = onyx twin via fill swap -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<circle cx="512" cy="512" r="55" fill="#1A1A1A"/>
+<circle cx="362" cy="362" r="55" fill="#1A1A1A"/>
+<circle cx="662" cy="362" r="55" fill="#1A1A1A"/>
+<circle cx="362" cy="662" r="55" fill="#1A1A1A"/>
+<circle cx="662" cy="662" r="55" fill="#1A1A1A"/>
+</svg>
