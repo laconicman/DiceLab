@@ -56,6 +56,28 @@
         }
       }
     },
+    "Brisker" : {
+      "comment" : "Pace slider high endpoint",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brisker"
+          }
+        }
+      }
+    },
+    "Calmer" : {
+      "comment" : "Pace slider low endpoint",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calmer"
+          }
+        }
+      }
+    },
     "Camera" : {
       "comment" : "Settings section header",
       "localizations" : {
@@ -155,6 +177,17 @@
         }
       }
     },
+    "Dry" : {
+      "comment" : "Viscosity slider low endpoint",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dry"
+          }
+        }
+      }
+    },
     "Dusk" : {
       "comment" : "Backdrop preset name",
       "localizations" : {
@@ -162,6 +195,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dusk"
+          }
+        }
+      }
+    },
+    "Dynamics" : {
+      "comment" : "Dynamics section header",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dynamics"
           }
         }
       }
@@ -349,6 +393,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Onyx"
+          }
+        }
+      }
+    },
+    "Pace" : {
+      "comment" : "Pace slider label — playback-rate dial",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pace"
+          }
+        }
+      }
+    },
+    "Pace changes how quickly the throw plays, not the throw itself. Viscosity makes dice shed momentum sooner. Both engines read the same dials and translate them their own way." : {
+      "comment" : "Dynamics section footer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pace changes how quickly the throw plays, not the throw itself. Viscosity makes dice shed momentum sooner. Both engines read the same dials and translate them their own way."
           }
         }
       }
@@ -573,6 +639,17 @@
         }
       }
     },
+    "Syrupy" : {
+      "comment" : "Viscosity slider high endpoint",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syrupy"
+          }
+        }
+      }
+    },
     "Table" : {
       "comment" : "Appearance-editor section header for the felt surface",
       "localizations" : {
@@ -624,6 +701,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use photo as felt"
+          }
+        }
+      }
+    },
+    "Viscosity" : {
+      "comment" : "Viscosity slider label — momentum drag dial",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viscosity"
           }
         }
       }

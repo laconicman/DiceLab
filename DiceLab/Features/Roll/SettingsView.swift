@@ -38,6 +38,45 @@ struct SettingsView<Table: DiceTable>: View {
                         Label("Appearance", systemImage: "paintpalette")
                     }
                 }
+                // Two axes on purpose: pace scales *playback* (the simulated
+                // throw is identical, just sooner), viscosity bleeds momentum
+                // in sim-space (a different throw at any pace). One shared
+                // setting — each engine maps it onto its own physics, so the
+                // engines still feel different at equal dials.
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Pace")
+                            .font(.subheadline)
+                        Slider(value: $table.dynamics.pace, in: RollDynamics.paceRange)
+                            .accessibilityLabel("Pace")
+                        HStack {
+                            Text("Calmer")
+                            Spacer()
+                            Text("Brisker")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Viscosity")
+                            .font(.subheadline)
+                        Slider(value: $table.dynamics.viscosity, in: RollDynamics.viscosityRange)
+                            .accessibilityLabel("Viscosity")
+                        HStack {
+                            Text("Dry")
+                            Spacer()
+                            Text("Syrupy")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    }
+                } header: {
+                    Text("Dynamics")
+                } footer: {
+                    Text("Pace changes how quickly the throw plays, not the throw itself. Viscosity makes dice shed momentum sooner. Both engines read the same dials and translate them their own way.")
+                }
                 Section("Feedback") {
                     // Two channels, two toggles: hardware without a Taptic
                     // Engine can still play the knock, and a user may want

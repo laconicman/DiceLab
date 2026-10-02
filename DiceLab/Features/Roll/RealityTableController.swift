@@ -1,3 +1,4 @@
+import CoreMedia
 import Foundation
 import Observation
 import RealityKit
@@ -15,7 +16,8 @@ import SwiftUI
 @MainActor
 @Observable
 final class RealityTableController: DiceTable {
-    /// The entity graph — the ECS analog of the owned `SCNScene`.
+    /// The entity graph — the ECS analog of the owned `SCNScene`. The root
+    /// doubles as the physics-simulation entity; see `setUpSimulation`.
     let root = Entity()
 
     /// A one-die entity graph for the appearance editor's live preview —
@@ -53,6 +55,13 @@ final class RealityTableController: DiceTable {
     /// every channel on any edit, and a slider drag shouldn't pay an
     /// equirect→cube→EnvironmentResource conversion per tick.
     var appliedBackdrop: BackdropAppearance?
+
+    /// The pace dial's hardware: a `CMTimebase` handed to the sim's
+    /// `PhysicsSimulationComponent.clock` — its `rate` scales simulated
+    /// seconds per wall second, the `physicsWorld.speed` analog RealityKit
+    /// lacked until iOS 18. Held strongly here because the component only
+    /// references the timebase.
+    var simulationTimebase: CMTimebase?
 
     /// Consecutive frames every die stayed under the rest thresholds —
     /// RealityKit exposes velocities but no `isResting`, so "settled" is a
@@ -168,6 +177,16 @@ final class RealityTableController: DiceTable {
         }
     }
 
+    /// The throw's feel — pace × viscosity. `applyDynamics` writes the
+    /// clock rate and per-body damping, both live-safe mid-roll.
+    var dynamics = TableSettings.storedDynamics() {
+        didSet {
+            TableSettings.persist(dynamics)
+            guard dynamics != oldValue else { return }
+            applyDynamics()
+        }
+    }
+
     init() {
         haptics.isHapticsEnabled = hapticsEnabled
         haptics.isSoundEnabled = soundEnabled
@@ -227,6 +246,8 @@ final class RealityTableController: DiceTable {
         probeEscaped = [] // a fresh dice set re-earns its escape reports
         fitConverged = false // refit to the fresh spawn cluster
         spawnDice(dieCount)
+        // Fresh bodies carry `PhysicsTune` defaults — re-apply the feel.
+        applyDynamics()
     }
 
     /// Throws every die: randomized linear + angular impulse, mirroring the
