@@ -17,6 +17,25 @@ enum DevFlags {
     static let appearanceEditor =
         ProcessInfo.processInfo.arguments.contains("-appearanceeditor")
 
+    /// Open the plain settings sheet at launch — the same drive-by as
+    /// `appearanceEditor` but landing on the sections list (engine picker,
+    /// dice count, dynamics), which is the storefront-capture scenario.
+    static let settings =
+        ProcessInfo.processInfo.arguments.contains("-settings")
+
+    /// `-engine realitykit` — transient engine override for capture runs;
+    /// shadows the stored choice without writing it back (the `settings`
+    /// flag pattern, not persistence), because `simctl spawn defaults write
+    /// settings.engine` loses to the app's own persisted value — see the
+    /// Defaults caveat above.
+    static let engineOverride: DiceEngine? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-engine"),
+              index + 1 < arguments.count
+        else { return nil }
+        return DiceEngine(rawValue: arguments[index + 1])
+    }()
+
     /// Log dice that leave the play volume — the containment check the
     /// other flags can't see: an escaped die falls forever and never
     /// settles, which reads as a hang, not a leak. Escapes go to `os_log`
