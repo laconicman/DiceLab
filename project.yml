@@ -18,7 +18,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.learnable.DiceLab
         MARKETING_VERSION: "0.9.4"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         TARGETED_DEVICE_FAMILY: "1,2"
         # No encryption beyond the OS's own — the build answers export compliance itself.
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
