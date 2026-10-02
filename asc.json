@@ -1,0 +1,10 @@
+{
+  "bundleId": "com.learnable.DiceLab",
+  "platform": "IOS",
+  "metadataRoot": "metadata",
+  "locales": [
+    "en-GB"
+  ],
+  "minimumOSVersion": "18.0",
+  "appSource": "."
+}
