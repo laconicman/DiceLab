@@ -14,7 +14,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.learnable.DiceLab
         MARKETING_VERSION: "0.9.4"
+        CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1,2"
+        # No encryption beyond the OS's own — the build answers export compliance itself.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # String Catalog: compiler extraction feeds Resources/Localizable.xcstrings.
