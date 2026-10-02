@@ -3,7 +3,12 @@
   "platform": "IOS",
   "metadataRoot": "metadata",
   "locales": [
+<<<<<<< HEAD
     "en-GB"
+=======
+    "en-GB",
+    "ru"
+>>>>>>> chore/appstore-readiness
   ],
   "minimumOSVersion": "18.0",
   "appSource": "."
