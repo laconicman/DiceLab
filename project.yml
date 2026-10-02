@@ -3,6 +3,10 @@ options:
   bundleIdPrefix: com.learnable
   deploymentTarget:
     iOS: "18.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: WEJF495R4D
+    CODE_SIGN_STYLE: Automatic
 targets:
   DiceLab:
     type: application
