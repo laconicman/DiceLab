@@ -13,3 +13,6 @@ DiceLab.xcodeproj/
 
 # Local device/console captures — not source
 logs/
+
+# App Store review contact info — owner PII, keep local (YDelivery convention)
+metadata/review_information/
