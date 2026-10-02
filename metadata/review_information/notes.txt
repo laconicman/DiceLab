@@ -1,0 +1,1 @@
+DiceLab is a self-contained 3D dice roller — no accounts, no sign-in, no network calls, no in-app purchases. Tap Roll on the first screen to test the core flow. Settings (gear button) switches between SceneKit and RealityKit renderings of the same table and adjusts dice count, dynamics, and appearance; everything runs on-device.
