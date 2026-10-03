@@ -245,7 +245,8 @@ extension RealityTableController {
         /// Also the `viscosity = 0` baseline for `applyDynamics`.
         static let linearDamping: Float = 0.05
         static let angularDamping: Float = 0.05
-        /// Viscosity 1 → damping 0.4 — the heavy end of the drag dial.
+        /// Per-unit drag gain: viscosity 1 → damping 0.4, the dial's 2 →
+        /// 0.75 — mid-air molasses at the top end.
         static let viscosityGain: Float = 0.35
     }
 

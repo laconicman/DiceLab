@@ -427,8 +427,11 @@ not a code audit.
 
 Issues #25/#26 asked for the physics levers; the answer that shipped is a
 single shared pair — `RollDynamics` (`Model/`, engine-free): `pace`
-(0.5…1.5, default 1.0) × `viscosity` (0…1, default 0), Codable+clamped like
-`Appearance`, persisted to `settings.dynamics`. The *educational* point is
+(0.25…2, default 1.0) × `viscosity` (0…2, default 0), Codable+clamped like
+`Appearance`, persisted to `settings.dynamics`. The ranges were
+0.5…1.5/0…1 at first ship; TestFlight testers wanted more headroom, so
+the axes widened while the gains stayed per-unit — a stored 1.0 still
+feels exactly like the old 1.0. The *educational* point is
 that the dials are orthogonal **only because both are defined in
 simulation space**:
 
@@ -457,8 +460,8 @@ clock — `CMTimebaseSetRate` rewrites it live, mid-roll. Measured on
 simulator (`-autoroll -impulseLog -pace N`): settle wall-time tracks
 roughly 1/rate — rate 0.25 settles in ~2.5–3.2 s vs ~1.6 s at baseline,
 rate 4 in ~0.7 s. The response is monotonic but clearly sub-linear, so the
-solver likely clamps per-frame dt; within the dial's 0.5–1.5 window the
-effect is gentler than the theory but unmistakable.
+solver likely clamps per-frame dt; across the dial's widened 0.25–2
+window the effect is gentler than the theory but unmistakable.
 
 What each engine's settle machinery does with pace is different by
 construction: Bullet's ~2-sim-second deactivation means a 0.5× pace

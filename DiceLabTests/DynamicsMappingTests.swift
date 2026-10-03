@@ -14,19 +14,22 @@ struct DynamicsMappingTests {
         #expect(DiceTableController.Dynamics.baselineSpeed
                 * RollDynamics().pace == 3)
         #expect(DiceTableController.Dynamics.baselineSpeed
-                * RollDynamics.paceRange.lowerBound == 1.5)
+                * RollDynamics.paceRange.lowerBound == 0.75)
         #expect(DiceTableController.Dynamics.baselineSpeed
-                * RollDynamics.paceRange.upperBound == 4.5)
+                * RollDynamics.paceRange.upperBound == 6)
     }
 
     /// Neutral viscosity must land on *exactly* the implicit Bullet
     /// defaults — a hair more damping and the baseline stops matching the
-    /// feel old builds shipped.
+    /// feel old builds shipped. The 1.0 pin matters on its own: widening
+    /// the dial kept the per-unit gain, so a stored 1.0 feels the same.
     @Test("SceneKit viscosity 0 is the implicit 0.1 damping")
     func sceneKitViscosity() {
         let tune = DiceTableController.Dynamics.self
         #expect(tune.baselineDamping + tune.viscosityGain * 0 == 0.1)
         #expect(tune.baselineDamping + tune.viscosityGain * 1 == 0.35)
+        #expect(tune.baselineDamping + tune.viscosityGain
+                * CGFloat(RollDynamics.viscosityRange.upperBound) == 0.6)
     }
 
     /// `PhysicsTune.linearDamping` doubles as the viscosity-0 baseline —
@@ -39,5 +42,7 @@ struct DynamicsMappingTests {
         #expect(tune.linearDamping + tune.viscosityGain * 0 == 0.05)
         #expect(tune.angularDamping == tune.linearDamping)
         #expect(tune.linearDamping + tune.viscosityGain * 1 == 0.4)
+        #expect(tune.linearDamping + tune.viscosityGain
+                * Float(RollDynamics.viscosityRange.upperBound) == 0.75)
     }
 }

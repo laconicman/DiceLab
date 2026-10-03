@@ -177,8 +177,9 @@ extension DiceTableController {
         static let baselineSpeed: Double = 3
         /// `SCNPhysicsBody.damping`/`angularDamping` defaults, made explicit.
         static let baselineDamping: CGFloat = 0.1
-        /// Viscosity 1 → damping 0.35 (≈35% velocity shed per sim-second) —
-        /// heavy air, but the felt still does most of the stopping.
+        /// Per-unit drag gain: viscosity 1 → damping 0.35 (≈35% velocity
+        /// shed per sim-second), the dial's 2 → 0.6 — heavy air, but the
+        /// felt still does most of the stopping.
         static let viscosityGain: CGFloat = 0.25
     }
 

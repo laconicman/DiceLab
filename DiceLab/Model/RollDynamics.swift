@@ -18,11 +18,14 @@ import Foundation
 struct RollDynamics: Codable, Equatable, Hashable {
     /// Playback rate of the simulated world: 1.0 is the tuned baseline.
     var pace = 1.0
-    /// Drag dial: 0 is the tuned baseline, 1 bleeds hard.
+    /// Drag dial: 0 is the tuned baseline, 1 bleeds hard, 2 is molasses.
     var viscosity = 0.0
 
-    static let paceRange: ClosedRange<Double> = 0.5...1.5
-    static let viscosityRange: ClosedRange<Double> = 0...1
+    /// Widened after TestFlight testers asked for more headroom on both
+    /// dials. Extending the *axis* rather than the gain keeps a stored
+    /// 1.0 meaning what it always did — baseline semantics don't move.
+    static let paceRange: ClosedRange<Double> = 0.25...2
+    static let viscosityRange: ClosedRange<Double> = 0...2
 
     init(pace: Double = 1.0, viscosity: Double = 0.0) {
         self.pace = pace
