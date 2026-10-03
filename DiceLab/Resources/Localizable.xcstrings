@@ -320,6 +320,17 @@
         }
       }
     },
+    "Louder" : {
+      "comment" : "Volume slider's high-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Louder"
+          }
+        }
+      }
+    },
     "Metalness" : {
       "comment" : "Material slider",
       "localizations" : {
@@ -404,6 +415,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Presets are sealed looks — choose Custom to edit materials."
+          }
+        }
+      }
+    },
+    "Quieter" : {
+      "comment" : "Volume slider's low-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieter"
           }
         }
       }
@@ -624,6 +646,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use photo as felt"
+          }
+        }
+      }
+    },
+    "Volume" : {
+      "comment" : "Collision-knock loudness slider label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
           }
         }
       }

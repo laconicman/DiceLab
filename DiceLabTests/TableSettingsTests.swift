@@ -38,4 +38,19 @@ struct TableSettingsTests {
         defaults.set(true, forKey: TableSettings.sound)
         #expect(TableSettings.storedSound(defaults: defaults))
     }
+
+    /// Volume is newer than the toggles: an absent key must read as full
+    /// loudness (the baseline testers wanted louder), and stored values
+    /// clamp to the slider's 0…1 like the other dials.
+    @Test("sound volume defaults to full, round-trips, and clamps")
+    func soundVolume() throws {
+        let defaults = try freshDefaults("TableSettingsTests.soundVolume")
+        #expect(TableSettings.storedSoundVolume(defaults: defaults) == 1)
+        defaults.set(0.3, forKey: TableSettings.soundVolume)
+        #expect(TableSettings.storedSoundVolume(defaults: defaults) == 0.3)
+        defaults.set(-4, forKey: TableSettings.soundVolume)
+        #expect(TableSettings.storedSoundVolume(defaults: defaults) == 0)
+        defaults.set(99, forKey: TableSettings.soundVolume)
+        #expect(TableSettings.storedSoundVolume(defaults: defaults) == 1)
+    }
 }

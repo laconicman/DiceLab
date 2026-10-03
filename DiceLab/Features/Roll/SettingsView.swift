@@ -44,6 +44,24 @@ struct SettingsView<Table: DiceTable>: View {
                     // sound without taps (or vice versa).
                     Toggle("Haptics", isOn: $table.hapticsEnabled)
                     Toggle("Sound", isOn: $table.soundEnabled)
+                    // Testers called the knock too quiet — the slider is a
+                    // ceiling over impact intensity (1 = full amplitude),
+                    // greyed rather than hidden when sound is off.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Volume")
+                            .font(.subheadline)
+                        Slider(value: $table.soundVolume, in: 0...1)
+                            .accessibilityLabel("Volume")
+                        HStack {
+                            Text("Quieter")
+                            Spacer()
+                            Text("Louder")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    }
+                    .disabled(!table.soundEnabled)
                     Toggle("Speak results", isOn: $speechEnabled)
                 }
                 Section {

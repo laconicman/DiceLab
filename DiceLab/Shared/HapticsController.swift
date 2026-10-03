@@ -37,6 +37,10 @@ final class HapticsController {
     var isHapticsEnabled = true
     var isSoundEnabled = true
 
+    /// The settings slider's gain, applied over impact intensity — 1.0
+    /// plays the knock at the synthesized event's full amplitude.
+    var soundVolume: Float = 1.0
+
     init(maxImpulse: Float = 25) {
         self.maxImpulse = maxImpulse
         capabilities = CHHapticEngine.capabilitiesForHardware()
@@ -85,7 +89,7 @@ final class HapticsController {
             events.append(CHHapticEvent(
                 eventType: .audioContinuous,
                 parameters: [
-                    .init(parameterID: .audioVolume, value: intensity * 0.4),
+                    .init(parameterID: .audioVolume, value: intensity * soundVolume),
                     .init(parameterID: .audioPitch, value: -0.2),
                     .init(parameterID: .decayTime, value: intensity * 0.15),
                     .init(parameterID: .sustained, value: 0),
