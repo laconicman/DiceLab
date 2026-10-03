@@ -164,6 +164,17 @@ final class DiceTableController: NSObject {
         }
     }
 
+    /// The throw's feel — pace × viscosity. Re-tunes the live world in
+    /// place when changed; both writes are mid-roll safe (`speed` is a
+    /// plain assignment, damping is a per-body property).
+    var dynamics = TableSettings.storedDynamics() {
+        didSet {
+            TableSettings.persist(dynamics)
+            guard dynamics != oldValue else { return }
+            applyDynamics()
+        }
+    }
+
     /// NSObject, because `SCNSceneRendererDelegate`/`SCNPhysicsContactDelegate`
     /// are `NSObjectProtocol`s — the price of the controller doubling as the
     /// renderer/physics delegate.
@@ -197,6 +208,8 @@ final class DiceTableController: NSObject {
         fitConverged = false // refit to the fresh spawn cluster
         lastFitPositions = [] // stale deltas would read as phantom speed
         spawnDice(dieCount)
+        // Fresh bodies carry default damping — re-apply the tuned feel.
+        applyDynamics()
     }
 
     /// Throws every die: a randomized torque impulse for spin plus an upward

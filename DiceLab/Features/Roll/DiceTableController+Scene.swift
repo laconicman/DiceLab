@@ -6,11 +6,10 @@ import SceneKit
 extension DiceTableController {
 
     func setUpScene() {
-        // Ancestors' tuning: physics at 3× real time reads as a snappier roll.
-        // Halved timestep because SceneKit exposes no per-body continuous
-        // collision detection (Bullet has it, the API doesn't surface it) —
-        // sub-stepping is the mitigation for fast dice tunneling.
-        scene.physicsWorld.speed = 3
+        // Halved timestep because SceneKit exposes no usable per-body
+        // continuous collision detection (the API exists but is
+        // sphere-shapes-only) — sub-stepping is the mitigation for fast
+        // dice tunneling. Pace arrives via `applyDynamics` below.
         scene.physicsWorld.timeStep = 1.0 / 120.0
         // Contact callbacks → haptics (M4). Only the dice opted into
         // contactTestBitMask, so every reported contact involves a die.
@@ -19,6 +18,7 @@ extension DiceTableController {
         setUpLighting()
         setUpTable()
         spawnDice(dieCount)
+        applyDynamics()
         setUpPreview()
         // Dice and felt already read the stored appearance at build —
         // the lighting rig is the one piece that waits for this pass.
@@ -164,6 +164,36 @@ extension DiceTableController {
             rate: Fit.rate, dt: dt)
         return simd_distance(camera.simdPosition, target) > Fit.epsilon
             || abs(simd_dot(camera.simdOrientation, CameraHome.orientation)) <= 0.9999
+    }
+
+    /// Throw-feel tuning (see `RollDynamics`). Numbers are sim-space:
+    /// `speed` is pure playback rate (a 24 u/s impulse stays 24 u/s in the
+    /// solver at any pace), and Bullet damping decays per *simulated*
+    /// second — so pace moves the wall-clock playback without touching
+    /// the trajectory, and viscosity moves the trajectory without
+    /// touching the rate. Baselines reproduce the pre-slider feel.
+    enum Dynamics {
+        /// Ancestors' tuning: 3× real time reads as a snappier roll.
+        static let baselineSpeed: Double = 3
+        /// `SCNPhysicsBody.damping`/`angularDamping` defaults, made explicit.
+        static let baselineDamping: CGFloat = 0.1
+        /// Per-unit drag gain: viscosity 1 → damping 0.35 (≈35% velocity
+        /// shed per sim-second), the dial's 2 → 0.6 — heavy air, but the
+        /// felt still does most of the stopping.
+        static let viscosityGain: CGFloat = 0.25
+    }
+
+    /// Re-tunes the live world in place — `speed` is a plain property
+    /// assignment even mid-roll; damping writes are per-body, so fresh
+    /// dice get it from `respawnDice`'s post-spawn call.
+    func applyDynamics() {
+        let pace = DevFlags.paceOverride ?? dynamics.pace
+        scene.physicsWorld.speed = Dynamics.baselineSpeed * pace
+        let damping = Dynamics.baselineDamping + Dynamics.viscosityGain * dynamics.viscosity
+        for die in dice {
+            die.physicsBody?.damping = damping
+            die.physicsBody?.angularDamping = damping
+        }
     }
 
     private func setUpCamera() {
