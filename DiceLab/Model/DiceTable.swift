@@ -34,6 +34,9 @@ protocol DiceTable: AnyObject, Observable {
     var hapticsEnabled: Bool { get set }
     /// Gates the synthesized collision knock — independent of haptics.
     var soundEnabled: Bool { get set }
+    /// The knock's loudness ceiling, 0…1 — applied over impact intensity,
+    /// so a soft contact still knocks softer than a hard one.
+    var soundVolume: Double { get set }
     /// The look of the table — preset or custom appearance. Replaces the
     /// M6 `DieSkin` enum: a theme resolves to a full `Appearance` (colors,
     /// finish, felt, lighting) that each engine translates its own way.
@@ -56,6 +59,7 @@ extension DiceTable {
         cameraFitEnabled = defaults.object(forKey: TableSettings.cameraFit) as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
         soundEnabled = TableSettings.storedSound()
+        soundVolume = TableSettings.storedSoundVolume()
         theme = TableSettings.storedTheme()
     }
 }
@@ -69,6 +73,7 @@ enum TableSettings {
     static let cameraFit = "settings.cameraFit"
     static let haptics = "settings.haptics"
     static let sound = "settings.sound"
+    static let soundVolume = "settings.soundVolume"
     /// Speech is view-layer feedback (it observes `lastRoll`), so it lives
     /// as `@AppStorage` like `engine` — not on the controllers, which hold
     /// only settings that shape the scene.
@@ -94,6 +99,13 @@ enum TableSettings {
     static func storedSound(defaults: UserDefaults = .standard) -> Bool {
         if let stored = defaults.object(forKey: sound) as? Bool { return stored }
         return defaults.object(forKey: haptics) as? Bool ?? true
+    }
+
+    /// The knock's gain — absent reads as full volume: TestFlight testers
+    /// found the knock too quiet, so the default is the loud end and the
+    /// slider is how a user tames it. Clamped 0…1 like the other dials.
+    static func storedSoundVolume(defaults: UserDefaults = .standard) -> Double {
+        min(max(defaults.object(forKey: soundVolume) as? Double ?? 1, 0), 1)
     }
 
     /// The stored theme, or a migration from M6's `settings.skin` rawValue —

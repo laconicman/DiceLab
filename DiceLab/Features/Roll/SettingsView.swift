@@ -38,13 +38,40 @@ struct SettingsView<Table: DiceTable>: View {
                         Label("Appearance", systemImage: "paintpalette")
                     }
                 }
-                Section("Feedback") {
+                Section {
                     // Two channels, two toggles: hardware without a Taptic
                     // Engine can still play the knock, and a user may want
-                    // sound without taps (or vice versa).
+                    // sound without taps (or vice versa). On iPad the tap
+                    // channel can't exist at all — the switch stays visible
+                    // but disabled, with the footer carrying the reason.
                     Toggle("Haptics", isOn: $table.hapticsEnabled)
+                        .disabled(!HapticsController.supportsHaptics)
                     Toggle("Sound", isOn: $table.soundEnabled)
+                    // Testers called the knock too quiet — the slider is a
+                    // ceiling over impact intensity (1 = full amplitude),
+                    // greyed rather than hidden when sound is off.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Volume")
+                            .font(.subheadline)
+                        Slider(value: $table.soundVolume, in: 0...1)
+                            .accessibilityLabel("Volume")
+                        HStack {
+                            Text("Quieter")
+                            Spacer()
+                            Text("Louder")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    }
+                    .disabled(!table.soundEnabled)
                     Toggle("Speak results", isOn: $speechEnabled)
+                } header: {
+                    Text("Feedback")
+                } footer: {
+                    if !HapticsController.supportsHaptics {
+                        Text("Haptics aren't available on this device — it has no Taptic Engine.")
+                    }
                 }
                 Section {
                     Toggle("Automatic framing", isOn: $table.cameraFitEnabled)
