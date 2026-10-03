@@ -41,6 +41,13 @@ final class HapticsController {
     /// plays the knock at the synthesized event's full amplitude.
     var soundVolume: Float = 1.0
 
+    /// iPads have no Taptic Engine (and neither does the simulator) — the
+    /// settings UI gates on this rather than offering a switch that can
+    /// never fire.
+    static var supportsHaptics: Bool {
+        CHHapticEngine.capabilitiesForHardware().supportsHaptics
+    }
+
     init(maxImpulse: Float = 25) {
         self.maxImpulse = maxImpulse
         capabilities = CHHapticEngine.capabilitiesForHardware()
