@@ -1,0 +1,13 @@
+Roll real physics dice — and watch how two different engines disagree about what "real" means.
+
+DiceLab is a 3D dice roller built as an open study in Apple physics: the same dice, the same table, the same throw — simulated twice, once by SceneKit and once by RealityKit. Switch engines in Settings and feel the difference in weight, bounce, and settling.
+
+• One to six dice on a felt table — tap Roll and let the physics decide.
+• Two engines, honestly different — SceneKit and RealityKit don't simulate alike; DiceLab keeps them side by side so you can see it.
+• Pace × viscosity — separate the speed of the simulation from the drag on the dice, and find the feel that reads "right" to you.
+• Make the table yours — felt, wood, or your own photo as the backdrop; light and materials are adjustable live.
+• Roll history — recent totals one tap away.
+
+Everything is on-device: no accounts, no ads, no tracking, no network calls.
+
+Built as a public learning project — source and design notes at github.com/laconicman/DiceLab.
