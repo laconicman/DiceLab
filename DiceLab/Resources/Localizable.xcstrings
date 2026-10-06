@@ -748,6 +748,50 @@
           }
         }
       }
+    },
+    "Haptics aren't available on this device — it has no Taptic Engine." : {
+      "comment" : "Feedback footer on hardware without a Taptic Engine (iPad, simulator)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haptics aren't available on this device — it has no Taptic Engine."
+          }
+        }
+      }
+    },
+    "Louder" : {
+      "comment" : "Volume slider's high-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Louder"
+          }
+        }
+      }
+    },
+    "Quieter" : {
+      "comment" : "Volume slider's low-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieter"
+          }
+        }
+      }
+    },
+    "Volume" : {
+      "comment" : "Collision-knock loudness slider label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -167,6 +167,15 @@ final class RealityTableController: DiceTable {
         }
     }
 
+    /// The knock's gain — persisted like the toggles, and pushed into the
+    /// haptics engine so the setting survives engine swaps.
+    var soundVolume = TableSettings.storedSoundVolume() {
+        didSet {
+            UserDefaults.standard.set(soundVolume, forKey: TableSettings.soundVolume)
+            haptics.soundVolume = Float(soundVolume)
+        }
+    }
+
     /// The table's look — preset theme or a custom appearance. Re-skins
     /// dice, felt, and lighting in place when changed.
     var theme = TableSettings.storedTheme() {
@@ -190,6 +199,7 @@ final class RealityTableController: DiceTable {
     init() {
         haptics.isHapticsEnabled = hapticsEnabled
         haptics.isSoundEnabled = soundEnabled
+        haptics.soundVolume = Float(soundVolume)
         setUpScene()
     }
 
