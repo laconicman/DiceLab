@@ -3,6 +3,10 @@ options:
   bundleIdPrefix: com.learnable
   deploymentTarget:
     iOS: "18.0"
+  knownRegions:
+    - en
+    - Base
+    - ru
 settings:
   base:
     DEVELOPMENT_TEAM: WEJF495R4D
