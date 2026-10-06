@@ -96,12 +96,11 @@ struct AppearanceTests {
     }
 
     /// The speech format is user-facing prose — pin it so a refactor can't
-    /// quietly turn "3 plus 3 plus 1 equals 7" into "sum 7".
-    @Test("speech text reads faces and total")
+    /// quietly grow "7" back into the equation readout.
+    @Test("speech text reads the total")
     func speechText() {
-        #expect(SpeechController.text(for: RollResult(faces: [3, 3, 1]))
-                == "3 plus 3 plus 1 equals 7")
-        #expect(SpeechController.text(for: RollResult(faces: [6])) == "6 equals 6")
+        #expect(SpeechController.text(for: RollResult(faces: [3, 3, 1])) == "7")
+        #expect(SpeechController.text(for: RollResult(faces: [6])) == "6")
     }
 
     /// The wire format is synthesized enum Codable — `{"custom":{"_0":…}}`.

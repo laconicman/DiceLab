@@ -134,6 +134,13 @@ final class RealityTableController: DiceTable {
     /// without a per-frame tug-of-war, until the next `roll()` unlatches it.
     var fitConverged = false
 
+    /// Speed-gate hysteresis for `updateCameraFit` — same shape as the
+    /// SceneKit controller's: a die hovering at the threshold must not flap
+    /// the camera target home↔fitted, so once dice flew and then slowed the
+    /// gate latches until the next `roll()`.
+    var fitSawFlight = false
+    var fitArmed = false
+
     var hapticsEnabled = UserDefaults.standard.object(forKey: TableSettings.haptics) as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(hapticsEnabled, forKey: TableSettings.haptics)
@@ -231,6 +238,8 @@ final class RealityTableController: DiceTable {
         probeEscaped = []
         isRolling = true
         fitConverged = false // a fresh throw re-owns the camera
+        fitSawFlight = false // and the speed gate re-arms from scratch
+        fitArmed = false
         if DevFlags.impulseLog {
             rollImpulses = []
             rollStartedAt = Date()

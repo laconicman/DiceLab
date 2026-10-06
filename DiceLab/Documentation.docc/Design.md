@@ -302,6 +302,15 @@ shrinks the dice, and the dice are the content.
   home again. An exponential damp toward the moving target turns those
   flips into the "one animation eases into another" the ask described —
   there is no animation object at all.
+- **The speed gate is measured and one-way per roll.** `SCNPhysicsBody.velocity`
+  reads zero outside the solver's own callbacks — observed (0,0,0) through a
+  visibly flying roll — so `fastest` comes from presentation-position deltas
+  ÷ simulated dt (`dt × physicsWorld.speed`, which keeps `Fit.speed` calibrated
+  in solver units). And the gate arms only once: `fitSawFlight` proves the
+  dice really flew, `fitArmed` latches when they slow — a die hovering at the
+  threshold must not flap the target home↔fitted mid-flight (the "unstable"
+  regression this fixed). RealityKit reads a real `linearVelocity` but carries
+  the same latch.
 - **`fitConverged` latches.** Once the settled pose is within epsilon
   *and* `isRolling` cleared (dice may still drift under the settle gate),
   the fit snaps the remainder and stops writing — the camera belongs to

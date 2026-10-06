@@ -15,11 +15,11 @@ struct TableSettingsTests {
         return defaults
     }
 
-    /// The unset default is 2 dice; a stored value wins and clamps to 1…6.
-    @Test("die count defaults to 2, round-trips, and clamps")
+    /// The unset default is 1 die; a stored value wins and clamps to 1…6.
+    @Test("die count defaults to 1, round-trips, and clamps")
     func dieCount() throws {
         let defaults = try freshDefaults("TableSettingsTests.dieCount")
-        #expect(TableSettings.storedDieCount(defaults: defaults) == 2)
+        #expect(TableSettings.storedDieCount(defaults: defaults) == 1)
         defaults.set(4, forKey: TableSettings.dieCount)
         #expect(TableSettings.storedDieCount(defaults: defaults) == 4)
         defaults.set(99, forKey: TableSettings.dieCount)

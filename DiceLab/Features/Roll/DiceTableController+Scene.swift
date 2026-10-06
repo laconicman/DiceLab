@@ -98,10 +98,21 @@ extension DiceTableController {
               let camera = cameraNode else { return false }
 
         let positions = dice.map { $0.presentation.simdPosition }
-        let fastest = dice.compactMap { die -> Float? in
-            guard let v = die.physicsBody?.velocity else { return nil }
-            return simd_length(simd_float3(v))
-        }.max() ?? 0
+        // `SCNPhysicsBody.velocity` reads zero when sampled from this
+        // main-actor hop — observed (0,0,0) throughout a visibly flying
+        // roll; the solver only syncs velocities inside its own callbacks.
+        // Speed comes from presentation deltas instead: dt is render-time,
+        // so dividing by dt × world speed yields solver units — the same
+        // scale `Fit.speed` is written in.
+        var fastest: Float = 0
+        if dt > 0, lastFitPositions.count == positions.count {
+            let simDt = dt * Float(scene.physicsWorld.speed)
+            for (i, position) in positions.enumerated() {
+                let speed = simd_distance(position, lastFitPositions[i]) / simDt
+                fastest = max(fastest, speed)
+            }
+        }
+        lastFitPositions = positions
         let box = CameraFit.boundingBox(of: positions, padding: Fit.padding)
         let fov = camera.camera?.fieldOfView ?? 60
         var distance = CameraFit.requiredDistance(
@@ -113,9 +124,17 @@ extension DiceTableController {
             verticalFieldOfView: Float(fov),
             aspect: Float(viewAspect))
         distance = min(max(distance, Fit.minDistance), maxDistance)
+        // The speed gate is one-way per roll — a die hovering near the
+        // threshold during final tumbling must not flap the camera target
+        // between home and fitted. Once the dice demonstrably flew and then
+        // slowed, `fitArmed` latches until the next throw.
+        if isRolling {
+            fitSawFlight = fitSawFlight || fastest >= Fit.speed
+            fitArmed = fitArmed || (fitSawFlight && fastest < Fit.speed)
+        }
         // Only reach for the cluster once the dice are nearly down; while
         // they fly (or before the first roll) the target is simply home.
-        let fitting = !positions.isEmpty && (!isRolling || fastest < Fit.speed)
+        let fitting = !positions.isEmpty && (!isRolling || fitArmed)
         let target = fitting
             ? box.center + CameraHome.axis * distance
             : CameraHome.position

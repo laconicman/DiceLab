@@ -7,18 +7,16 @@ final class SpeechController {
     private let synthesizer = AVSpeechSynthesizer()
 
     /// What a settled roll sounds like — pure text so tests can pin it.
-    /// Speech localizes with the UI: a translated "speech.result" reads
-    /// aloud in that language, and the default `AVSpeechUtterance` voice
-    /// follows the resolved locale. Pinning a voice per locale is the
-    /// voice-roll milestone's call — nothing here preempts it.
+    /// Just the total: "8", not "3 plus 5 equals 8" — the equation read
+    /// aloud was a mouthful. Speech still localizes with the UI: a
+    /// translated "speech.total" reads aloud in that language, and the
+    /// default `AVSpeechUtterance` voice follows the resolved locale.
+    /// Pinning a voice per locale is the voice-roll milestone's call —
+    /// nothing here preempts it.
     static func text(for result: RollResult) -> String {
-        let faces = result.faces.map(String.init).joined(
-            separator: String(localized: "speech.plus",
-                              defaultValue: " plus ",
-                              comment: "Spoken joiner between die face values — keep the surrounding spaces"))
-        return String(localized: "speech.result",
-                      defaultValue: "\(faces) equals \(result.total)",
-                      comment: "Spoken roll result — %1$@ is the faces joined by the ' plus ' joiner, %2$lld the total")
+        String(localized: "speech.total",
+               defaultValue: "\(result.total)",
+               comment: "Spoken roll result — the settled total alone")
     }
 
     /// A new roll interrupts the previous utterance — the stale readout of
