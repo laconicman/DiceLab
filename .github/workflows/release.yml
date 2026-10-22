@@ -11,6 +11,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The next step dereferences the pushed ref with `git cat-file -t`
+          # to prove the tag is annotated (not lightweight); without this,
+          # checkout fetches only the commit and the ref dereferences to it.
+          fetch-tags: true
 
       - name: Assert tag is annotated and matches MARKETING_VERSION
         run: |
