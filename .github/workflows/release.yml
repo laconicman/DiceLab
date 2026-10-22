@@ -13,9 +13,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           # The next step dereferences the pushed ref with `git cat-file -t`
-          # to prove the tag is annotated (not lightweight); without this,
-          # checkout fetches only the commit and the ref dereferences to it.
-          fetch-tags: true
+          # to prove the tag is annotated (not lightweight). `fetch-tags:
+          # true` alone collides with checkout's event-SHA-to-tag refspec
+          # (actions/checkout handles both the commit mapping and tag
+          # following for the same ref — Git rejects the duplicate dest);
+          # fetching the full history avoids that path and still brings the
+          # tag object into the working repo.
+          fetch-depth: 0
 
       - name: Assert tag is annotated and matches MARKETING_VERSION
         run: |
