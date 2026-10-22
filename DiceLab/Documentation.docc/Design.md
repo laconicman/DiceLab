@@ -88,16 +88,28 @@ old code carried:
 
 `SCNBox` exposes one geometry element; its six material slots map to
 contiguous triangle groups inside it — measured order `+Z, +X, −Z, −X, +Y,
-−Y`. `DieFaceTexture.materialAxes` derives each slot's face axis from vertex
-data (mean position = outward normal) rather than hardcoding that order, so
-the visible pips can never silently disagree with `DieFace`'s value↔axis
-authority. Textures are `UIGraphicsImageRenderer`-drawn pips — no assets.
+−Y`. The d20's custom geometry gives each of its twenty faces its own
+element, so `materials[i]` lands on face `i` directly. Either way,
+`DieFaceTexture.materialAxes` derives each slot's outward direction from
+vertex data (mean position = normal direction) rather than hardcoding an
+order, and `DieFace.value(facing:)` resolves the nearest table normal —
+nearest-normal replaced the M5 axis quantization when the d20 arrived, and
+for the cube the two coincide. Textures are `UIGraphicsImageRenderer`-drawn
+— no assets: pips for the cube, bold numerals for the d20 with the
+real-die underline under 6 and 9. Each triangle face samples a shared UV
+template — the equilateral triangle inscribed in the image's center
+circle, apex up — which bounds the numeral inside its incircle; each
+engine maps the template's image-space v to its own texture convention.
 
 - *Deferred to M6:* the ancestors' alternate skin and a style switcher —
   that is settings UI, not material work. `SCNShaderModifier` stays out of
   scope until PBR proves insufficient.
 - *Confirmed at runtime:* `SCNBox(chamferRadius:)` produces identical
   triangle layout, so the derivation survives the tumble-friendly chamfer.
+- *Confirmed at runtime:* `SCNGeometryElement` indices must be `Int32`:
+  `[Int]` stores 8-byte indices Metal can't use — the element renders
+  nothing while its physics still works (the test suite pins the width
+  now).
 
 ## Settings live in the controller, persisted by it
 
@@ -511,3 +523,22 @@ dot product over the shape's normals. For the cube the nearest of the
 six axes *is* the old dominant-axis quantization, so the quantizer
 disappeared rather than growing a second table; `up(of:shape:)` is the
 same math as before, resolving world +Y into body space.
+
+Sizing keeps the shapes visually comparable rather than dimensionally
+equal: the d20's circumradius is 2 SceneKit units, which puts
+face-to-face at ≈3.2 against the cube's 3, while vertex-to-vertex is 4
+— still under the cube's 5.2 diagonal that spawn spacing and camera
+fit already accommodate. Almost: at six dice the row's 3.2-unit x
+spacing is tighter than the shape's ~3.4 x footprint (half-extent
+2φ/√(1+φ²) ≈ 1.70), and the ±10 wall can't widen it — so a multi-die
+d20 row zig-zags ±2 units in z, putting neighbours √(3.2² + 4²) ≈ 5.1
+apart, past the 4-unit diameter in any orientation; a lone die stays
+centered and the cube's row is unchanged. Its physics shape is
+explicit — `SCNPhysicsShape` `.convexHull`, because a custom
+geometry's derived default is not a documented guarantee; the box
+keeps its `shape: nil` path untouched.
+
+One caveat deferred to a device pass: the haptics `maxImpulse`
+constants were tuned on the cube's contact-impulse distribution, and
+twenty smaller faces will land differently. `-impulseLog` already
+gathers the data a recalibration needs.

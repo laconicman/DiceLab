@@ -614,7 +614,7 @@ extension RealityTableController {
                 guard part.materialIndex < slots.count else { continue }
                 let axis = dominantAxis(of: centroid(of: part))
                 slots[part.materialIndex] = faceMaterial(
-                    DieFaceTexture.value(on: axis), appearance: appearance)
+                    DieFace.value(facing: axis, shape: .d6), appearance: appearance)
             }
         }
         return slots
@@ -623,7 +623,8 @@ extension RealityTableController {
     private static func faceMaterial(_ value: Int,
                                      appearance: DieAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
-        if let image = DieFaceTexture.images(for: appearance)[value - 1].cgImage,
+        if let image = DieFaceTexture.images(for: appearance,
+                                             shape: .d6)[value - 1].cgImage,
            let texture = try? TextureResource(
                image: image, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white,
@@ -641,7 +642,8 @@ extension RealityTableController {
         // The color parameter must stay unset: a non-black `EmissiveColor`
         // color adds a flat wash on top of the texture rather than tinting
         // it (verified on-device — `color: .white` whites out the face).
-        if let emissionImages = DieFaceTexture.emissionImages(for: appearance),
+        if let emissionImages = DieFaceTexture.emissionImages(for: appearance,
+                                                              shape: .d6),
            let cgImage = emissionImages[value - 1].cgImage,
            let texture = try? TextureResource(
                image: cgImage, options: .init(semantic: .color)) {

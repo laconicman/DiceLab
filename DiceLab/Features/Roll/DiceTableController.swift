@@ -82,6 +82,16 @@ final class DiceTableController: NSObject {
         }
     }
 
+    /// The shape every die on the table takes; respawns the dice — and
+    /// the appearance-editor preview — when changed.
+    var dieShape = TableSettings.storedDieShape() {
+        didSet {
+            UserDefaults.standard.set(dieShape.rawValue, forKey: TableSettings.dieShape)
+            guard dieShape != oldValue else { return }
+            respawnDice()
+        }
+    }
+
     /// Free camera orbiting for debugging — the product tradeoff from TD-3
     /// is resolved by exposing the choice instead of shipping it silently.
     var cameraControlEnabled = UserDefaults.standard.object(forKey: TableSettings.cameraControl) as? Bool ?? true {
@@ -218,6 +228,10 @@ final class DiceTableController: NSObject {
         fitConverged = false // refit to the fresh spawn cluster
         lastFitPositions = [] // stale deltas would read as phantom speed
         spawnDice(dieCount)
+        // A shape change lands here too: the preview die must match the
+        // table's geometry, not just its paint.
+        previewDie?.geometry = Self.dieGeometry(
+            for: dieShape, appearance: theme.appearance.die)
         // Fresh bodies carry default damping — re-apply the tuned feel.
         applyDynamics()
     }
@@ -297,7 +311,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
             if let generation = sync.withLock({ $0.rolling ? $0.rollID : nil }),
                isRolling, sync.withLock({ $0.rollID == generation }),
                dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) {
-                let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation, shape: .d6) })
+                let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation, shape: dieShape) })
                 lastRoll = result
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }

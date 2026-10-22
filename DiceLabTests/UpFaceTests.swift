@@ -123,14 +123,35 @@ struct PhysicsCategoryTests {
 struct SpawnPositionTests {
     @Test("N dice → N positions, centered on the table midline")
     func countsAndSymmetry() {
-        #expect(DiceTableController.spawnPositions(count: 0).isEmpty)
+        #expect(DiceTableController.spawnPositions(count: 0, shape: .d6).isEmpty)
         for count in 1...6 {
-            let positions = DiceTableController.spawnPositions(count: count)
+            let positions = DiceTableController.spawnPositions(count: count, shape: .d6)
             #expect(positions.count == count)
             let xs = positions.map(\.x)
             #expect(xs.first! == -xs.last!) // symmetric spread
             // Die is 3 units wide; a centered die needs |x| ≤ 10 − 1.5.
             #expect(xs.allSatisfy { abs($0) <= 8.5 })
+            #expect(positions.allSatisfy { $0.z == 0 }) // cubes spawn in one row
+        }
+    }
+
+    /// A radius-2 d20's x half-extent is 2φ/√(1+φ²) ≈ 1.70 — a ~3.4-wide
+    /// footprint the row's 3.2-unit spacing at six dice can't hold, so
+    /// the row zig-zags ±2 in z instead. Every pair of spawn slots must
+    /// clear 2 × radius = 4 (orientation-independent), and each die
+    /// needs |x| ≤ 10 − 1.70 = 8.3 of wall clearance.
+    @Test("d20 rows zig-zag past the die's own diameter")
+    func d20ZigZag() {
+        for count in 1...6 {
+            let positions = DiceTableController.spawnPositions(count: count, shape: .d20)
+            for (i, a) in positions.enumerated() {
+                #expect(abs(a.x) <= 8.3)
+                for b in positions[(i + 1)...] {
+                    let d = simd_distance(SIMD3<Float>(a.x, a.y, a.z),
+                                          SIMD3<Float>(b.x, b.y, b.z))
+                    #expect(d >= 4)
+                }
+            }
         }
     }
 }
@@ -160,18 +181,54 @@ struct DieFaceTextureTests {
         #expect(DieFaceTexture.pipLayout(for: 7).isEmpty)
     }
 
-    @Test("an SCNBox's six material slots cover all six axes exactly once")
+    /// The box's one element groups triangles per face; the slot
+    /// directions are derived means, not exact axes — resolve each through
+    /// `value(facing:)` and the six faces must each appear once.
+    @Test("an SCNBox's six material slots cover all six faces")
     func materialAxesCoverAllFaces() {
         let box = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
-        let axes = DieFaceTexture.materialAxes(of: box)
-        #expect(axes.count == 6)
-        #expect(Set(axes) == Set(DieFace.axes(for: .d6).map(\.normal)))
+        let values = DieFaceTexture.materialAxes(of: box)
+            .map { DieFace.value(facing: $0, shape: .d6) }
+        #expect(values.count == 6)
+        #expect(Set(values) == Set(1...6))
     }
 
-    @Test("every derived material slot resolves to a face value 1…6")
-    func everySlotHasAValue() {
+    /// The custom icosahedron gives each face its own element — twenty
+    /// slots, resolving to exactly 1…20.
+    @Test("the d20 geometry's twenty material slots cover all faces")
+    func d20MaterialAxesCoverAllFaces() {
+        let geometry = DieGeometry.icosahedron(radius: 2)
+        let values = DieFaceTexture.materialAxes(of: geometry)
+            .map { DieFace.value(facing: $0, shape: .d20) }
+        #expect(values.count == 20)
+        #expect(Set(values) == Set(1...20))
+    }
+
+    /// Metal has no 64-bit index buffers — `[Int]` elements store 8 bytes
+    /// per index and render nothing (measured: dice invisible while the
+    /// physics body still settled). The d20's indices must stay ≤ 32-bit.
+    @Test("the d20's index buffers fit Metal's 16/32-bit formats")
+    func d20IndexWidth() {
+        let geometry = DieGeometry.icosahedron(radius: 2)
+        #expect(geometry.elements.allSatisfy { $0.bytesPerIndex <= 4 })
+    }
+
+    @Test("face image count tracks the shape's face count")
+    func imageCounts() {
+        let appearance = Appearance.ivory.die
+        #expect(DieFaceTexture.images(face: appearance.faceColor,
+                                      pip: appearance.pipColor,
+                                      shape: .d6).count == 6)
+        #expect(DieFaceTexture.images(face: appearance.faceColor,
+                                      pip: appearance.pipColor,
+                                      shape: .d20).count == 20)
+    }
+
+    @Test("materials(for:) returns one material per slot for both shapes")
+    func materialCounts() {
         let box = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
-        let values = DieFaceTexture.materialAxes(of: box).map(DieFaceTexture.value(on:))
-        #expect(Set(values) == Set(1...6))
+        #expect(DieFaceTexture.materials(for: box, shape: .d6).count == 6)
+        let d20 = DieGeometry.icosahedron(radius: 2)
+        #expect(DieFaceTexture.materials(for: d20, shape: .d20).count == 20)
     }
 }

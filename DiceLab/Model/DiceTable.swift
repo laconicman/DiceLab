@@ -73,6 +73,7 @@ extension DiceTable {
 /// both controllers must read and write the same slots.
 enum TableSettings {
     static let dieCount = "settings.dieCount"
+    static let dieShape = "settings.dieShape"
     static let cameraControl = "settings.cameraControl"
     static let cameraFit = "settings.cameraFit"
     static let haptics = "settings.haptics"
@@ -96,6 +97,12 @@ enum TableSettings {
     static func storedDieCount(defaults: UserDefaults = .standard) -> Int {
         let raw = defaults.integer(forKey: dieCount)
         return raw == 0 ? 1 : min(max(raw, 1), 6)
+    }
+
+    /// Unset or unreadable reads as the cube — the only shape older
+    /// releases knew, so "never chosen" and "corrupt" both mean d6.
+    static func storedDieShape(defaults: UserDefaults = .standard) -> DieShape {
+        DieShape(rawValue: defaults.string(forKey: dieShape) ?? "") ?? .d6
     }
 
     /// Sound predates its own toggle: users who muted the old combined

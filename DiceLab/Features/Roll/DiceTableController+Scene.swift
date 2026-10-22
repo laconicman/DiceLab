@@ -289,6 +289,11 @@ extension DiceTableController {
         /// the frame. The "infinite table": geometry ends past visibility;
         /// the omni's falloff has already dimmed it to black out there.
         static let feltSpan: Float = 500
+        /// The d20's circumradius — face-to-face ≈ 3.2 against the cube's
+        /// 3, so the shapes read as the same size while the 4-unit
+        /// vertex-to-vertex span stays under the cube's 5.2 diagonal that
+        /// spawn spacing and camera fit already accommodate.
+        static let d20Radius: Float = 2
     }
 
     private func setUpTable() {
@@ -374,8 +379,9 @@ extension DiceTableController {
     /// Internal (not private) so the main file's `respawnDice` can rebuild —
     /// scene construction lives here, roll-state bookkeeping lives there.
     func spawnDice(_ count: Int) {
-        for position in Self.spawnPositions(count: count) {
-            let die = Self.makeDie(at: position, appearance: theme.appearance.die)
+        for position in Self.spawnPositions(count: count, shape: dieShape) {
+            let die = Self.makeDie(at: position, shape: dieShape,
+                                   appearance: theme.appearance.die)
             dice.append(die)
             scene.rootNode.addChildNode(die)
         }
@@ -386,15 +392,27 @@ extension DiceTableController {
     private enum Spawn {
         static let span: Float = 16
         static let maxSpacing: Float = 4.5
+        /// At six dice the row's 3.2-unit x spacing is tighter than a
+        /// radius-2 d20's ~3.4-unit x footprint (half-extent 2φ/√(1+φ²)
+        /// ≈ 1.70), and the ±10 wall can't widen the row — so a multi-die
+        /// d20 row zig-zags in z instead: neighbours land √(3.2² + 4²)
+        /// ≈ 5.1 apart, past the 4-unit diameter in any orientation.
+        static let d20Stagger: Float = 2
     }
 
     /// Spawn slots centered on the table midline, evenly spread across the
-    /// play volume's width. Static and pure so tests can pin the geometry.
-    static func spawnPositions(count: Int) -> [SCNVector3] {
+    /// play volume's width; a lone die or a cube row stays on z = 0.
+    /// Static and pure so tests can pin the geometry.
+    static func spawnPositions(count: Int, shape: DieShape) -> [SCNVector3] {
         guard count > 0 else { return [] }
         let spacing = min(Spawn.maxSpacing, Spawn.span / Float(max(count - 1, 1)))
         let first = -spacing * Float(count - 1) / 2
-        return (0..<count).map { SCNVector3(first + spacing * Float($0), 0, 0) }
+        return (0..<count).map {
+            let stagger = shape == .d20 && count > 1
+                ? ($0.isMultiple(of: 2) ? Spawn.d20Stagger : -Spawn.d20Stagger)
+                : 0
+            return SCNVector3(first + spacing * Float($0), 0, stagger)
+        }
     }
 
     /// Re-skins the whole table in place — dice, felt, and lighting preset.
@@ -403,11 +421,13 @@ extension DiceTableController {
     func applyAppearance() {
         let appearance = theme.appearance
         for die in dice {
-            guard let box = die.geometry as? SCNBox else { continue }
-            box.materials = DieFaceTexture.materials(for: box, appearance: appearance.die)
+            guard let geometry = die.geometry else { continue }
+            geometry.materials = DieFaceTexture.materials(
+                for: geometry, shape: dieShape, appearance: appearance.die)
         }
-        if let previewDie, let box = previewDie.geometry as? SCNBox {
-            box.materials = DieFaceTexture.materials(for: box, appearance: appearance.die)
+        if let geometry = previewDie?.geometry {
+            geometry.materials = DieFaceTexture.materials(
+                for: geometry, shape: dieShape, appearance: appearance.die)
         }
         if let floor = scene.rootNode.childNode(withName: NodeName.felt, recursively: false) {
             floor.geometry?.firstMaterial?.diffuse.contents =
@@ -493,7 +513,7 @@ extension DiceTableController {
         previewScene.rootNode.addChildNode(camera)
         camera.look(at: SCNVector3Zero)
 
-        let die = Self.makeDie(at: SCNVector3Zero,
+        let die = Self.makeDie(at: SCNVector3Zero, shape: dieShape,
                                appearance: theme.appearance.die)
         die.physicsBody = nil
         die.runAction(SCNAction.repeatForever(
@@ -516,19 +536,45 @@ extension DiceTableController {
         previewScene.rootNode.addChildNode(fill)
     }
 
-    private static func makeDie(at position: SCNVector3, appearance: DieAppearance) -> SCNNode {
-        // Chamfered box: the rounded edge is what lets a die tumble instead of
-        // sliding like a brick.
-        let geometry = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
-        // Pips are mapped to material slots by inspecting the box's own
-        // geometry — never a hardcoded index order (see DieFaceTexture).
-        geometry.materials = DieFaceTexture.materials(for: geometry, appearance: appearance)
+    /// The geometry a die of `shape` takes — chamfered box or generated
+    /// icosahedron — already materialized: materials live on the geometry,
+    /// so a preview-die swap gets the skin on the way in. Internal so
+    /// `respawnDice` can rebuild the preview in a new shape.
+    static func dieGeometry(for shape: DieShape,
+                            appearance: DieAppearance) -> SCNGeometry {
+        let geometry: SCNGeometry
+        switch shape {
+        case .d6:
+            // Chamfered box: the rounded edge is what lets a die tumble
+            // instead of sliding like a brick.
+            geometry = SCNBox(width: 3, height: 3, length: 3, chamferRadius: 0.1)
+        case .d20:
+            geometry = DieGeometry.icosahedron(radius: Bounds.d20Radius)
+        }
+        // Face textures map to material slots by inspecting the geometry's
+        // own vertex data — never a hardcoded index order (see
+        // DieFaceTexture).
+        geometry.materials = DieFaceTexture.materials(
+            for: geometry, shape: shape, appearance: appearance)
+        return geometry
+    }
 
+    private static func makeDie(at position: SCNVector3, shape: DieShape,
+                                appearance: DieAppearance) -> SCNNode {
+        let geometry = dieGeometry(for: shape, appearance: appearance)
         let die = SCNNode(geometry: geometry)
         die.position = position
         die.castsShadow = true
 
-        let body = SCNPhysicsBody(type: .dynamic, shape: nil)
+        // `shape: nil` derives the collider from the node's geometry —
+        // for the box primitive SceneKit documents an idealized box,
+        // for a custom mesh the derived type isn't specified, so the
+        // d20 asks for its convex hull explicitly.
+        let physicsShape = shape == .d20
+            ? SCNPhysicsShape(geometry: geometry,
+                              options: [.type: SCNPhysicsShape.ShapeType.convexHull])
+            : nil
+        let body = SCNPhysicsBody(type: .dynamic, shape: physicsShape)
         let diceAndTable = PhysicsCategory.die.union(.table).rawValue
         body.categoryBitMask = PhysicsCategory.die.rawValue
         body.collisionBitMask = diceAndTable
@@ -538,6 +584,48 @@ extension DiceTableController {
         die.physicsBody = body
 
         return die
+    }
+}
+
+/// Builds the d20's flat-shaded mesh from `Icosahedron`'s model data:
+/// every face owns its three vertices (shared vertices would blend
+/// normals across the ridge), and each face is its own
+/// `SCNGeometryElement` so `materials` gets twenty slots the way the
+/// box's element-groups give six. Top-level and non-isolated so tests
+/// can build the same geometry the table spawns.
+enum DieGeometry {
+    static func icosahedron(radius: Float) -> SCNGeometry {
+        var positions: [SCNVector3] = []
+        var normals: [SCNVector3] = []
+        var uvs: [CGPoint] = []
+        positions.reserveCapacity(60)
+        normals.reserveCapacity(60)
+        uvs.reserveCapacity(60)
+        for (index, face) in Icosahedron.faces.enumerated() {
+            let normal = Icosahedron.normals[index]
+            for (vertex, uv) in zip(
+                [face.x, face.y, face.z].map { Icosahedron.vertices[$0] },
+                DieFaceTexture.triangleUVs) {
+                positions.append(SCNVector3(vertex * radius))
+                normals.append(SCNVector3(normal))
+                // SceneKit samples v down like UIKit draws — the shared
+                // image-space template applies unflipped.
+                uvs.append(CGPoint(x: CGFloat(uv.x), y: CGFloat(uv.y)))
+            }
+        }
+        // Int32, not Int: SceneKit stores [Int] indices at 8 bytes each,
+        // and Metal has no 64-bit index buffers — the element silently
+        // renders nothing (measured: dice invisible, physics intact).
+        let elements = Icosahedron.faces.indices.map {
+            SCNGeometryElement(indices: [Int32(3 * $0), Int32(3 * $0 + 1),
+                                         Int32(3 * $0 + 2)],
+                               primitiveType: .triangles)
+        }
+        return SCNGeometry(sources: [
+            SCNGeometrySource(vertices: positions),
+            SCNGeometrySource(normals: normals),
+            SCNGeometrySource(textureCoordinates: uvs),
+        ], elements: elements)
     }
 }
 

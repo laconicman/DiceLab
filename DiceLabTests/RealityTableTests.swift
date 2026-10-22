@@ -20,7 +20,7 @@ struct RealityTableTests {
             for part in model.parts {
                 let axis = RealityTableController.dominantAxis(
                     of: RealityTableController.centroid(of: part))
-                seen[part.materialIndex] = DieFaceTexture.value(on: axis)
+                seen[part.materialIndex] = DieFace.value(facing: axis, shape: .d6)
             }
         }
         #expect(seen.count == 6)
