@@ -113,7 +113,8 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   builds a 20-element `SCNGeometry` with a convex-hull physics shape,
   RealityKit a `perFace` `MeshDescriptor` with a generated convex
   collider. Face textures draw numerals (underlined 6/9) instead of
-  pips.
+  pips. (PR #37)
+  `MARKETING_VERSION: "1.1"`.
 
 ## Next
 
