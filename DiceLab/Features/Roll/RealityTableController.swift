@@ -106,6 +106,16 @@ final class RealityTableController: DiceTable {
         }
     }
 
+    /// The shape every die on the table takes; respawns the dice — and
+    /// the appearance-editor preview — when changed.
+    var dieShape = TableSettings.storedDieShape() {
+        didSet {
+            UserDefaults.standard.set(dieShape.rawValue, forKey: TableSettings.dieShape)
+            guard dieShape != oldValue else { return }
+            respawnDice()
+        }
+    }
+
     var cameraControlEnabled = UserDefaults.standard.object(forKey: TableSettings.cameraControl) as? Bool ?? true {
         didSet { UserDefaults.standard.set(cameraControlEnabled, forKey: TableSettings.cameraControl) }
     }
@@ -256,6 +266,12 @@ final class RealityTableController: DiceTable {
         probeEscaped = [] // a fresh dice set re-earns its escape reports
         fitConverged = false // refit to the fresh spawn cluster
         spawnDice(dieCount)
+        // A shape change lands here too: the preview die must match the
+        // table's mesh, not just its paint.
+        previewDie?.components.set(ModelComponent(
+            mesh: Self.dieMesh(for: dieShape),
+            materials: Self.materials(shape: dieShape,
+                                      appearance: theme.appearance.die)))
         // Fresh bodies carry `PhysicsTune` defaults — re-apply the feel.
         applyDynamics()
     }
@@ -302,7 +318,7 @@ final class RealityTableController: DiceTable {
             steadyFrames = settled ? steadyFrames + 1 : 0
             if steadyFrames >= Rest.requiredFrames {
                 steadyFrames = 0
-                let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation, shape: .d6) })
+                let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation, shape: dieShape) })
                 lastRoll = result
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }

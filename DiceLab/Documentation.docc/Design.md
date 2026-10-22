@@ -110,6 +110,10 @@ engine maps the template's image-space v to its own texture convention.
   `[Int]` stores 8-byte indices Metal can't use — the element renders
   nothing while its physics still works (the test suite pins the width
   now).
+- *Confirmed at runtime:* SceneKit samples the template's v unflipped
+  (v-down, like UIKit draws); RealityKit's `MeshDescriptor` runs v up,
+  so its mesh flips v on the way in — 6/9 underlines land below the
+  digit on both engines.
 
 ## Settings live in the controller, persisted by it
 
@@ -525,18 +529,19 @@ disappeared rather than growing a second table; `up(of:shape:)` is the
 same math as before, resolving world +Y into body space.
 
 Sizing keeps the shapes visually comparable rather than dimensionally
-equal: the d20's circumradius is 2 SceneKit units, which puts
-face-to-face at ≈3.2 against the cube's 3, while vertex-to-vertex is 4
-— still under the cube's 5.2 diagonal that spawn spacing and camera
-fit already accommodate. Almost: at six dice the row's 3.2-unit x
-spacing is tighter than the shape's ~3.4 x footprint (half-extent
-2φ/√(1+φ²) ≈ 1.70), and the ±10 wall can't widen it — so a multi-die
-d20 row zig-zags ±2 units in z, putting neighbours √(3.2² + 4²) ≈ 5.1
-apart, past the 4-unit diameter in any orientation; a lone die stays
-centered and the cube's row is unchanged. Its physics shape is
-explicit — `SCNPhysicsShape` `.convexHull`, because a custom
-geometry's derived default is not a documented guarantee; the box
-keeps its `shape: nil` path untouched.
+equal: the d20's circumradius is 2 SceneKit units (0.02 m in
+RealityKit), which puts face-to-face at ≈3.2 against the cube's 3,
+while vertex-to-vertex is 4 — still under the cube's 5.2 diagonal that
+spawn spacing and camera fit already accommodate. Almost: at six dice
+the row's 3.2-unit x spacing is tighter than the shape's ~3.4 x
+footprint (half-extent 2φ/√(1+φ²) ≈ 1.70), and the ±10 wall can't
+widen it — so a multi-die d20 row zig-zags ±2 units in z (0.02 m in
+RealityKit), putting neighbours √(3.2² + 4²) ≈ 5.1 apart, past the
+4-unit diameter in any orientation; a lone die stays centered and the
+cube's row is unchanged. Physics gets explicit convex-hull shapes per
+engine (`SCNPhysicsShape` `.convexHull`, `ShapeResource.generateConvex`)
+because a custom geometry's derived default shape is not a documented
+guarantee; the box keeps its `shape: nil` path untouched.
 
 One caveat deferred to a device pass: the haptics `maxImpulse`
 constants were tuned on the cube's contact-impulse distribution, and

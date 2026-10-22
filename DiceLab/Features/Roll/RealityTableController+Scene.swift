@@ -228,6 +228,10 @@ extension RealityTableController {
         static let feltSpan: Float = 20
         static let dieEdge: Float = 0.03
         static let dieMass: Float = 0.02   // kg — impulse tuning assumes it
+        /// The d20's circumradius: face-to-face ≈ 0.032 m against the
+        /// cube's 0.03 edge — the same relative sizing as SceneKit's
+        /// 2-unit radius against the 3-unit box.
+        static let d20Radius: Float = 0.02
     }
 
     /// Friction/restitution pairs — named because they're the dials a device
@@ -392,20 +396,32 @@ extension RealityTableController {
     private enum Spawn {
         static let span: Float = 0.16
         static let maxSpacing: Float = 0.045
+        /// The meter-scale d20 stagger: the 0.032 spacing at six dice is
+        /// under a radius-0.02 d20's ~0.034 x footprint, and the row
+        /// can't widen — so dice zig-zag ±0.02 in z, landing ≈0.051
+        /// apart, past the 0.04 diameter in any orientation.
+        static let d20Stagger: Float = 0.02
     }
 
-    /// Spawn slots centered on the table midline. Static and pure so tests
-    /// can pin the geometry — the mirror of the SceneKit version.
-    static func spawnPositions(count: Int) -> [SIMD3<Float>] {
+    /// Spawn slots centered on the table midline; a lone die or a cube
+    /// row stays on z = 0. Static and pure so tests can pin the geometry
+    /// — the mirror of the SceneKit version.
+    static func spawnPositions(count: Int, shape: DieShape) -> [SIMD3<Float>] {
         guard count > 0 else { return [] }
         let spacing = min(Spawn.maxSpacing, Spawn.span / Float(max(count - 1, 1)))
         let first = -spacing * Float(count - 1) / 2
-        return (0..<count).map { SIMD3(first + spacing * Float($0), 0, 0) }
+        return (0..<count).map {
+            let stagger = shape == .d20 && count > 1
+                ? ($0.isMultiple(of: 2) ? Spawn.d20Stagger : -Spawn.d20Stagger)
+                : 0
+            return SIMD3(first + spacing * Float($0), 0, stagger)
+        }
     }
 
     func spawnDice(_ count: Int) {
-        for position in Self.spawnPositions(count: count) {
-            let die = Self.makeDie(at: position, appearance: theme.appearance.die)
+        for position in Self.spawnPositions(count: count, shape: dieShape) {
+            let die = Self.makeDie(at: position, shape: dieShape,
+                                   appearance: theme.appearance.die)
             dice.append(die)
             root.addChild(die)
         }
@@ -416,7 +432,7 @@ extension RealityTableController {
     /// reassignment; felt and lights are found by name.
     func applyAppearance() {
         let appearance = theme.appearance
-        let materials = Self.materials(appearance: appearance.die)
+        let materials = Self.materials(shape: dieShape, appearance: appearance.die)
         for die in dice {
             die.components[ModelComponent.self]?.materials = materials
         }
@@ -528,6 +544,47 @@ extension RealityTableController {
         width: Bounds.dieEdge, height: Bounds.dieEdge, depth: Bounds.dieEdge,
         cornerRadius: Bounds.dieEdge * 0.06, splitFaces: true)
 
+    /// The d20's mesh, built from `Icosahedron`'s model data: flat-shaded —
+    /// every face owns its three vertices — with one `perFace` material
+    /// index per triangle so the twenty faces take twenty materials the
+    /// way the box's split faces take six. `MeshDescriptor` texture v runs
+    /// UP, opposite the image space the shared UV template is written in,
+    /// so v is flipped on the way in. `try!` is safe: the descriptor is
+    /// constant geometry, so a failure is a programming error the tests
+    /// pin — REVIEW.md's no-force-unwrap rule is about loadable assets.
+    static let d20Mesh: MeshResource = {
+        var descriptor = MeshDescriptor(name: "d20")
+        var positions: [SIMD3<Float>] = []
+        var normals: [SIMD3<Float>] = []
+        var uvs: [SIMD2<Float>] = []
+        for (index, face) in Icosahedron.faces.enumerated() {
+            let normal = Icosahedron.normals[index]
+            for (vertex, uv) in zip(
+                [face.x, face.y, face.z].map { Icosahedron.vertices[$0] },
+                DieFaceTexture.triangleUVs) {
+                positions.append(vertex * Bounds.d20Radius)
+                normals.append(normal)
+                uvs.append(SIMD2(uv.x, 1 - uv.y))
+            }
+        }
+        descriptor.positions = .init(positions)
+        descriptor.normals = .init(normals)
+        descriptor.textureCoordinates = .init(uvs)
+        descriptor.primitives = .triangles((0..<60).map { UInt32($0) })
+        descriptor.materials = .perFace((0..<20).map { UInt32($0) })
+        return try! MeshResource.generate(from: [descriptor])
+    }()
+
+    /// One selector for the table dice and the preview — both must
+    /// resolve a shape to the same mesh, or the editor would preview a
+    /// die the table never rolls.
+    static func dieMesh(for shape: DieShape) -> MeshResource {
+        switch shape {
+        case .d6: dieMesh
+        case .d20: d20Mesh
+        }
+    }
+
     /// The preview world's staging — meter-scale like the table (die ≈ 3 cm).
     private enum Preview {
         static let cameraPosition = SIMD3<Float>(0, 0.055, 0.08)
@@ -550,8 +607,10 @@ extension RealityTableController {
         camera.look(at: .zero, from: Preview.cameraPosition, relativeTo: nil)
         previewRoot.addChild(camera)
 
-        let die = ModelEntity(mesh: Self.dieMesh,
-                              materials: Self.materials(appearance: theme.appearance.die))
+        let die = ModelEntity(
+            mesh: Self.dieMesh(for: dieShape),
+            materials: Self.materials(shape: dieShape,
+                                      appearance: theme.appearance.die))
         previewRoot.addChild(die)
         previewDie = die
 
@@ -574,16 +633,25 @@ extension RealityTableController {
         previewRoot.addChild(probe)
     }
 
-    private static func makeDie(at position: SIMD3<Float>,
+    private static func makeDie(at position: SIMD3<Float>, shape dieShape: DieShape,
                                 appearance: DieAppearance) -> ModelEntity {
         // `ModelEntity`, not bare `Entity`: the impulse methods
         // (`applyLinearImpulse`/`applyAngularImpulse`) hang off
         // `HasPhysicsBody`, which only the model-entity subclass conforms to.
-        let die = ModelEntity(mesh: dieMesh, materials: materials(appearance: appearance))
+        let die = ModelEntity(mesh: dieMesh(for: dieShape),
+                              materials: materials(shape: dieShape,
+                                                   appearance: appearance))
         die.position = position
 
-        let shape = ShapeResource.generateBox(
-            size: .init(repeating: Bounds.dieEdge))
+        // The box's collider stays the primitive box; the d20's comes from
+        // its mesh's convex hull — `generateConvex` is the documented path
+        // for arbitrary geometry.
+        let shape: ShapeResource = switch dieShape {
+        case .d6:
+            ShapeResource.generateBox(size: .init(repeating: Bounds.dieEdge))
+        case .d20:
+            ShapeResource.generateConvex(from: d20Mesh)
+        }
         var body = PhysicsBodyComponent(
             shapes: [shape], mass: Bounds.dieMass,
             material: dieMaterial, mode: .dynamic)
@@ -601,30 +669,33 @@ extension RealityTableController {
         return die
     }
 
-    /// Six materials in the mesh's own part order — derived from geometry,
-    /// never assumed (the M5 rule, kept). A split-faces box has one part per
-    /// face; each part's bounding-box center *is* the face normal, quantized
-    /// to the dominant axis via `DieFace.axes` — the same authority the
-    /// reported face-up value uses.
-    static func materials(appearance: DieAppearance) -> [any RealityKit.Material] {
-        var slots: [any RealityKit.Material] = (0..<dieMesh.expectedMaterialCount)
+    /// One material per part in the mesh's own order — derived from
+    /// geometry, never assumed (the M5 rule, kept). A split-faces box has
+    /// one part per face and so does the d20's perFace mesh; each part's
+    /// centroid direction resolves to a face value via
+    /// `DieFace.value(facing:)` — the same authority the reported face-up
+    /// value uses.
+    static func materials(shape: DieShape,
+                          appearance: DieAppearance) -> [any RealityKit.Material] {
+        let mesh = dieMesh(for: shape)
+        var slots: [any RealityKit.Material] = (0..<mesh.expectedMaterialCount)
             .map { _ in PhysicallyBasedMaterial() }
-        for model in dieMesh.contents.models {
+        for model in mesh.contents.models {
             for part in model.parts {
                 guard part.materialIndex < slots.count else { continue }
-                let axis = dominantAxis(of: centroid(of: part))
+                let value = DieFace.value(facing: centroid(of: part), shape: shape)
                 slots[part.materialIndex] = faceMaterial(
-                    DieFace.value(facing: axis, shape: .d6), appearance: appearance)
+                    value, shape: shape, appearance: appearance)
             }
         }
         return slots
     }
 
-    private static func faceMaterial(_ value: Int,
+    private static func faceMaterial(_ value: Int, shape: DieShape,
                                      appearance: DieAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
         if let image = DieFaceTexture.images(for: appearance,
-                                             shape: .d6)[value - 1].cgImage,
+                                             shape: shape)[value - 1].cgImage,
            let texture = try? TextureResource(
                image: image, options: .init(semantic: .color)) {
             material.baseColor = .init(tint: .white,
@@ -643,7 +714,7 @@ extension RealityTableController {
         // color adds a flat wash on top of the texture rather than tinting
         // it (verified on-device — `color: .white` whites out the face).
         if let emissionImages = DieFaceTexture.emissionImages(for: appearance,
-                                                              shape: .d6),
+                                                              shape: shape),
            let cgImage = emissionImages[value - 1].cgImage,
            let texture = try? TextureResource(
                image: cgImage, options: .init(semantic: .color)) {
@@ -666,14 +737,4 @@ extension RealityTableController {
         }
         return count == 0 ? .zero : sum / Float(count)
     }
-
-    /// Dominant ±axis of a vector — same quantization as the SceneKit path.
-    static func dominantAxis(of v: SIMD3<Float>) -> SIMD3<Float> {
-        let absV = abs(v)
-        if absV.x >= absV.y, absV.x >= absV.z { return SIMD3(sign(v.x), 0, 0) }
-        if absV.y >= absV.z { return SIMD3(0, sign(v.y), 0) }
-        return SIMD3(0, 0, sign(v.z))
-    }
-
-    private static func sign(_ x: Float) -> Float { x >= 0 ? 1 : -1 }
 }
