@@ -31,7 +31,11 @@ jobs:
           [ "$VER" = "$TAG" ] || { echo "tag $GITHUB_REF_NAME != MARKETING_VERSION $VER"; exit 1; }
 
       - name: Create release
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes \
-             --title "$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
+        # A block scalar, not a plain one: YAML folds a plain scalar's line
+        # break into a space, so the trailing `\` escaped that space and gh
+        # read ` --title` as an asset path (v1.1's run: "no matches found").
+        run: |
+          gh release create "$GITHUB_REF_NAME" --generate-notes \
+            --title "$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
