@@ -1,8 +1,8 @@
-First public build of DiceLab — a dice-physics sandbox that throws real 3D dice on a glass table.
+First public build of DiceLab — a dice-physics sandbox that throws real 3D dice on a felt table.
 
 • Two physics engines you can switch live: SceneKit and RealityKit
 • Pace × viscosity sliders to tune how a throw feels
-• Adjustable table size and dice count
+• One to six dice; recolour the felt, swap backdrops, or lay your own photo on the table
 • Everything runs on-device — no accounts, no network
 
 Tell us how the throws feel — feedback shapes where the lab goes next.
