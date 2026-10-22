@@ -9,6 +9,12 @@
             "state" : "translated",
             "value" : "A session roll list on the table screen — tap its header to expand it toward the safe area."
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Список бросков сессии на экране стола — коснитесь заголовка, чтобы развернуть."
+          }
         }
       }
     },
@@ -19,6 +25,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appearance"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оформление"
           }
         }
       }
@@ -31,6 +43,12 @@
             "state" : "translated",
             "value" : "Automatic framing"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автокадрирование"
+          }
         }
       }
     },
@@ -41,6 +59,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Automatic framing eases the camera to keep all dice in view while they settle. Camera control lets you orbit freely between rolls."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автокадрирование подводит камеру, чтобы все кубики оставались в кадре, пока останавливаются. Управление камерой позволяет свободно облетать стол между бросками."
           }
         }
       }
@@ -53,6 +77,12 @@
             "state" : "translated",
             "value" : "Backdrop"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фон"
+          }
         }
       }
     },
@@ -63,6 +93,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Brisker"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бодрее"
           }
         }
       }
@@ -75,6 +111,12 @@
             "state" : "translated",
             "value" : "Calmer"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Спокойнее"
+          }
         }
       }
     },
@@ -85,6 +127,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Camera"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Камера"
           }
         }
       }
@@ -97,6 +145,12 @@
             "state" : "translated",
             "value" : "Camera control"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Управление камерой"
+          }
         }
       }
     },
@@ -107,6 +161,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Clearcoat"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Лак"
           }
         }
       }
@@ -119,6 +179,12 @@
             "state" : "translated",
             "value" : "Close roll history"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрыть историю бросков"
+          }
         }
       }
     },
@@ -129,6 +195,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Collapse roll history"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свернуть историю бросков"
           }
         }
       }
@@ -141,6 +213,12 @@
             "state" : "translated",
             "value" : "Custom"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Своя"
+          }
         }
       }
     },
@@ -151,6 +229,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dice"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кубики"
           }
         }
       }
@@ -163,6 +247,12 @@
             "state" : "translated",
             "value" : "Die"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кубик"
+          }
         }
       }
     },
@@ -173,6 +263,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dramatic"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Драма"
           }
         }
       }
@@ -185,6 +281,12 @@
             "state" : "translated",
             "value" : "Dry"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сухо"
+          }
         }
       }
     },
@@ -195,6 +297,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dusk"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сумерки"
           }
         }
       }
@@ -207,6 +315,12 @@
             "state" : "translated",
             "value" : "Dynamics"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Динамика"
+          }
         }
       }
     },
@@ -217,6 +331,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ember"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Жар"
           }
         }
       }
@@ -229,6 +349,12 @@
             "state" : "translated",
             "value" : "Emission"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эмиссия"
+          }
         }
       }
     },
@@ -239,6 +365,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Engine"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Движок"
           }
         }
       }
@@ -251,6 +383,12 @@
             "state" : "translated",
             "value" : "Expand roll history"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Развернуть историю бросков"
+          }
         }
       }
     },
@@ -261,6 +399,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Face"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Грань"
           }
         }
       }
@@ -273,6 +417,12 @@
             "state" : "translated",
             "value" : "Face glow"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свечение грани"
+          }
         }
       }
     },
@@ -283,6 +433,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Face intensity"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Интенсивность грани"
           }
         }
       }
@@ -295,6 +451,12 @@
             "state" : "translated",
             "value" : "Feedback"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отклик"
+          }
         }
       }
     },
@@ -305,6 +467,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Felt color"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цвет сукна"
           }
         }
       }
@@ -317,6 +485,12 @@
             "state" : "translated",
             "value" : "Graphite"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Графит"
+          }
         }
       }
     },
@@ -328,16 +502,11 @@
             "state" : "translated",
             "value" : "Haptics"
           }
-        }
-      }
-    },
-    "Haptics aren't available on this device — it has no Taptic Engine." : {
-      "comment" : "Feedback footer on hardware without a Taptic Engine (iPad, simulator)",
-      "localizations" : {
-        "en" : {
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Haptics aren't available on this device — it has no Taptic Engine."
+            "value" : "Тактильный отклик"
           }
         }
       }
@@ -350,6 +519,12 @@
             "state" : "translated",
             "value" : "History"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История"
+          }
         }
       }
     },
@@ -360,6 +535,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ivory"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Слоновая кость"
           }
         }
       }
@@ -372,16 +553,11 @@
             "state" : "translated",
             "value" : "Lighting"
           }
-        }
-      }
-    },
-    "Louder" : {
-      "comment" : "Volume slider's high-end label",
-      "localizations" : {
-        "en" : {
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Louder"
+            "value" : "Освещение"
           }
         }
       }
@@ -394,6 +570,12 @@
             "state" : "translated",
             "value" : "Metalness"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Металличность"
+          }
         }
       }
     },
@@ -404,6 +586,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "None"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет"
           }
         }
       }
@@ -416,6 +604,12 @@
             "state" : "translated",
             "value" : "Onyx"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оникс"
+          }
         }
       }
     },
@@ -426,6 +620,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pace"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Темп"
           }
         }
       }
@@ -438,6 +638,12 @@
             "state" : "translated",
             "value" : "Pace changes how quickly the throw plays, not the throw itself. Viscosity makes dice shed momentum sooner. Both engines read the same dials and translate them their own way."
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Темп меняет, насколько быстро проигрывается бросок, а не сам бросок. Вязкость заставляет кубики терять импульс раньше. Оба движка читают одни и те же значения и переводят их по-своему."
+          }
         }
       }
     },
@@ -448,6 +654,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pip glow"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Свечение точек"
           }
         }
       }
@@ -460,6 +672,12 @@
             "state" : "translated",
             "value" : "Pip intensity"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Интенсивность точек"
+          }
         }
       }
     },
@@ -470,6 +688,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pips"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Точки"
           }
         }
       }
@@ -482,6 +706,12 @@
             "state" : "translated",
             "value" : "Preset"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пресет"
+          }
         }
       }
     },
@@ -493,16 +723,11 @@
             "state" : "translated",
             "value" : "Presets are sealed looks — choose Custom to edit materials."
           }
-        }
-      }
-    },
-    "Quieter" : {
-      "comment" : "Volume slider's low-end label",
-      "localizations" : {
-        "en" : {
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quieter"
+            "value" : "Пресеты — готовые образы. Выберите «Своя», чтобы редактировать материалы."
           }
         }
       }
@@ -515,6 +740,12 @@
             "state" : "translated",
             "value" : "Remove backdrop photo"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить фото фона"
+          }
         }
       }
     },
@@ -525,6 +756,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remove photo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить фото"
           }
         }
       }
@@ -537,6 +774,12 @@
             "state" : "translated",
             "value" : "Renderer"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рендерер"
+          }
         }
       }
     },
@@ -547,6 +790,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renderer fixed by the -engine launch flag for this run."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рендерер задан флагом -engine на время этого запуска."
           }
         }
       }
@@ -559,6 +808,12 @@
             "state" : "translated",
             "value" : "Roll"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бросить"
+          }
         }
       }
     },
@@ -569,6 +824,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Roll history"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "История бросков"
           }
         }
       }
@@ -581,6 +842,12 @@
             "state" : "translated",
             "value" : "Rolling…"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Бросок…"
+          }
         }
       }
     },
@@ -591,6 +858,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Roughness"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шероховатость"
           }
         }
       }
@@ -603,6 +876,12 @@
             "state" : "translated",
             "value" : "SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures."
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SceneKit: граф сцены. RealityKit: entity-component-system — один стол, две архитектуры."
+          }
         }
       }
     },
@@ -613,6 +892,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Settings"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки"
           }
         }
       }
@@ -625,6 +910,36 @@
             "state" : "translated",
             "value" : "Count: %lld"
           }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Кубик: %lld"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Кубика: %lld"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Кубиков: %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Кубиков: %lld"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -635,6 +950,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Soft"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мягкий"
           }
         }
       }
@@ -647,6 +968,12 @@
             "state" : "translated",
             "value" : "Sound"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звук"
+          }
         }
       }
     },
@@ -657,6 +984,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speak results"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Озвучивать результаты"
           }
         }
       }
@@ -669,6 +1002,12 @@
             "state" : "translated",
             "value" : "Studio"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Студия"
+          }
         }
       }
     },
@@ -679,6 +1018,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Style"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стиль"
           }
         }
       }
@@ -691,6 +1036,12 @@
             "state" : "translated",
             "value" : "Syrupy"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вязко"
+          }
         }
       }
     },
@@ -701,6 +1052,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Table"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стол"
           }
         }
       }
@@ -713,6 +1070,12 @@
             "state" : "translated",
             "value" : "The backdrop doubles as the scene's light source where the engine supports image-based lighting."
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фон также служит источником света сцены, если движок поддерживает освещение на основе изображения."
+          }
         }
       }
     },
@@ -723,6 +1086,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Theme"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тема"
           }
         }
       }
@@ -735,6 +1104,12 @@
             "state" : "translated",
             "value" : "Use photo as backdrop"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовать фото как фон"
+          }
         }
       }
     },
@@ -745,6 +1120,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use photo as felt"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовать фото как сукно"
           }
         }
       }
@@ -757,16 +1138,11 @@
             "state" : "translated",
             "value" : "Viscosity"
           }
-        }
-      }
-    },
-    "Volume" : {
-      "comment" : "Collision-knock loudness slider label",
-      "localizations" : {
-        "en" : {
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Volume"
+            "value" : "Вязкость"
           }
         }
       }
@@ -775,6 +1151,12 @@
       "comment" : "Result banner — the settled roll's total",
       "localizations" : {
         "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        },
+        "ru" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld"
@@ -790,6 +1172,12 @@
             "state" : "translated",
             "value" : "%lld"
           }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
         }
       }
     },
@@ -800,6 +1188,80 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "Haptics aren't available on this device — it has no Taptic Engine." : {
+      "comment" : "Feedback footer on hardware without a Taptic Engine (iPad, simulator)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haptics aren't available on this device — it has no Taptic Engine."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тактильный отклик недоступен на этом устройстве — нет Taptic Engine."
+          }
+        }
+      }
+    },
+    "Louder" : {
+      "comment" : "Volume slider's high-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Louder"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Громче"
+          }
+        }
+      }
+    },
+    "Quieter" : {
+      "comment" : "Volume slider's low-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieter"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тише"
+          }
+        }
+      }
+    },
+    "Volume" : {
+      "comment" : "Collision-knock loudness slider label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Громкость"
           }
         }
       }
