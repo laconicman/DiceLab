@@ -1,0 +1,1 @@
+A physics lab disguised as a dice roller — roll under SceneKit, then under RealityKit, and feel how differently they settle.
