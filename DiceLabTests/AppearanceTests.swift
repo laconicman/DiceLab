@@ -5,6 +5,10 @@ import UIKit
 
 /// Model-layer pins for the appearance system: persistence round-trips,
 /// the M6 skin→theme migration, and per-appearance texture keying.
+/// `DieFaceTexture`'s cache is main-actor state, so the suite is — which
+/// also keeps SceneKit geometry construction serial, the way the app does
+/// it.
+@MainActor
 struct AppearanceTests {
 
     /// A custom theme must survive the UserDefaults JSON round-trip intact —

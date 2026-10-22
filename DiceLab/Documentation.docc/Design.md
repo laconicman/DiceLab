@@ -100,6 +100,9 @@ real-die underline under 6 and 9. Each triangle face samples a shared UV
 template — the equilateral triangle inscribed in the image's center
 circle, apex up — which bounds the numeral inside its incircle; each
 engine maps the template's image-space v to its own texture convention.
+The drawn images cache per ink as main-actor state — the controllers
+build dice there anyway, and the parallel test runner is what exposed
+the plain static dictionary as a data race.
 
 - *Deferred to M6:* the ancestors' alternate skin and a style switcher —
   that is settings UI, not material work. `SCNShaderModifier` stays out of

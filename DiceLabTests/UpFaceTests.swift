@@ -169,6 +169,10 @@ struct HapticsTests {
 /// The pip textures are drawn per material slot of `SCNBox`, but Apple never
 /// documents which slot is which face — `materialAxes` derives it from
 /// vertex data. These tests pin the derivation and the layout data itself.
+/// `DieFaceTexture`'s cache is main-actor state, so the suite is — which
+/// also keeps SceneKit geometry construction serial, the way the app does
+/// it.
+@MainActor
 struct DieFaceTextureTests {
     @Test("face value N draws exactly N pips, all inside the 3×3 grid")
     func pipCounts() {
