@@ -39,6 +39,20 @@ struct TableSettingsTests {
         #expect(TableSettings.storedSound(defaults: defaults))
     }
 
+    /// Absent key reads the tuned baseline (pre-slider users keep today's
+    /// feel); a stored payload round-trips, and a corrupt blob falls back
+    /// rather than trapping — the same lenient rule as `Theme`.
+    @Test("dynamics defaults to baseline, round-trips, tolerates corruption")
+    func dynamics() throws {
+        let defaults = try freshDefaults("TableSettingsTests.dynamics")
+        #expect(TableSettings.storedDynamics(defaults: defaults) == RollDynamics())
+        let stored = RollDynamics(pace: 1.4, viscosity: 0.7)
+        TableSettings.persist(stored, defaults: defaults)
+        #expect(TableSettings.storedDynamics(defaults: defaults) == stored)
+        defaults.set(Data("not json".utf8), forKey: TableSettings.dynamics)
+        #expect(TableSettings.storedDynamics(defaults: defaults) == RollDynamics())
+    }
+
     /// Volume is newer than the toggles: an absent key must read as full
     /// loudness (the baseline testers wanted louder), and stored values
     /// clamp to the slider's 0…1 like the other dials.

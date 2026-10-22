@@ -40,7 +40,7 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                 if DevFlags.autoroll {
                     table.roll()
                 }
-                if DevFlags.appearanceEditor {
+                if DevFlags.appearanceEditor || DevFlags.settings {
                     showingSettings = true
                 }
             }

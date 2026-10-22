@@ -40,7 +40,7 @@ private struct WindowRoot: View {
 
     var body: some View {
         Group {
-            switch engine {
+            switch DevFlags.engineOverride ?? engine {
             case .sceneKit:
                 SceneKitRollView(showingSettings: $showingSettings)
                     .environment(sceneKitTable)
@@ -64,7 +64,7 @@ private struct WindowRoot: View {
     private var settingsContent: some View {
         if DevFlags.appearanceEditor {
             NavigationStack {
-                switch engine {
+                switch DevFlags.engineOverride ?? engine {
                 case .sceneKit:
                     AppearanceEditor(table: sceneKitTable, preview: sceneKitPreview)
                 case .realityKit:
@@ -72,7 +72,7 @@ private struct WindowRoot: View {
                 }
             }
         } else {
-            switch engine {
+            switch DevFlags.engineOverride ?? engine {
             case .sceneKit:
                 SettingsView(table: sceneKitTable, preview: sceneKitPreview)
             case .realityKit:
