@@ -783,6 +783,23 @@
         }
       }
     },
+    "Renderer fixed by the -engine launch flag for this run." : {
+      "comment" : "Engine section footer while the -engine launch flag forces the renderer",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renderer fixed by the -engine launch flag for this run."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Рендерер задан флагом -engine на время этого запуска."
+          }
+        }
+      }
+    },
     "Roll" : {
       "comment" : "Roll button, idle state",
       "localizations" : {

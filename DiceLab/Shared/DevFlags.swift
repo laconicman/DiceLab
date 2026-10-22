@@ -29,9 +29,10 @@ enum DevFlags {
     static let settings =
         ProcessInfo.processInfo.arguments.contains("-settings")
 
-    /// `-engine realitykit` — transient engine override for capture runs;
-    /// shadows the stored choice without writing it back (the `settings`
-    /// flag pattern, not persistence), because `simctl spawn defaults write
+    /// `-engine realityKit` — transient engine override for capture runs;
+    /// the flag shadows the persisted `settings.engine` for the process
+    /// lifetime and never writes it back (the `settings` flag pattern,
+    /// not persistence), because `simctl spawn defaults write
     /// settings.engine` loses to the app's own persisted value — see the
     /// Defaults caveat above.
     static let engineOverride: DiceEngine? = {
