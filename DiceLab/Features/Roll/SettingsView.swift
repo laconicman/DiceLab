@@ -103,15 +103,25 @@ struct SettingsView<Table: DiceTable>: View {
                 // Last on purpose: the renderer is the deepest cut — the
                 // everyday dials sit above it.
                 Section {
-                    Picker("Renderer", selection: $engine) {
+                    // A -engine launch override decides the renderer for the
+                    // whole process, so the picker shows that engine and
+                    // locks: a live-looking switch writing a stored value
+                    // nothing reads would lie.
+                    Picker("Renderer",
+                           selection: DevFlags.engineOverride.map { Binding.constant($0) } ?? $engine) {
                         ForEach(DiceEngine.allCases) {
                             Text($0.title).tag($0)
                         }
                     }
+                    .disabled(DevFlags.engineOverride != nil)
                 } header: {
                     Text("Engine")
                 } footer: {
-                    Text("SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures.")
+                    if DevFlags.engineOverride != nil {
+                        Text("Renderer fixed by the -engine launch flag for this run.")
+                    } else {
+                        Text("SceneKit: scene graph. RealityKit: entity-component-system — same table, two architectures.")
+                    }
                 }
             }
             .navigationTitle("Settings")
