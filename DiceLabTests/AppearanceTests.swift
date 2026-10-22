@@ -60,8 +60,8 @@ struct AppearanceTests {
         var dark = Appearance.ivory.die
         dark.faceColor = CodableColor(red: 0.1, green: 0.1, blue: 0.1)
         dark.pipColor = CodableColor(red: 1, green: 1, blue: 1)
-        let ivoryFaces = DieFaceTexture.images(for: Appearance.ivory.die)
-        let darkFaces = DieFaceTexture.images(for: dark)
+        let ivoryFaces = DieFaceTexture.images(for: Appearance.ivory.die, shape: .d6)
+        let darkFaces = DieFaceTexture.images(for: dark, shape: .d6)
         #expect(ivoryFaces.count == 6 && darkFaces.count == 6)
         #expect(ivoryFaces[0].pngData() != darkFaces[0].pngData())
     }
@@ -155,13 +155,13 @@ struct AppearanceTests {
     /// is *not* the diffuse image.
     @Test("emission images exist only when something emits")
     func emissionImagesGate() {
-        #expect(DieFaceTexture.emissionImages(for: Appearance.ivory.die) == nil)
+        #expect(DieFaceTexture.emissionImages(for: Appearance.ivory.die, shape: .d6) == nil)
         var die = Appearance.ivory.die
         die.emission.pipIntensity = 1
-        let emission = DieFaceTexture.emissionImages(for: die)
+        let emission = DieFaceTexture.emissionImages(for: die, shape: .d6)
         #expect(emission?.count == 6)
         #expect(emission?[0].pngData()
-                != DieFaceTexture.images(for: die)[0].pngData())
+                != DieFaceTexture.images(for: die, shape: .d6)[0].pngData())
     }
 
     /// The editor gates every material control on `theme.kind == .custom` —

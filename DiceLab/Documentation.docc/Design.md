@@ -88,16 +88,32 @@ old code carried:
 
 `SCNBox` exposes one geometry element; its six material slots map to
 contiguous triangle groups inside it — measured order `+Z, +X, −Z, −X, +Y,
-−Y`. `DieFaceTexture.materialAxes` derives each slot's face axis from vertex
-data (mean position = outward normal) rather than hardcoding that order, so
-the visible pips can never silently disagree with `DieFace`'s value↔axis
-authority. Textures are `UIGraphicsImageRenderer`-drawn pips — no assets.
+−Y`. The d20's custom geometry gives each of its twenty faces its own
+element, so `materials[i]` lands on face `i` directly. Either way,
+`DieFaceTexture.materialAxes` derives each slot's outward direction from
+vertex data (mean position = normal direction) rather than hardcoding an
+order, and `DieFace.value(facing:)` resolves the nearest table normal —
+nearest-normal replaced the M5 axis quantization when the d20 arrived, and
+for the cube the two coincide. Textures are `UIGraphicsImageRenderer`-drawn
+— no assets: pips for the cube, bold numerals for the d20 with the
+real-die underline under 6 and 9. Each triangle face samples a shared UV
+template — the equilateral triangle inscribed in the image's center
+circle, apex up — which bounds the numeral inside its incircle; each
+engine maps the template's image-space v to its own texture convention.
 
 - *Deferred to M6:* the ancestors' alternate skin and a style switcher —
   that is settings UI, not material work. `SCNShaderModifier` stays out of
   scope until PBR proves insufficient.
 - *Confirmed at runtime:* `SCNBox(chamferRadius:)` produces identical
   triangle layout, so the derivation survives the tumble-friendly chamfer.
+- *Confirmed at runtime:* `SCNGeometryElement` indices must be `Int32`:
+  `[Int]` stores 8-byte indices Metal can't use — the element renders
+  nothing while its physics still works (the test suite pins the width
+  now).
+- *Confirmed at runtime:* SceneKit samples the template's v unflipped
+  (v-down, like UIKit draws); RealityKit's `MeshDescriptor` runs v up,
+  so its mesh flips v on the way in — 6/9 underlines land below the
+  digit on both engines.
 
 ## Settings live in the controller, persisted by it
 
@@ -118,7 +134,8 @@ opened it (and a flag on `App` itself would be shared by every window).
   `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
   the discarded dice can never publish a result for dice that no longer
   exist — the same stale-publish class Devin caught in M3, handled the
-  same way.
+  same way. `dieShape` rides the same path — respawn rebuilds the
+  appearance-editor preview in the new shape too.
 - *TD-3 discharged:* camera control is now a user toggle, default on — this
   is a learning toy, free orbiting is a feature. M9b's scripted fit shares
   the camera with it by time-slicing, not by disabling the gesture (see
@@ -419,9 +436,9 @@ locale was pure data: 72 keys localized without a code audit, with
   lifetime without writing it back — capture runs need a deterministic
   renderer, and the persisted key would otherwise win — and while the
   override is live the Settings picker shows the forced engine, disabled.
-- Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
-  `cameraControl`, `cameraFit`, `dynamics`) — controller `didSet` →
-  `UserDefaults`, shared keys across engines.
+- Per-controller settings (`dieCount`, `dieShape`, `theme`, `haptics`,
+  `sound`, `cameraControl`, `cameraFit`, `dynamics`) — controller
+  `didSet` → `UserDefaults`, shared keys across engines.
 - `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
   view-layer feedback reads a view-layer key (same slot as `engine`).
 - `WindowRoot.showingSettings` — `@State` on the per-window root view,
@@ -482,3 +499,52 @@ SceneKit's speed gate already divides by `world.speed`, and RealityKit's
 is a velocity threshold. For timing runs a transient `-pace` launch
 override (`DevFlags`) shadows the stored dial — unclamped, so stress tests
 can push past the UI range to probe wall-thickness and settle margins.
+
+## Two shapes, one `DieFace`
+
+M10 adds a second die shape — the d20 icosahedron — chosen once per
+table like `dieCount`, never per die (a mixed-shape throw would make
+the reported totals incomparable). The model stays engine-neutral:
+`Icosahedron` is pure data — twelve unit-circumradius vertices (cyclic
+permutations of (0, ±1, ±φ)) and twenty face triples wound
+counter-clockwise seen from outside — and the face normals are
+*computed* from them, not typed. The twenty normals are the dual
+dodecahedron's vertex directions: (±1, ±1, ±1)/√3 plus cyclic
+permutations of (0, ±φ, ±1/φ) — measured, and pinned by test. The face
+list is ordered in antipodal pairs (2k opposes 2k + 1), the same
+adjacency the cube table uses, so the d20 values pair to sum 21 the
+way cube pairs sum to 7. The value table also follows the two other
+conventions real d20s use: the five faces meeting at every vertex sum
+to 52 or 53 — 5 × 10.5 is the ideal integers can't hit — and no two
+edge-adjacent faces carry consecutive values. Fairness doesn't need
+any of this (a regular icosahedron lands on every face equally); it
+keeps the die from reading as a spindown, where the high numbers
+cluster around one vertex — the first table did exactly that, and the
+screenshots caught it.
+
+`DieFace` generalizes from six axes to a per-shape table:
+`axes(for:)` feeds one resolver — `value(facing:shape:)`, the largest
+dot product over the shape's normals. For the cube the nearest of the
+six axes *is* the old dominant-axis quantization, so the quantizer
+disappeared rather than growing a second table; `up(of:shape:)` is the
+same math as before, resolving world +Y into body space.
+
+Sizing keeps the shapes visually comparable rather than dimensionally
+equal: the d20's circumradius is 2 SceneKit units (0.02 m in
+RealityKit), which puts face-to-face at ≈3.2 against the cube's 3,
+while vertex-to-vertex is 4 — still under the cube's 5.2 diagonal that
+spawn spacing and camera fit already accommodate. Almost: at six dice
+the row's 3.2-unit x spacing is tighter than the shape's ~3.4 x
+footprint (half-extent 2φ/√(1+φ²) ≈ 1.70), and the ±10 wall can't
+widen it — so a multi-die d20 row zig-zags ±2 units in z (0.02 m in
+RealityKit), putting neighbours √(3.2² + 4²) ≈ 5.1 apart, past the
+4-unit diameter in any orientation; a lone die stays centered and the
+cube's row is unchanged. Physics gets explicit convex-hull shapes per
+engine (`SCNPhysicsShape` `.convexHull`, `ShapeResource.generateConvex`)
+because a custom geometry's derived default shape is not a documented
+guarantee; the box keeps its `shape: nil` path untouched.
+
+One caveat deferred to a device pass: the haptics `maxImpulse`
+constants were tuned on the cube's contact-impulse distribution, and
+twenty smaller faces will land differently. `-impulseLog` already
+gathers the data a recalibration needs.

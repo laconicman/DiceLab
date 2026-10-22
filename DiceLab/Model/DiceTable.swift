@@ -19,6 +19,10 @@ protocol DiceTable: AnyObject, Observable {
     var history: [RollResult] { get }
     /// 1…6 dice on the table; respawns the dice when changed.
     var dieCount: Int { get set }
+    /// The shape every die on the table takes; respawns the dice when
+    /// changed. One shape per table — mixed-shape throws would make the
+    /// reported totals incomparable.
+    var dieShape: DieShape { get set }
     /// Free camera orbiting, exposed to the user. Stays attached even
     /// during a roll — suppressing it would mean rebuilding the scene view
     /// mid-render, which wedges RealityKit's render graph (TD-10). The fit
@@ -58,6 +62,7 @@ extension DiceTable {
     func reloadSettings() {
         let defaults = UserDefaults.standard
         dieCount = TableSettings.storedDieCount()
+        dieShape = TableSettings.storedDieShape()
         cameraControlEnabled = defaults.object(forKey: TableSettings.cameraControl) as? Bool ?? true
         cameraFitEnabled = defaults.object(forKey: TableSettings.cameraFit) as? Bool ?? true
         hapticsEnabled = defaults.object(forKey: TableSettings.haptics) as? Bool ?? true
@@ -73,6 +78,7 @@ extension DiceTable {
 /// both controllers must read and write the same slots.
 enum TableSettings {
     static let dieCount = "settings.dieCount"
+    static let dieShape = "settings.dieShape"
     static let cameraControl = "settings.cameraControl"
     static let cameraFit = "settings.cameraFit"
     static let haptics = "settings.haptics"
@@ -96,6 +102,12 @@ enum TableSettings {
     static func storedDieCount(defaults: UserDefaults = .standard) -> Int {
         let raw = defaults.integer(forKey: dieCount)
         return raw == 0 ? 1 : min(max(raw, 1), 6)
+    }
+
+    /// Unset or unreadable reads as the cube — the only shape older
+    /// releases knew, so "never chosen" and "corrupt" both mean d6.
+    static func storedDieShape(defaults: UserDefaults = .standard) -> DieShape {
+        DieShape(rawValue: defaults.string(forKey: dieShape) ?? "") ?? .d6
     }
 
     /// Sound predates its own toggle: users who muted the old combined

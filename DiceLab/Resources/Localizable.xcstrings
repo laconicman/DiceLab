@@ -256,6 +256,40 @@
         }
       }
     },
+    "dieShape.d20" : {
+      "comment" : "Die shape picker option — twenty-sided icosahedron",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d20"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d20"
+          }
+        }
+      }
+    },
+    "dieShape.d6" : {
+      "comment" : "Die shape picker option — six-sided cube",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d6"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "d6"
+          }
+        }
+      }
+    },
     "Dramatic" : {
       "comment" : "Lighting preset name",
       "localizations" : {
