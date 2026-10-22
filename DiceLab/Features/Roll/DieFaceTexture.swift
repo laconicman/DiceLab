@@ -48,15 +48,18 @@ enum DieFaceTexture {
 
     /// Face images per ink, drawn lazily and cached — identical for
     /// every die, so `materials(for:)` reuses them instead of re-rendering
-    /// per spawn.
-    private static var faceImageCache: [Ink: [UIImage]] = [:]
+    /// per spawn. Main-actor state: the controllers build dice on the
+    /// main actor anyway, and a plain static dictionary read and written
+    /// from Swift Testing's parallel workers is a data race — CI tripped
+    /// on it once the M10 suites multiplied the readers.
+    @MainActor private static var faceImageCache: [Ink: [UIImage]] = [:]
 
     /// The cached faces, 1…`shape.faceCount`, keyed by ink alone — the
     /// diffuse and emission channels both draw through here; a
     /// packed-emission ink that happens to match a diffuse ink shares the
     /// same images.
-    static func images(face: CodableColor, pip: CodableColor,
-                       shape: DieShape) -> [UIImage] {
+    @MainActor static func images(face: CodableColor, pip: CodableColor,
+                                  shape: DieShape) -> [UIImage] {
         let key = Ink(face: face, pip: pip, shape: shape)
         if let cached = faceImageCache[key] { return cached }
         // Color sliders mint a key per sampled value — a long edit session
@@ -71,8 +74,8 @@ enum DieFaceTexture {
 
     /// The diffuse channel — the RealityKit path binds the same images
     /// through `TextureResource`; generation stays in one place.
-    static func images(for appearance: DieAppearance,
-                       shape: DieShape) -> [UIImage] {
+    @MainActor static func images(for appearance: DieAppearance,
+                                  shape: DieShape) -> [UIImage] {
         images(face: appearance.faceColor, pip: appearance.pipColor, shape: shape)
     }
 
@@ -81,8 +84,8 @@ enum DieFaceTexture {
     /// the material's scalar intensity can carry the magnitude (see
     /// `EmissionAppearance`). `peak == 0` means "leave emission off" — no
     /// black textures need drawing.
-    static func emissionImages(for appearance: DieAppearance,
-                               shape: DieShape) -> [UIImage]? {
+    @MainActor static func emissionImages(for appearance: DieAppearance,
+                                          shape: DieShape) -> [UIImage]? {
         let emission = appearance.emission
         guard emission.peak > 0 else { return nil }
         return images(face: emission.packedFace, pip: emission.packedPips,
@@ -148,8 +151,8 @@ enum DieFaceTexture {
     /// `emission.intensity` carries the peak while the texture holds the
     /// face-vs-pip ratio, which is the only way "glowing pips, dark body"
     /// fits one emission channel.
-    static func materials(for geometry: SCNGeometry, shape: DieShape,
-                          appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {
+    @MainActor static func materials(for geometry: SCNGeometry, shape: DieShape,
+                                     appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {
         let images = images(for: appearance, shape: shape)
         let emissionImages = emissionImages(for: appearance, shape: shape)
         return materialAxes(of: geometry).map { direction in
