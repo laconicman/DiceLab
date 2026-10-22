@@ -302,7 +302,7 @@ final class RealityTableController: DiceTable {
             steadyFrames = settled ? steadyFrames + 1 : 0
             if steadyFrames >= Rest.requiredFrames {
                 steadyFrames = 0
-                let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation) })
+                let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation, shape: .d6) })
                 lastRoll = result
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }

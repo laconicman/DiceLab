@@ -482,3 +482,32 @@ SceneKit's speed gate already divides by `world.speed`, and RealityKit's
 is a velocity threshold. For timing runs a transient `-pace` launch
 override (`DevFlags`) shadows the stored dial — unclamped, so stress tests
 can push past the UI range to probe wall-thickness and settle margins.
+
+## Two shapes, one `DieFace`
+
+M10 adds a second die shape — the d20 icosahedron — chosen once per
+table like `dieCount`, never per die (a mixed-shape throw would make
+the reported totals incomparable). The model stays engine-neutral:
+`Icosahedron` is pure data — twelve unit-circumradius vertices (cyclic
+permutations of (0, ±1, ±φ)) and twenty face triples wound
+counter-clockwise seen from outside — and the face normals are
+*computed* from them, not typed. The twenty normals are the dual
+dodecahedron's vertex directions: (±1, ±1, ±1)/√3 plus cyclic
+permutations of (0, ±φ, ±1/φ) — measured, and pinned by test. The face
+list is ordered in antipodal pairs (2k opposes 2k + 1), the same
+adjacency the cube table uses, so the d20 values pair to sum 21 the
+way cube pairs sum to 7. The value table also follows the two other
+conventions real d20s use: the five faces meeting at every vertex sum
+to 52 or 53 — 5 × 10.5 is the ideal integers can't hit — and no two
+edge-adjacent faces carry consecutive values. Fairness doesn't need
+any of this (a regular icosahedron lands on every face equally); it
+keeps the die from reading as a spindown, where the high numbers
+cluster around one vertex — the first table did exactly that, and the
+screenshots caught it.
+
+`DieFace` generalizes from six axes to a per-shape table:
+`axes(for:)` feeds one resolver — `value(facing:shape:)`, the largest
+dot product over the shape's normals. For the cube the nearest of the
+six axes *is* the old dominant-axis quantization, so the quantizer
+disappeared rather than growing a second table; `up(of:shape:)` is the
+same math as before, resolving world +Y into body space.

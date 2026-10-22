@@ -120,7 +120,7 @@ enum DieFaceTexture {
 
     /// Face value for an axis, via `DieFace.axes` — the single authority.
     static func value(on axis: SIMD3<Float>) -> Int {
-        DieFace.axes.first { simd_equal($0.normal, axis) }!.value
+        DieFace.axes(for: .d6).first { simd_equal($0.normal, axis) }!.value
     }
 
     /// The dominant outward axis of each material slot, in order. An SCNBox

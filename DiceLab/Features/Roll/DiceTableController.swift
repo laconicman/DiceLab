@@ -297,7 +297,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
             if let generation = sync.withLock({ $0.rolling ? $0.rollID : nil }),
                isRolling, sync.withLock({ $0.rollID == generation }),
                dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) {
-                let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation) })
+                let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation, shape: .d6) })
                 lastRoll = result
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }
