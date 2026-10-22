@@ -24,6 +24,15 @@ struct SettingsView<Table: DiceTable>: View {
         NavigationStack {
             Form {
                 Section("Dice") {
+                    // One shape per table — the picker's `dieShape` set
+                    // respawns every die (and the editor's preview) the
+                    // same way the count stepper does.
+                    Picker("Die", selection: $table.dieShape) {
+                        ForEach(DieShape.allCases) {
+                            Text($0.title).tag($0)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                     // Explicit catalog key — the count is a numeric
                     // substitution future locales can pluralize, and an
                     // English-text key would break if the wording moved.

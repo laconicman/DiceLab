@@ -106,6 +106,15 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   2026-10-06 → **VALID**, submitted to TestFlight external review.
   `MARKETING_VERSION: "1.0"`.
 
+- **M10 — second die shape (d20).** `DieShape` picker beside the count
+  stepper, one shape per table; `Icosahedron` carries the geometry,
+  `DieFace` resolves any shape's up-face by nearest normal. Per-engine
+  meshes, colliders, and material maps stay in the controllers: SceneKit
+  builds a 20-element `SCNGeometry` with a convex-hull physics shape,
+  RealityKit a `perFace` `MeshDescriptor` with a generated convex
+  collider. Face textures draw numerals (underlined 6/9) instead of
+  pips.
+
 ## Next
 
 - Open learning surface: device-time haptic/tuning pass, scripted camera

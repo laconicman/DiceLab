@@ -134,7 +134,8 @@ opened it (and a flag on `App` itself would be shared by every window).
   `rollID` and clears `isRolling`/`lastRoll`, so a settle task queued for
   the discarded dice can never publish a result for dice that no longer
   exist — the same stale-publish class Devin caught in M3, handled the
-  same way.
+  same way. `dieShape` rides the same path — respawn rebuilds the
+  appearance-editor preview in the new shape too.
 - *TD-3 discharged:* camera control is now a user toggle, default on — this
   is a learning toy, free orbiting is a feature. M9b's scripted fit shares
   the camera with it by time-slicing, not by disabling the gesture (see
@@ -435,9 +436,9 @@ locale was pure data: 72 keys localized without a code audit, with
   lifetime without writing it back — capture runs need a deterministic
   renderer, and the persisted key would otherwise win — and while the
   override is live the Settings picker shows the forced engine, disabled.
-- Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
-  `cameraControl`, `cameraFit`, `dynamics`) — controller `didSet` →
-  `UserDefaults`, shared keys across engines.
+- Per-controller settings (`dieCount`, `dieShape`, `theme`, `haptics`,
+  `sound`, `cameraControl`, `cameraFit`, `dynamics`) — controller
+  `didSet` → `UserDefaults`, shared keys across engines.
 - `settings.speech` — `@AppStorage` on `RollScreen`/`SettingsView`:
   view-layer feedback reads a view-layer key (same slot as `engine`).
 - `WindowRoot.showingSettings` — `@State` on the per-window root view,

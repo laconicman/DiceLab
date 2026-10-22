@@ -26,6 +26,18 @@ struct TableSettingsTests {
         #expect(TableSettings.storedDieCount(defaults: defaults) == 6)
     }
 
+    /// Unset or garbage reads as the cube — the only shape releases before
+    /// M10 knew — and a stored raw value round-trips.
+    @Test("die shape defaults to d6, round-trips, tolerates corruption")
+    func dieShape() throws {
+        let defaults = try freshDefaults("TableSettingsTests.dieShape")
+        #expect(TableSettings.storedDieShape(defaults: defaults) == .d6)
+        defaults.set(DieShape.d20.rawValue, forKey: TableSettings.dieShape)
+        #expect(TableSettings.storedDieShape(defaults: defaults) == .d20)
+        defaults.set("d100", forKey: TableSettings.dieShape)
+        #expect(TableSettings.storedDieShape(defaults: defaults) == .d6)
+    }
+
     /// Sound predates its own key — a legacy muted-haptics user must not
     /// gain sound on upgrade. Pinned twice because the migration is silent.
     @Test("sound falls back to the legacy haptics key")
