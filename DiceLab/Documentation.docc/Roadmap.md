@@ -97,6 +97,15 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   the UI; per-locale voice pinning stays with voice-roll. Verified
   exhaustively: extracted keys ≡ catalog entries, both directions. (PR #17)
 
+- **1.0 (1) — publish.** Post-M9e feedback cycle (TestFlight #28 pace ×
+  viscosity dynamics, #32 sound volume + iPad haptics gating, #31
+  `-engine` capture-run flag), full ru localization (72-key catalog with
+  plural variations for the dice count), en-GB + ru storefront
+  listings, PrivacyInfo + export-compliance plist bits, Liquid Glass
+  `.icon` package. Archived from `release/1.0`, build 1 uploaded
+  2026-10-06 → **VALID**, submitted to TestFlight external review.
+  `MARKETING_VERSION: "1.0"`.
+
 ## Next
 
 - Open learning surface: device-time haptic/tuning pass, scripted camera

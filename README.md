@@ -10,9 +10,6 @@ and RealityKit (ECS) — switchable in Settings, the M7 comparison exercise.
 ## Requirements
 
 - iOS 18+ (the RealityKit engine needs `RealityView`)
-
-## Requirements
-
 - Xcode 26+
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) — the `.xcodeproj` is
   generated, not committed: run `xcodegen` after cloning or changing
