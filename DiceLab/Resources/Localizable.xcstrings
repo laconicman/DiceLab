@@ -331,6 +331,17 @@
         }
       }
     },
+    "Haptics aren't available on this device — it has no Taptic Engine." : {
+      "comment" : "Feedback footer on hardware without a Taptic Engine (iPad, simulator)",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haptics aren't available on this device — it has no Taptic Engine."
+          }
+        }
+      }
+    },
     "History" : {
       "comment" : "Settings section header and history panel title",
       "localizations" : {
@@ -360,6 +371,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lighting"
+          }
+        }
+      }
+    },
+    "Louder" : {
+      "comment" : "Volume slider's high-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Louder"
           }
         }
       }
@@ -470,6 +492,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Presets are sealed looks — choose Custom to edit materials."
+          }
+        }
+      }
+    },
+    "Quieter" : {
+      "comment" : "Volume slider's low-end label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieter"
           }
         }
       }
@@ -723,6 +756,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Viscosity"
+          }
+        }
+      }
+    },
+    "Volume" : {
+      "comment" : "Collision-knock loudness slider label",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume"
           }
         }
       }
