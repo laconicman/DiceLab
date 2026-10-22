@@ -11,11 +11,16 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
-        with:
-          # The next step dereferences the pushed ref with `git cat-file -t`
-          # to prove the tag is annotated (not lightweight); without this,
-          # checkout fetches only the commit and the ref dereferences to it.
-          fetch-tags: true
+
+      # On a tag push, checkout maps the event SHA onto refs/tags/<name>, so
+      # the ref dereferences to the commit and the next step's `git cat-file
+      # -t` can never see a tag object. `fetch-tags: true` collides with that
+      # mapping (two refspecs, one destination); `fetch-depth: 0` fetches the
+      # tag object but checkout then overwrites the ref with the commit when
+      # its testRef comparison fails. One explicit forced fetch of the pushed
+      # ref, after checkout is done, lands the tag object on the ref it owns.
+      - name: Fetch the pushed tag object
+        run: scripts/fetch_release_tag.sh "$GITHUB_REF_NAME"
 
       - name: Assert tag is annotated and matches MARKETING_VERSION
         run: |
