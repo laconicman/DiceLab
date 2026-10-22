@@ -408,7 +408,11 @@ not a code audit.
 
 - `WindowRoot.engine` — `@AppStorage("settings.engine")`, the app-level
   choice of which controller exists. Plus two `@State` controllers — the
-  documented Apple pattern for root-owned reference objects.
+  documented Apple pattern for root-owned reference objects. A `-engine`
+  launch argument (`DevFlags.engineOverride`) shadows it for the process
+  lifetime without writing it back — capture runs need a deterministic
+  renderer, and the persisted key would otherwise win — and while the
+  override is live the Settings picker shows the forced engine, disabled.
 - Per-controller settings (`dieCount`, `theme`, `haptics`, `sound`,
   `cameraControl`, `cameraFit`) — controller `didSet` → `UserDefaults`,
   shared keys across engines.
