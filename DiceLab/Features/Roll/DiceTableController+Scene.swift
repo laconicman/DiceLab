@@ -151,6 +151,7 @@ extension DiceTableController {
            abs(simd_dot(camera.simdOrientation, CameraHome.orientation)) > 0.9999 {
             camera.simdPosition = target
             camera.simdOrientation = CameraHome.orientation
+            orbitPivot = box.center
             fitConverged = true
             return false
         }
@@ -209,18 +210,66 @@ extension DiceTableController {
         cameraNode = camera
     }
 
-    /// The orbit floor (M11). `SCNCameraController` enforces vertical-angle
-    /// limits itself in turntable mode — its default, measured — inertia
-    /// tail included, while the fit's programmatic writes pass through
-    /// untouched. Reached here because `SceneView` never hands out its view.
-    func configureCameraFloor(in view: SCNView) {
-        let controller = view.defaultCameraController
-        controller.minimumVerticalAngle = CameraOrbit.floorDegrees
-        // Not 90: at exactly 90 the constraint is silently not enforced —
-        // measured from the home pose and the straight-down fitted pose
-        // alike. One degree short, it holds.
-        controller.maximumVerticalAngle = CameraOrbit.ceilingDegrees
-        cameraControlledView = view
+    /// Custom-orbit tuning (M11) — same `degreesPerPoint` as RealityKit so
+    /// the feel ports; `radiusRange` is the SceneKit (×100) analogue of
+    /// RealityKit's 0.08…2.0 m.
+    private enum Orbit {
+        static let degreesPerPoint: Float = 0.2
+        static let radiusRange: ClosedRange<Float> = 8...200
+    }
+
+    /// One-finger drag, in points since the last event. Ignored while the
+    /// fit owns the camera — same gate as the RealityKit twin. Both deltas
+    /// read negative so the scene follows the finger (right/down drag →
+    /// camera rotates the opposite way about the pivot).
+    func orbit(by delta: CGSize) {
+        guard let camera = orbitableCamera else { return }
+        let perPoint = Orbit.degreesPerPoint * .pi / 180
+        let pose = CameraOrbit.orbit(
+            CameraOrbit.pose(of: camera.presentation.simdPosition,
+                             about: orbitPivot),
+            azimuthDelta: -Float(delta.width) * perPoint,
+            elevationDelta: -Float(delta.height) * perPoint,
+            radiusScale: 1, radiusRange: Orbit.radiusRange)
+        if DevFlags.cameraLog {
+            print(String(format: "[DiceLab] orbit d=(%.1f,%.1f) -> az=%.1f° elev=%.1f° r=%.3f",
+                         delta.width, delta.height,
+                         pose.azimuth * 180 / .pi, pose.elevation * 180 / .pi, pose.radius))
+        }
+        place(camera, at: pose)
+    }
+
+    /// Pinch: magnification >1 pulls the camera closer.
+    func dolly(by scale: CGFloat) {
+        guard let camera = orbitableCamera, scale.isFinite, scale > 0
+        else { return }
+        let pose = CameraOrbit.orbit(
+            CameraOrbit.pose(of: camera.presentation.simdPosition,
+                             about: orbitPivot),
+            azimuthDelta: 0, elevationDelta: 0,
+            radiusScale: 1 / Float(scale), radiusRange: Orbit.radiusRange)
+        if DevFlags.cameraLog {
+            print(String(format: "[DiceLab] dolly x%.3f -> r=%.3f", scale, pose.radius))
+        }
+        place(camera, at: pose)
+    }
+
+    /// The camera, if the user may move it right now: control on, and the
+    /// fit either off or latched. Mirror of RealityKit's guard.
+    private var orbitableCamera: SCNNode? {
+        guard cameraControlEnabled, fitConverged || !cameraFitEnabled
+        else { return nil }
+        return cameraNode
+    }
+
+    private func place(_ camera: SCNNode, at pose: CameraOrbit.Pose) {
+        let position = CameraOrbit.position(of: pose, about: orbitPivot)
+        guard position.x.isFinite, position.y.isFinite,
+              position.z.isFinite else { return }
+        camera.simdPosition = position
+        camera.look(at: SCNVector3(orbitPivot),
+                    up: SCNVector3(0, 1, 0),
+                    localFront: SCNVector3(0, 0, -1))
     }
 
     /// `-boundsProbe` diagnostics: flags the first position a die is seen

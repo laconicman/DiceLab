@@ -116,7 +116,7 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   pips. (PR #37)
   `MARKETING_VERSION: "1.1"`.
 
-- **M11 — Camera floor.** The orbit can't dip under the felt: one shared `CameraOrbit.floorDegrees` (10°). SceneKit sets `SCNCameraController.minimumVerticalAngle` through the renderer-delegate's `SCNView` (maximum 89 — at 90 the limit silently stops working); RealityKit replaces `realityViewCameraControls(.orbit)` — no limit, hidden angle, inert `cameraTarget` — with a `DragGesture`/`MagnifyGesture` orbit over an engine-free spherical pose, pivoting on the fitted cluster center. Discharges TD-10, records TD-12. (PR #42)
+- **M11 — Camera floor.** The orbit can't dip under the felt: one shared `CameraOrbit.floorDegrees` (10°). Both engines drop their stock camera controls — `.allowsCameraControl` on SceneKit, `realityViewCameraControls(.orbit)` on RealityKit — for a shared `DragGesture`/`MagnifyGesture` driving `CameraOrbit.Pose` (azimuth / elevation / radius about the fitted cluster center), engine-free and unit-tested. Discharges TD-10, discharges TD-12. (PRs #42, #43)
 
 ## Next
 
