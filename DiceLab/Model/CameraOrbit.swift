@@ -3,8 +3,12 @@ import simd
 
 /// The orbit math behind the camera floor (M11): a spherical camera pose
 /// about a pivot plus the elevation band both engines honor. Engine-free
-/// like `CameraFit` — SceneKit hands the limits to `SCNCameraController`,
-/// RealityKit drives `Pose` from its own gesture.
+/// like `CameraFit` — both engines drive `Pose` from their own
+/// `DragGesture`/`MagnifyGesture`, because neither stock camera control
+/// survived device verification: SceneKit's `SCNCameraController` limits
+/// are bypassed by SwiftUI `SceneView`'s real-finger gesture path, and
+/// RealityKit's `.orbit` has no limit and keeps a hidden angle any clamp
+/// fights (both measured on PavP).
 enum CameraOrbit {
     /// Lowest elevation above the pivot's horizontal plane the orbit may
     /// reach, in degrees — the felt is never seen from below.
