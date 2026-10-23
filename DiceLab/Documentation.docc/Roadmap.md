@@ -118,6 +118,38 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
 
 ## Next
 
+Planned — one session each, in this order (reflection before glass, so
+translucent dice are mirrored by a finished floor):
+
+- **Camera floor.** The orbit must never dip under the felt. SceneKit:
+  `SCNCameraController` has `minimumVerticalAngle`, but `SceneView`
+  never hands out its `SCNView` — the renderer-delegate callback's
+  `renderer` is the candidate way to reach `defaultCameraController`
+  (to verify). RealityKit: `realityViewCameraControls(.orbit)` exposes
+  no limit, so either a per-frame clamp beside the fit's writes (M9b)
+  or the custom gesture layer TD-10 names — which would discharge TD-10
+  too. Must coexist with the scripted fit.
+- **Felt reflection.** The felt is a thin box *because* `SCNFloor`'s
+  reflection pass spammed the console at `reflectivity = 0` (TD-4); a
+  mirror finish puts that pass to work. SceneKit: `SCNFloor` with
+  `reflectivity` + `reflectionFalloffStart/End` (check the FloorPass log
+  goes quiet once the pass is used, and keep the UVs photo felt got from
+  the box). RealityKit has no planar reflection on iOS: mirrored dice
+  clones under a semi-transparent felt, or an IBL-only sheen that
+  reflects the backdrop but not the dice. The dial belongs to
+  `Appearance.felt`, translated per engine like roughness/metalness.
+- **Glass dice.** Translucent bodies, opaque ink, visible back faces,
+  refraction. Model: a translucency dial on `Appearance` (lenient-decoded
+  like the others) with an `AppearanceEditor` control. SceneKit:
+  `transparency` + `transparencyMode = .dualLayer` (convex bodies) +
+  `fresnelExponent`; refraction isn't in its lighting models — a fragment
+  shader modifier bending the environment lookup, or an `SCNTechnique`
+  screen-space pass. RealityKit: `PhysicallyBasedMaterial` transparent
+  blending for the body; refraction would need `CustomMaterial` and
+  can't read the framebuffer (to verify) — environment-only. Face
+  textures gain meaningful alpha (ink opaque, body translucent) and the
+  M9d packed-emission glow needs re-checking against translucency.
+
 - Open learning surface: device-time haptic/tuning pass, scripted camera
   moments (would revisit TD-3's default-on toggle), a second skin family,
   or RealityKit-vs-SceneKit performance measurement. Voice-trigger design
