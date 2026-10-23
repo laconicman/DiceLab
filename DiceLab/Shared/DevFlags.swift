@@ -51,6 +51,12 @@ enum DevFlags {
     static let boundsProbe =
         ProcessInfo.processInfo.arguments.contains("-boundsProbe")
 
+    /// Log the camera's elevation about its orbit pivot and the lowest
+    /// height it has reached — the camera floor's evidence (M11) a
+    /// screenshot can't carry; `-boundsProbe` for the camera.
+    static let cameraLog =
+        ProcessInfo.processInfo.arguments.contains("-cameraLog")
+
     /// `-pace 0.5` — transient pace override for timing runs; shadows the
     /// stored setting without writing it back. Deliberately unclamped:
     /// pushing past `RollDynamics.paceRange` is how the wall-thickness and

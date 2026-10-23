@@ -66,6 +66,12 @@ final class DiceTableController: NSObject {
     /// `-boundsProbe`: die/face pairs already reported this roll.
     var probeEscaped: Set<String> = []
 
+    /// `-cameraLog` (M11): cadence + running minimums for the floor line —
+    /// dev-flag state, grouped with the probe's.
+    var cameraLogLastTime: TimeInterval = -.infinity
+    var cameraLogMinY: Float = .infinity
+    var cameraLogMinElev: Float = .infinity
+
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
@@ -342,6 +348,23 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 (renderer as? SCNView)?.setNeedsDisplay()
             }
             probeBounds()
+            // The floor's evidence: elevation about the controller's own
+            // target, which is the pivot the limit is actually measured
+            // against — `SCNView` retargets it at touch-begin.
+            if DevFlags.cameraLog, time - cameraLogLastTime >= 0.25,
+               let p = cameraNode?.presentation.simdPosition {
+                cameraLogLastTime = time
+                let pivot = cameraControlledView.map {
+                    SIMD3<Float>($0.defaultCameraController.target)
+                } ?? .zero
+                let d = p - pivot
+                let elev = atan2(d.y, hypot(d.x, d.z)) * 180 / .pi
+                cameraLogMinY = min(cameraLogMinY, p.y)
+                cameraLogMinElev = min(cameraLogMinElev, elev)
+                print(String(format: "[DiceLab] camera y=%.3f elev=%.1f° about (%.2f,%.2f,%.2f) minY=%.3f minElev=%.1f°",
+                             p.y, elev, pivot.x, pivot.y, pivot.z,
+                             cameraLogMinY, cameraLogMinElev))
+            }
         }
     }
 

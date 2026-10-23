@@ -93,6 +93,14 @@ final class RealityTableController: DiceTable {
     /// `-boundsProbe`: die/face pairs already reported this roll.
     var probeEscaped: Set<String> = []
 
+    /// `-cameraLog` (M11): accumulated update time, cadence, and running
+    /// minimums for the floor line — dev-flag state, grouped with the
+    /// probe's.
+    var cameraLogTime: Float = 0
+    var cameraLogLast: Float = -.infinity
+    var cameraLogMinY: Float = .infinity
+    var cameraLogMinElev: Float = .infinity
+
     // MARK: Settings — the keys are shared with the SceneKit controller via
     // `TableSettings`: a setting is the user's choice about the *table*, not
     // the engine — switching engines must not reset dice count or skin.
@@ -337,6 +345,23 @@ final class RealityTableController: DiceTable {
         // the flag clears — that's what "stays fitted" means.
         updateCameraFit(dt: dt)
         probeBounds()
+        // The floor's evidence: elevation about `orbitPivot` — the pivot
+        // the gesture actually orbits, which is the dice cluster once the
+        // fit has latched, not the origin the stock control pivoted on.
+        cameraLogTime += dt
+        if DevFlags.cameraLog, cameraLogTime - cameraLogLast >= 0.25,
+           let cam = cameraEntity {
+            cameraLogLast = cameraLogTime
+            let v = cam.position - orbitPivot
+            let r = simd_length(v)
+            let elev = r > 1e-6 ? asin(v.y / r) * 180 / .pi : 90
+            cameraLogMinY = min(cameraLogMinY, cam.position.y)
+            cameraLogMinElev = min(cameraLogMinElev, elev)
+            print(String(format: "[DiceLab] camera y=%.3f elev=%.1f° about (%.2f,%.2f,%.2f) minY=%.3f minElev=%.1f°",
+                         cam.position.y, elev,
+                         orbitPivot.x, orbitPivot.y, orbitPivot.z,
+                         cameraLogMinY, cameraLogMinElev))
+        }
     }
 
     /// The `-impulseLog` summary: one line per settled roll — enough to
