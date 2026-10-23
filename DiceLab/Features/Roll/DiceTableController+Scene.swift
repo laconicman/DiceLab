@@ -209,6 +209,20 @@ extension DiceTableController {
         cameraNode = camera
     }
 
+    /// The orbit floor (M11). `SCNCameraController` enforces vertical-angle
+    /// limits itself in turntable mode — its default, measured — inertia
+    /// tail included, while the fit's programmatic writes pass through
+    /// untouched. Reached here because `SceneView` never hands out its view.
+    func configureCameraFloor(in view: SCNView) {
+        let controller = view.defaultCameraController
+        controller.minimumVerticalAngle = CameraOrbit.floorDegrees
+        // Not 90: at exactly 90 the constraint is silently not enforced —
+        // measured from the home pose and the straight-down fitted pose
+        // alike. One degree short, it holds.
+        controller.maximumVerticalAngle = CameraOrbit.ceilingDegrees
+        cameraControlledView = view
+    }
+
     /// `-boundsProbe` diagnostics: flags the first position a die is seen
     /// outside the play volume (naming the face it crossed) and dumps rest
     /// positions at settle.

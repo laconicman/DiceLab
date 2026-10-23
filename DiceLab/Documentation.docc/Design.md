@@ -38,6 +38,7 @@ need: scene injection, renderer delegate, antialiasing, camera control.
 - *Rejected for now:* wrapping `SCNView` in `UIViewRepresentable` — the escape
   hatch for `SCNView`-only APIs (custom gestures, overlays). If a milestone needs
   one, only `RollView` changes.
+- *Still not needed after M11:* the camera floor reaches `SCNView.defaultCameraController` through the renderer-delegate callback, whose `renderer` is the view itself.
 
 ## SceneKit first, RealityKit later — then both
 

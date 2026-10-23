@@ -126,6 +126,13 @@ final class DiceTableController: NSObject {
     /// an absolute timestamp, the damp needs a delta.
     var lastFitTime: TimeInterval?
 
+    /// The `SCNView` whose default camera controller already carries the
+    /// orbit floor. `SceneView` never exposes its view, but the renderer-
+    /// delegate callback hands it over every frame — the weak reference is
+    /// what makes the configuration run once per view instance (the limit
+    /// getters read back in radians, so comparing them is no dedupe).
+    weak var cameraControlledView: SCNView?
+
     /// Once the fitted pose has converged after a settle, the fit stops
     /// writing: orbit gestures are then free, with no per-frame
     /// tug-of-war, until the next `roll()` or dice respawn unlatches it.
@@ -319,6 +326,9 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 sync.withLock { $0.rolling = false }
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
                 probeRest()
+            }
+            if let view = renderer as? SCNView, view !== cameraControlledView {
+                configureCameraFloor(in: view)
             }
             // The camera fit must keep easing *after* the rolling flag
             // clears — the settle publish above is what lands it — so it
