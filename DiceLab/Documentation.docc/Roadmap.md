@@ -116,19 +116,13 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   pips. (PR #37)
   `MARKETING_VERSION: "1.1"`.
 
+- **M11 — Camera floor.** The orbit can't dip under the felt: one shared `CameraOrbit.floorDegrees` (10°). SceneKit sets `SCNCameraController.minimumVerticalAngle` through the renderer-delegate's `SCNView` (maximum 89 — at 90 the limit silently stops working); RealityKit replaces `realityViewCameraControls(.orbit)` — no limit, hidden angle, inert `cameraTarget` — with a `DragGesture`/`MagnifyGesture` orbit over an engine-free spherical pose, pivoting on the fitted cluster center. Discharges TD-10, records TD-12. (PR #42)
+
 ## Next
 
 Planned — one session each, in this order (reflection before glass, so
 translucent dice are mirrored by a finished floor):
 
-- **Camera floor.** The orbit must never dip under the felt. SceneKit:
-  `SCNCameraController` has `minimumVerticalAngle`, but `SceneView`
-  never hands out its `SCNView` — the renderer-delegate callback's
-  `renderer` is the candidate way to reach `defaultCameraController`
-  (to verify). RealityKit: `realityViewCameraControls(.orbit)` exposes
-  no limit, so either a per-frame clamp beside the fit's writes (M9b)
-  or the custom gesture layer TD-10 names — which would discharge TD-10
-  too. Must coexist with the scripted fit.
 - **Felt reflection.** The felt is a thin box *because* `SCNFloor`'s
   reflection pass spammed the console at `reflectivity = 0` (TD-4); a
   mirror finish puts that pass to work. SceneKit: `SCNFloor` with
