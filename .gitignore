@@ -16,3 +16,6 @@ logs/
 
 # App Store review contact info — owner PII, keep local (YDelivery convention)
 metadata/review_information/
+
+# asc three-way-diff baseline (ids, states, digests) — local for now, see TD-11
+metadata/.asc-baseline.json
