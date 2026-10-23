@@ -12,9 +12,10 @@ struct SceneKitRollView: View {
         RollScreen(table: table, scene: SceneView(
             scene: table.scene,
             // Static on purpose: flipping this option mid-roll rebuilds
-            // the view, and the RealityKit twin wedges its render graph on
-            // that. Ownership is instead time-sliced by the fit itself —
-            // it stops writing once the settled pose converges.
+            // the view — the RealityKit twin wedged its render graph on
+            // exactly that (TD-10) before its orbit became a gesture.
+            // Ownership is instead time-sliced by the fit itself — it
+            // stops writing once the settled pose converges.
             options: table.cameraControlEnabled ? [.allowsCameraControl] : [],
             antialiasingMode: .multisampling4X,
             delegate: table

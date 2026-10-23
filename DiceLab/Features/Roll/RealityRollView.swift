@@ -9,36 +9,39 @@ struct RealityRollView: View {
     @Environment(RealityTableController.self) private var table
     @Binding var showingSettings: Bool
 
+    @GestureState private var dragTranslation: CGSize = .zero
+    @GestureState private var pinchMagnification: CGFloat = 1
+
     var body: some View {
         RollScreen(table: table, scene: realityScene,
                    showingSettings: $showingSettings)
     }
 
-    @ViewBuilder
     private var realityScene: some View {
-        let view = RealityView { content in
+        RealityView { content in
             table.populate(&content)
         }
-        // Orbit gestures when the setting is on; no modifier when off —
-        // `CameraControls` isn't an OptionSet, so there's no `.none` to
-        // pass. The gate must NOT key on `isRolling`: flipping the branch
-        // rebuilds `RealityView`, and a mid-roll rebuild wedges the render
-        // graph (framebuffer errors, blank view). Fit/orbit ownership is
-        // time-sliced inside the controller instead (`fitConverged`).
-        if table.cameraControlEnabled {
-            aspectFeed(view.realityViewCameraControls(.orbit))
-        } else {
-            aspectFeed(view)
-        }
-    }
-
-    /// The fit's horizontal-FOV math needs the viewport shape — applied
-    /// via a helper because the orbit-gated and plain branches are
-    /// different view types.
-    private func aspectFeed(_ content: some View) -> some View {
-        content.onGeometryChange(for: CGFloat.self) {
-            $0.size.width / $0.size.height
-        } action: { table.viewAspect = $0 }
+        // Our own orbit (M11), not `.realityViewCameraControls(.orbit)`:
+        // the stock control has no floor, pivots on the origin, ignores
+        // `cameraTarget`, and keeps a hidden angle that fights any clamp.
+        // Attached unconditionally — the handler checks
+        // `cameraControlEnabled` and the fit's ownership, so no view-tree
+        // branch flips on a setting or a roll (TD-10). Deltas come from
+        // `@GestureState`, which SwiftUI resets when a gesture ends *or is
+        // cancelled* — a stored baseline would survive a cancelled drag
+        // and throw the next one.
+        .gesture(DragGesture().updating($dragTranslation) { value, last, _ in
+            table.orbit(by: CGSize(width: value.translation.width - last.width,
+                                   height: value.translation.height - last.height))
+            last = value.translation
+        })
+        .simultaneousGesture(MagnifyGesture().updating($pinchMagnification) { value, last, _ in
+            table.dolly(by: value.magnification / last)
+            last = value.magnification
+        })
+        // The fit's horizontal-FOV math needs the viewport shape.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width / $0.size.height }
+            action: { table.viewAspect = $0 }
     }
 }
 

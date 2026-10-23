@@ -117,6 +117,7 @@ extension RealityTableController {
            abs(simd_dot(camera.orientation, cameraHomeOrientation)) > 0.9999 {
             camera.position = target
             camera.orientation = cameraHomeOrientation
+            orbitPivot = box.center
             fitConverged = true
             return
         }
@@ -128,6 +129,59 @@ extension RealityTableController {
         camera.orientation = CameraFit.damp(
             camera.orientation, toward: cameraHomeOrientation,
             rate: Fit.rate, dt: dt)
+    }
+
+    /// Custom-orbit tuning (M11) — the stock `.orbit` control's feel,
+    /// measured on it before it was replaced: 0.22° of rotation per point
+    /// of finger travel, both axes alike. Dolly stays outside the dice and
+    /// inside the backdrop dome (4 m); the fit's own range is 0.22–~1 m.
+    private enum Orbit {
+        static let degreesPerPoint: Float = 0.2
+        static let radiusRange: ClosedRange<Float> = 0.08...2.0
+    }
+
+    /// One-finger drag, in points since the last event. Ignored while the
+    /// fit owns the camera (`cameraFitEnabled && !fitConverged`) — the
+    /// suppression TD-10 called impossible while the orbit belonged to
+    /// RealityKit. Both deltas read negative: measured on the stock
+    /// control, right and down are minus in this convention — the camera
+    /// chases the finger's opposite, so the scene follows the finger.
+    func orbit(by delta: CGSize) {
+        guard let camera = orbitableCamera else { return }
+        let perPoint = Orbit.degreesPerPoint * .pi / 180
+        place(camera, at: CameraOrbit.orbit(
+            CameraOrbit.pose(of: camera.position, about: orbitPivot),
+            azimuthDelta: -Float(delta.width) * perPoint,
+            elevationDelta: -Float(delta.height) * perPoint,
+            radiusScale: 1, radiusRange: Orbit.radiusRange))
+    }
+
+    /// Pinch, as the ratio of this event's magnification to the last
+    /// one's — magnification above 1 (pinch out) zooms in.
+    func dolly(by scale: CGFloat) {
+        guard let camera = orbitableCamera, scale.isFinite, scale > 0
+        else { return }
+        place(camera, at: CameraOrbit.orbit(
+            CameraOrbit.pose(of: camera.position, about: orbitPivot),
+            azimuthDelta: 0, elevationDelta: 0,
+            radiusScale: 1 / Float(scale), radiusRange: Orbit.radiusRange))
+    }
+
+    /// The camera, if the user may move it right now: control on, and the
+    /// fit either off or latched.
+    private var orbitableCamera: Entity? {
+        guard cameraControlEnabled, fitConverged || !cameraFitEnabled
+        else { return nil }
+        return cameraEntity
+    }
+
+    private func place(_ camera: Entity, at pose: CameraOrbit.Pose) {
+        let position = CameraOrbit.position(of: pose, about: orbitPivot)
+        // A NaN transform blanks the frame for good (see the fit) — never
+        // write one.
+        guard position.x.isFinite, position.y.isFinite,
+              position.z.isFinite else { return }
+        camera.look(at: orbitPivot, from: position, relativeTo: nil)
     }
 
     private func setUpCamera() {

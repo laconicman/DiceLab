@@ -350,8 +350,11 @@ shrinks the dice, and the dice are the content.
   `realityViewCameraControls` (or `SceneView`'s `options`) mid-roll
   rebuilds the view — and `RealityView` wedges its render graph on
   rebuild mid-render (`Requested framebuffer 1 is invalid`, permanent
-  blank; TD-10). `SceneView` survives it, but both engines keep the gate
-  static for symmetry: ownership is time-sliced inside the controllers.
+  blank; TD-10). `SceneView` survives it but keeps its gate static all
+  the same: ownership is time-sliced inside the controllers. M11 took
+  RealityKit's orbit out of the view tree altogether — a gesture the
+  controller interprets, so there is nothing left to flip (see "Camera
+  floor").
 - **NaN transforms are unrecoverable.** `simd_slerp` between identical
   quaternions divides by `sin(0)` → NaN orientation → blank frame
   *forever* (NaN+x=NaN). `CameraFit.damp` short-circuits identical quats,

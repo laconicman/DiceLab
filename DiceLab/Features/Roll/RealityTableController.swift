@@ -153,6 +153,12 @@ final class RealityTableController: DiceTable {
     /// without a per-frame tug-of-war, until the next `roll()` unlatches it.
     var fitConverged = false
 
+    /// What the custom orbit (M11) rotates about: the home look-at until
+    /// the first fit lands, then the fitted cluster center —
+    /// `updateCameraFit` records it when it latches, so a between-rolls
+    /// orbit circles the dice, not the table's origin.
+    var orbitPivot: SIMD3<Float> = .zero
+
     /// Speed-gate hysteresis for `updateCameraFit` — same shape as the
     /// SceneKit controller's: a die hovering at the threshold must not flap
     /// the camera target home↔fitted, so once dice flew and then slowed the
