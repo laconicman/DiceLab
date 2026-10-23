@@ -66,6 +66,12 @@ final class DiceTableController: NSObject {
     /// `-boundsProbe`: die/face pairs already reported this roll.
     var probeEscaped: Set<String> = []
 
+    /// `-cameraLog` (M11): cadence + running minimums for the floor line —
+    /// dev-flag state, grouped with the probe's.
+    var cameraLogLastTime: TimeInterval = -.infinity
+    var cameraLogMinY: Float = .infinity
+    var cameraLogMinElev: Float = .infinity
+
     /// Dice currently on the table. Internal so the `+Scene` extension can
     /// populate it during construction.
     var dice: [SCNNode] = []
@@ -125,6 +131,13 @@ final class DiceTableController: NSObject {
     /// `updateCameraFit`'s frame-to-frame delta source — `now` arrives as
     /// an absolute timestamp, the damp needs a delta.
     var lastFitTime: TimeInterval?
+
+    /// The `SCNView` whose default camera controller already carries the
+    /// orbit floor. `SceneView` never exposes its view, but the renderer-
+    /// delegate callback hands it over every frame — the weak reference is
+    /// what makes the configuration run once per view instance (the limit
+    /// getters read back in radians, so comparing them is no dedupe).
+    weak var cameraControlledView: SCNView?
 
     /// Once the fitted pose has converged after a settle, the fit stops
     /// writing: orbit gestures are then free, with no per-frame
@@ -320,6 +333,9 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
                 probeRest()
             }
+            if let view = renderer as? SCNView, view !== cameraControlledView {
+                configureCameraFloor(in: view)
+            }
             // The camera fit must keep easing *after* the rolling flag
             // clears — the settle publish above is what lands it — so it
             // can't sit behind a `rolling` early-out.
@@ -332,6 +348,23 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 (renderer as? SCNView)?.setNeedsDisplay()
             }
             probeBounds()
+            // The floor's evidence: elevation about the controller's own
+            // target, which is the pivot the limit is actually measured
+            // against — `SCNView` retargets it at touch-begin.
+            if DevFlags.cameraLog, time - cameraLogLastTime >= 0.25,
+               let p = cameraNode?.presentation.simdPosition {
+                cameraLogLastTime = time
+                let pivot = cameraControlledView.map {
+                    SIMD3<Float>($0.defaultCameraController.target)
+                } ?? .zero
+                let d = p - pivot
+                let elev = atan2(d.y, hypot(d.x, d.z)) * 180 / .pi
+                cameraLogMinY = min(cameraLogMinY, p.y)
+                cameraLogMinElev = min(cameraLogMinElev, elev)
+                print(String(format: "[DiceLab] camera y=%.3f elev=%.1f° about (%.2f,%.2f,%.2f) minY=%.3f minElev=%.1f°",
+                             p.y, elev, pivot.x, pivot.y, pivot.z,
+                             cameraLogMinY, cameraLogMinElev))
+            }
         }
     }
 

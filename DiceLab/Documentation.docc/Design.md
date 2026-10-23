@@ -38,6 +38,7 @@ need: scene injection, renderer delegate, antialiasing, camera control.
 - *Rejected for now:* wrapping `SCNView` in `UIViewRepresentable` — the escape
   hatch for `SCNView`-only APIs (custom gestures, overlays). If a milestone needs
   one, only `RollView` changes.
+- *Still not needed after M11:* the camera floor reaches `SCNView.defaultCameraController` through the renderer-delegate callback, whose `renderer` is the view itself.
 
 ## SceneKit first, RealityKit later — then both
 
@@ -349,8 +350,11 @@ shrinks the dice, and the dice are the content.
   `realityViewCameraControls` (or `SceneView`'s `options`) mid-roll
   rebuilds the view — and `RealityView` wedges its render graph on
   rebuild mid-render (`Requested framebuffer 1 is invalid`, permanent
-  blank; TD-10). `SceneView` survives it, but both engines keep the gate
-  static for symmetry: ownership is time-sliced inside the controllers.
+  blank; TD-10). `SceneView` survives it but keeps its gate static all
+  the same: ownership is time-sliced inside the controllers. M11 took
+  RealityKit's orbit out of the view tree altogether — a gesture the
+  controller interprets, so there is nothing left to flip (see "Camera
+  floor").
 - **NaN transforms are unrecoverable.** `simd_slerp` between identical
   quaternions divides by `sin(0)` → NaN orientation → blank frame
   *forever* (NaN+x=NaN). `CameraFit.damp` short-circuits identical quats,
@@ -551,3 +555,13 @@ One caveat deferred to a device pass: the haptics `maxImpulse`
 constants were tuned on the cube's contact-impulse distribution, and
 twenty smaller faces will land differently. `-impulseLog` already
 gathers the data a recalibration needs.
+
+## Camera floor — the orbit stays above the felt
+
+M11's ask was one sentence — the orbit must never dip under the felt — and the two engines answered it in opposite ways, because their camera controls are opposite kinds of thing: SceneKit's is a configurable object, RealityKit's a sealed modifier. One number is shared, `CameraOrbit.floorDegrees` (10°, in `Model/`): the lowest elevation the camera may reach above its pivot's horizontal plane.
+
+- **SceneKit keeps its native controller and gets a limit.** `SCNCameraController` enforces `minimumVerticalAngle`/`maximumVerticalAngle` itself in turntable mode — its default, measured — inertia tail included, and the fit's programmatic writes pass through untouched, so the fit still parks the camera straight down. `SceneView` never hands out its `SCNView`, but the renderer-delegate callback's `renderer` *is* the view — the same cast `setNeedsDisplay()` already leans on — so `configureCameraFloor(in:)` runs from that hop, once per view instance (a weak reference dedupes it; the getters read back in radians, so a read-back compare can't). Two measured rules: the maximum must be **89, not 90** — at 90 the constraint is silently not enforced, from the home pose and from the straight-down fitted pose alike; and `SCNView` overwrites the controller's `target` at touch-begin with the scene's bounding-sphere center — (0, −10, 0), because the 500-unit felt box dominates — whatever `automaticTarget` says, so the orbit pivots two units under the surface and the floor is measured from there: at the closest fit distance, 10° still leaves the camera 2.4 units above the felt. Not covered: the two-finger pan and three-finger dolly *translate* the camera, and translation is outside an angle limit's reach — the ask was about the orbit, and the next roll's fit resets the position (TD-12).
+- **RealityKit gets its own orbit, because `.orbit` can't be bent.** `realityViewCameraControls(.orbit)` has no limit, pivots on the world origin, ignores `RealityViewCameraContent.cameraTarget` (measured: a target entity at the felt center, then offset to (0.05, −0.08, 0.05), moved the pivot not at all), and keeps a hidden angle during a gesture — a per-frame clamp holds the rendered pose, but the control's internal elevation keeps diving to −89° and a reversed drag is dead until it climbs back: a sticky camera. So `RealityRollView` attaches a `DragGesture` and a `MagnifyGesture` of its own, and `RealityTableController` drives a spherical pose — `CameraOrbit.Pose`: azimuth, elevation, radius about a pivot, engine-free and unit-tested — with the elevation clamped to [floor, 89°] and the radius to a dolly range. The pivot is the fitted cluster center, recorded when the fit latches, and the home look-at before the first fit — so a between-rolls orbit circles the dice, where the stock control circled the table's origin. The orbit *does* re-aim (`look(at:)` the pivot): "never re-aiming" is the scripted fit's rule about its own writes; the user's hand may turn the camera. Deltas come from `@GestureState` (`updating`), which SwiftUI resets when a gesture ends *or is cancelled* — a controller-side baseline would survive a cancelled drag and throw the next one. Inertia is not re-implemented: the next roll's fit resets the camera anyway, and a decaying angular velocity is a small addition if the feel asks for it.
+- **TD-10 discharged by construction.** The gestures attach unconditionally; `cameraControlEnabled` and the fit's ownership (`fitConverged || !cameraFitEnabled`) are checked in the handler. No view-tree branch flips on a setting or a roll, so `RealityView` is never rebuilt mid-render, and an orbit during a roll is ignored instead of tugging against the fit's per-frame writes. SceneKit keeps its static `options` gate — there the fit and the controller never wrote the same frame to begin with.
+- **The ceiling is 89° on both engines for one reason.** A turntable's basis degenerates at the pole: SceneKit's constraint dies at a 90 maximum, and `look(at:)` has no up vector straight down. Only the fit parks the camera at 90°, and it writes the orientation directly.
+- **`-cameraLog` is the measuring stick.** It prints the camera's elevation about its pivot and the lowest height seen so far — the device check's evidence, as `-impulseLog` is for haptics.

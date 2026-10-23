@@ -23,11 +23,12 @@ protocol DiceTable: AnyObject, Observable {
     /// changed. One shape per table — mixed-shape throws would make the
     /// reported totals incomparable.
     var dieShape: DieShape { get set }
-    /// Free camera orbiting, exposed to the user. Stays attached even
-    /// during a roll — suppressing it would mean rebuilding the scene view
-    /// mid-render, which wedges RealityKit's render graph (TD-10). The fit
-    /// owns the camera while writing and hands it back once the settled
-    /// pose converges.
+    /// Free camera orbiting, exposed to the user. Each engine keeps its
+    /// gesture attached through a roll — SceneKit because flipping
+    /// `SceneView`'s option mid-roll rebuilds the view, RealityKit because
+    /// its orbit is a gesture the controller interprets and can simply
+    /// ignore while the fit writes (TD-10, discharged). Either way the fit
+    /// owns the camera until the settled pose converges, then hands it back.
     var cameraControlEnabled: Bool { get set }
     /// Scripted framing (M9b): as dice slow, the camera eases along its
     /// fixed view axis until every die is in frame, holds the fitted pose
