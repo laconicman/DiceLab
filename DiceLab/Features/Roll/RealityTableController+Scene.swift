@@ -149,11 +149,17 @@ extension RealityTableController {
     func orbit(by delta: CGSize) {
         guard let camera = orbitableCamera else { return }
         let perPoint = Orbit.degreesPerPoint * .pi / 180
-        place(camera, at: CameraOrbit.orbit(
+        let pose = CameraOrbit.orbit(
             CameraOrbit.pose(of: camera.position, about: orbitPivot),
             azimuthDelta: -Float(delta.width) * perPoint,
             elevationDelta: -Float(delta.height) * perPoint,
-            radiusScale: 1, radiusRange: Orbit.radiusRange))
+            radiusScale: 1, radiusRange: Orbit.radiusRange)
+        if DevFlags.cameraLog {
+            print(String(format: "[DiceLab] orbit d=(%.1f,%.1f) -> az=%.1f° elev=%.1f° r=%.3f",
+                         delta.width, delta.height,
+                         pose.azimuth * 180 / .pi, pose.elevation * 180 / .pi, pose.radius))
+        }
+        place(camera, at: pose)
     }
 
     /// Pinch, as the ratio of this event's magnification to the last
@@ -161,10 +167,14 @@ extension RealityTableController {
     func dolly(by scale: CGFloat) {
         guard let camera = orbitableCamera, scale.isFinite, scale > 0
         else { return }
-        place(camera, at: CameraOrbit.orbit(
+        let pose = CameraOrbit.orbit(
             CameraOrbit.pose(of: camera.position, about: orbitPivot),
             azimuthDelta: 0, elevationDelta: 0,
-            radiusScale: 1 / Float(scale), radiusRange: Orbit.radiusRange))
+            radiusScale: 1 / Float(scale), radiusRange: Orbit.radiusRange)
+        if DevFlags.cameraLog {
+            print(String(format: "[DiceLab] dolly x%.3f -> r=%.3f", scale, pose.radius))
+        }
+        place(camera, at: pose)
     }
 
     /// The camera, if the user may move it right now: control on, and the
