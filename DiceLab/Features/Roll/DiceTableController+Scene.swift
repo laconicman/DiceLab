@@ -153,6 +153,13 @@ extension DiceTableController {
             camera.simdOrientation = CameraHome.orientation
             orbitPivot = box.center
             fitConverged = true
+            // `-orbit`: swing to the capture elevation now that the pivot is
+            // known — and ask for one more frame, or the event-driven view
+            // never draws the parked pose.
+            if let degrees = DevFlags.orbitElevation {
+                park(camera, atElevationDegrees: Float(degrees))
+                return true
+            }
             return false
         }
         camera.simdPosition = CameraFit.damp(
@@ -272,6 +279,15 @@ extension DiceTableController {
                     localFront: SCNVector3(0, 0, -1))
     }
 
+    /// `-orbit` park: re-aim the converged camera at `degrees` elevation
+    /// about the current pivot — same math the drag gesture runs through.
+    private func park(_ camera: SCNNode, atElevationDegrees degrees: Float) {
+        let pose = CameraOrbit.pose(of: camera.simdPosition, about: orbitPivot)
+        place(camera, at: CameraOrbit.orbit(
+            pose, azimuthDelta: 0, elevationDelta: degrees * .pi / 180 - pose.elevation,
+            radiusScale: 1, radiusRange: Orbit.radiusRange))
+    }
+
     /// `-boundsProbe` diagnostics: flags the first position a die is seen
     /// outside the play volume (naming the face it crossed) and dumps rest
     /// positions at settle.
@@ -309,6 +325,7 @@ extension DiceTableController {
     /// fixed nodes.
     private enum NodeName {
         static let felt = "felt"
+        static let feltSurface = "feltSurface"
         static let keyLight = "keyLight"
         static let fillLight = "fillLight"
     }
@@ -359,33 +376,76 @@ extension DiceTableController {
         static let d20Radius: Float = 2
     }
 
+    /// Reflection translation (M12). SceneKit has a planar reflection of
+    /// its own — `SCNFloor` renders the scene mirrored into an offscreen
+    /// buffer and blends it over the material by `reflectivity` — but the
+    /// pass lives as long as the geometry does: at reflectivity 0 it logs
+    /// "Pass FloorPass is not linked to the rendering graph" every frame
+    /// (TD-4; re-measured on the iOS 27 simulator: 152 lines in 10 s at 0,
+    /// none at 0.5). So the dial picks the geometry — matte felt is the
+    /// thin box, reflective felt the floor. Falloff stays off: the
+    /// RealityKit mirror has no depth falloff, and one dial must read the
+    /// same on both engines.
+    private enum Reflection {
+        /// World units per `SCNFloor` texture repeat with no transform —
+        /// measured offscreen with a checker under an orthographic camera:
+        /// the floor's UVs aren't the mesh's (it's a unit quad the shader
+        /// stretches), they run one unit per 100 world units.
+        static let floorUVPeriod: Float = 100
+        /// One tile per `span` on either geometry, so a photo felt keeps
+        /// its tiling across the swap: the floor needs `period / span`,
+        /// the box's 0…1 face UVs need `feltSpan / span`. The floor's is
+        /// negative on both axes — its UVs run 180° to the box's top face
+        /// (captured: the same photo upright on the box, inverted on the
+        /// floor), and the box is what photo felt has looked like since M9d.
+        static var floorUVScale: Float { -floorUVPeriod / Bounds.span }
+        static var boxUVScale: Float { Bounds.feltSpan / Bounds.span }
+    }
+
+    private static func makeFeltMaterial() -> SCNMaterial {
+        let material = SCNMaterial()
+        material.roughness.contents = NSNumber(1) // matte felt
+        material.specular.contents = UIColor.black
+        material.diffuse.wrapS = .repeat
+        material.diffuse.wrapT = .repeat
+        material.diffuse.mipFilter = .linear
+        return material
+    }
+
+    /// Re-skins the felt — photo or color, and the reflection dial, which
+    /// swaps the surface geometry at zero (see `Reflection`). The one
+    /// material instance survives the swap, so every face of the box shares it.
+    private func applyFelt(_ felt: FeltAppearance) {
+        guard let surface = scene.rootNode.childNode(withName: NodeName.feltSurface, recursively: true) else { return }
+        let material = surface.geometry?.firstMaterial ?? Self.makeFeltMaterial()
+        let reflective = felt.reflectivity > 0
+        if surface.geometry == nil || reflective != (surface.geometry is SCNFloor) {
+            if reflective {
+                let floor = SCNFloor()
+                floor.materials = [material]
+                surface.geometry = floor
+                // The floor plane is its node's local y = 0, and the parent
+                // sits half a thickness under the contact plane.
+                surface.position.y = Bounds.thickness / 2
+            } else {
+                let box = SCNBox(width: CGFloat(Bounds.feltSpan), height: CGFloat(Bounds.thickness),
+                                 length: CGFloat(Bounds.feltSpan), chamferRadius: 0)
+                box.materials = Array(repeating: material, count: 6)
+                surface.geometry = box
+                surface.position.y = 0
+            }
+        }
+        (surface.geometry as? SCNFloor)?.reflectivity = CGFloat(felt.reflectivity)
+        material.diffuse.contents = (felt.usesImage ? UserImageStore.felt.load() : nil) ?? felt.color.uiColor
+        let uvScale = reflective ? Reflection.floorUVScale : Reflection.boxUVScale
+        material.diffuse.contentsTransform = SCNMatrix4MakeScale(uvScale, uvScale, 1)
+    }
+
     private func setUpTable() {
-        // A thin box, not SCNFloor: the floor's reflection pass (FloorPass)
-        // spams the log every frame even at reflectivity = 0 — the geometry
-        // alone opts into the pass. A box never creates it, and gives the
-        // felt a real UV-mapped surface for texture work. TD-4 discharged.
-        let feltMaterial = SCNMaterial()
-        let feltAppearance = theme.appearance.felt
-        feltMaterial.diffuse.contents =
-            (feltAppearance.usesImage ? UserImageStore.felt.load() : nil)
-            ?? feltAppearance.color.uiColor
-        feltMaterial.roughness.contents = NSNumber(1) // matte felt
-        feltMaterial.specular.contents = UIColor.black
-        // A photo felt tiles at its old density across the bigger box:
-        // repeat-wrap + a UV scale factor instead of stretching — inert
-        // when `diffuse.contents` is a plain color.
-        feltMaterial.diffuse.wrapS = .repeat
-        feltMaterial.diffuse.wrapT = .repeat
-        feltMaterial.diffuse.mipFilter = .linear
-        feltMaterial.diffuse.contentsTransform = SCNMatrix4MakeScale(
-            Bounds.feltSpan / Bounds.span, Bounds.feltSpan / Bounds.span, 1)
-        let felt = SCNBox(width: CGFloat(Bounds.feltSpan),
-                          height: CGFloat(Bounds.thickness),
-                          length: CGFloat(Bounds.feltSpan), chamferRadius: 0)
-        // One shared instance across the six face slots: mutating it later
-        // (applyAppearance) updates every face at once.
-        felt.materials = Array(repeating: feltMaterial, count: 6)
-        let floor = SCNNode(geometry: felt)
+        // The felt node is the physics anchor only — it carries no geometry.
+        // The visual surface is its child `feltSurface`, whose geometry
+        // `applyFelt` picks per the reflection dial (see `Reflection`).
+        let floor = SCNNode()
         floor.name = NodeName.felt
         // Same convention as the walls: center sits half a thickness below,
         // so the top face lands exactly on floorY — the contact plane the
@@ -398,7 +458,11 @@ extension DiceTableController {
             geometry: SCNBox(width: CGFloat(Bounds.span),
                              height: CGFloat(Bounds.thickness),
                              length: CGFloat(Bounds.span), chamferRadius: 0)))
+        let surface = SCNNode()
+        surface.name = NodeName.feltSurface
+        floor.addChildNode(surface)
         scene.rootNode.addChildNode(floor)
+        applyFelt(theme.appearance.felt)
 
         // Thin boxes, not the ancestors' oriented planes: an axis-aligned box
         // needs no orientation math at all — `reposition`'s arbitrary-normal
@@ -492,11 +556,7 @@ extension DiceTableController {
             geometry.materials = DieFaceTexture.materials(
                 for: geometry, shape: dieShape, appearance: appearance.die)
         }
-        if let floor = scene.rootNode.childNode(withName: NodeName.felt, recursively: false) {
-            floor.geometry?.firstMaterial?.diffuse.contents =
-                (appearance.felt.usesImage ? UserImageStore.felt.load() : nil)
-                ?? appearance.felt.color.uiColor
-        }
+        applyFelt(appearance.felt)
         applyLighting(appearance.lighting, in: scene.rootNode)
         applyLighting(appearance.lighting, in: previewScene.rootNode)
         applyBackdrop(appearance.backdrop)
