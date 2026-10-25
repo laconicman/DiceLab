@@ -45,12 +45,28 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.learnable.DiceLabTests
         GENERATE_INFOPLIST_FILE: YES
+  DiceLabUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DiceLabUITests
+        fileSystem: synchronized
+    dependencies:
+      - target: DiceLab
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.learnable.DiceLabUITests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: DiceLab
 schemes:
   DiceLab:
     build:
       targets:
         DiceLab: all
         DiceLabTests: [test]
+        DiceLabUITests:
+          - test
     test:
       targets:
         - DiceLabTests
+        - DiceLabUITests
