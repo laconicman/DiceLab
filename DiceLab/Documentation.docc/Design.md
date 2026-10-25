@@ -574,12 +574,7 @@ M11's ask was one sentence — the orbit must never dip under the felt — and a
 
 ## Felt reflection — one dial, two mirrors
 
-M12 adds `FeltAppearance.reflectivity` (0…1, default 0, lenient-decoded
-like every channel since M8): 0 is today's matte cloth, 1 a cloth with
-fully opaque mirror images of the dice on it. The presets stay at 0; the
-dial is a "Reflection" slider in the editor's Table section. As with
-pace × viscosity, the *model* is one number and each engine lands it on
-different hardware:
+M12 adds `FeltAppearance.reflectivity` (0…1, default 0, lenient-decoded like every channel since M8): 0 is today's matte cloth, 1 a cloth with fully opaque mirror images of the dice on it. The presets stay at 0; the dial is a "Reflection" slider in the editor's Table section. As with pace × viscosity, the *model* is one number and each engine lands it on different hardware:
 
 | | SceneKit | RealityKit |
 |---|---|---|
@@ -588,90 +583,13 @@ different hardware:
 | above 0 | `SCNFloor`, reflectivity = dial, no falloff | copies enabled, `blending = .transparent(opacity: dial)`; the felt is untouched |
 | at 1 | cloth with opaque reflected dice | cloth with opaque copies |
 
-Measured, not assumed: SceneKit's composite keeps the cloth — the felt
-away from the dice read the same at 0.3 and 0.8, and a dusk backdrop
-changed it by a few RGB points at most, so neither engine's mirror shows
-the environment; both show the dice.
+Measured, not assumed: SceneKit's composite keeps the cloth — the felt away from the dice read the same at 0.3 and 0.8, and a dusk backdrop changed it by a few RGB points at most, so neither engine's mirror shows the environment; both show the dice.
 
-- **SceneKit: the dial picks the geometry.** TD-4 had the felt become a
-  box because `SCNFloor` logged `Pass FloorPass is not linked to the
-  rendering graph` every frame at `reflectivity = 0`. Re-measured on the
-  iOS 27 simulator: 152 lines in 10 s at 0, *none* at 0.5 — the pass is
-  only unlinked while nothing consumes it. So the box stays the dial's
-  zero (no pass, no spam, no offscreen render for a matte felt) and the
-  floor is its positive range. The felt node is now a physics anchor
-  with no geometry; a child `feltSurface` carries the box or the floor,
-  and `applyFelt` swaps them at the boundary, keeping the one shared
-  `SCNMaterial`. Rejected: an `SCNFloor` always, with a tiny minimum
-  reflectivity to keep the pass linked — an offscreen scene render on
-  every frame for nothing, on every default user's table.
-- **`SCNFloor` UVs repeat every 100 world units.** The floor is an
-  11×11 unit quad (UV 0…1 across it) that the shader stretches, so its
-  mesh sources say nothing about tiling; measured offscreen instead —
-  `SCNRenderer`, orthographic camera spanning 120 units, a 10-square
-  checker: 12 squares across at `contentsTransform` identity, 20 at a
-  100/60 scale. One texture unit per 100 world units, in both ortho and
-  perspective. The box's face UVs run 0…1 across its 500 units, so its
-  `feltSpan / span` scale and the floor's `100 / span` are the same
-  density — a photo felt tiles identically on either geometry, which is
-  what "keep the UVs the box gave photo felt" turned out to mean. (The
-  first guess, "world units", put one photo across 6,000 units — the
-  capture caught it as a felt with no visible tiling at all.) The
-  floor's UVs also run 180° to the box's top face, so its scale is
-  negative on both axes; what remains across the zero crossing is a
-  phase offset — the box anchors its tiles at a face corner, the floor
-  at the world origin — a one-time shift of the pattern when the dial
-  leaves zero, accepted.
-- **Falloff stays off.** `reflectionFalloffStart/End` would fade
-  reflections with height above the floor; RealityKit's mirror has no
-  such depth, and one dial must read the same on both engines.
-- **RealityKit: copies, not sheen.** iOS RealityKit has no planar
-  reflection pass, so the choice was between an IBL-only sheen (felt
-  roughness from the dial — reflects the backdrop probe) and mirrored
-  dice drawn into the felt. Copies won: a sheen never reflects the
-  dice; from our mostly top-down camera a dielectric reflects ~4% at
-  normal incidence, so it would read as nothing; and with no backdrop
-  image there is no probe at all — the dial would do nothing on the
-  default theme. The copies are the oldest trick in real-time graphics
-  and show exactly what a floor mirror shows: the dice.
-- **The mirror is an improper transform.** `MirrorPose` (`Model/`,
-  unit-tested) gives the copy a `(1, −1, 1)` local scale, the die's
-  rotation conjugated by that mirror (x and z imaginary parts flipped),
-  and the position reflected across `floorY`; `R′·(M v) = M·(R v)` for
-  every vertex. Negative scale flips winding, and RealityKit does *not*
-  compensate: with default culling the copy renders inside-out — solid
-  looking, but its upward face shows the die's *top* value instead of
-  the opposite face (measured: 2/2 and 4/4 without `faceCulling =
-  .front`, 1/6 with it). Copies are synced from the dice every frame in
-  `update` — derived, never simulated.
-- **Copies are unlit.** A lit copy sits in its die's shadow and renders
-  black. `UnlitMaterial` with the dice's face textures and a 0.75 tint
-  stands in for "a reflection is dimmer than its object" — the tint
-  dims the source material's own tint, so a face whose texture failed
-  (its material tints the face color instead) still mirrors in color.
-  Glowing pips don't glow in the mirror — TD-13.
-- **Draw order beats depth: the copies paint over the felt.** A copy
-  sits *under* the felt, where depth testing hides it. The first cut
-  made the felt see-through (`opacity = 1 − dial`), and went through
-  two failures: with the dome showing through, the table went 80%
-  black at 0.8 where SceneKit's stayed green; with an opaque lit twin
-  of the felt under the copies, the twin received the dice's shadow
-  23 cm below the surface — through the cloth that read as a shadow
-  floating under a solid mirror (RealityKit has no per-entity
-  *receive* flag; `DynamicLightShadowComponent` is cast-only). The
-  mechanism that works keeps the felt opaque and untouched: felt and
-  copies share a `ModelSortGroup(depthPass: .postPass)`, which draws
-  its members' color in `order` and their depth afterwards — so the
-  copies, ordered after the felt, paint on top of it at `opacity =
-  dial`, and `copy × dial + felt × (1 − dial)` is exactly SceneKit's
-  composite. The dice stay out of the group, so normal depth testing
-  still lets a die hide the copy under it (measured top-down: no ghost
-  over the die). One surface, one shadow, nothing floating. Copies
-  cast no shadows — under the felt there is nothing for one to land on.
-- **A straight-down camera sees no reflection.** The mirror image of a
-  resting die lies directly under it; both the home pose and the fit
-  look straight down, so the dial reads only once the user orbits —
-  which is what free orbiting is for. The `-orbit <deg>` dev flag parks
-  the camera at an elevation every time the fit latches, because
-  `simctl` has no finger: it is the reflection's measuring stick the way
-  `-cameraLog` is the floor's.
+- **SceneKit: the dial picks the geometry.** TD-4 had the felt become a box because `SCNFloor` logged `Pass FloorPass is not linked to the rendering graph` every frame at `reflectivity = 0`. Re-measured on the iOS 27 simulator: 152 lines in 10 s at 0, *none* at 0.5 — the pass is only unlinked while nothing consumes it. So the box stays the dial's zero (no pass, no spam, no offscreen render for a matte felt) and the floor is its positive range. The felt node is now a physics anchor with no geometry; a child `feltSurface` carries the box or the floor, and `applyFelt` swaps them at the boundary, keeping the one shared `SCNMaterial`. Rejected: an `SCNFloor` always, with a tiny minimum reflectivity to keep the pass linked — an offscreen scene render on every frame for nothing, on every default user's table.
+- **`SCNFloor` UVs repeat every 100 world units.** The floor is an 11×11 unit quad (UV 0…1 across it) that the shader stretches, so its mesh sources say nothing about tiling; measured offscreen instead — `SCNRenderer`, orthographic camera spanning 120 units, a 10-square checker: 12 squares across at `contentsTransform` identity, 20 at a 100/60 scale. One texture unit per 100 world units, in both ortho and perspective. The box's face UVs run 0…1 across its 500 units, so its `feltSpan / span` scale and the floor's `100 / span` are the same density — a photo felt tiles identically on either geometry, which is what "keep the UVs the box gave photo felt" turned out to mean. (The first guess, "world units", put one photo across 6,000 units — the capture caught it as a felt with no visible tiling at all.) The floor's UVs also run 180° to the box's top face, so its scale is negative on both axes; what remains across the zero crossing is a phase offset — the box anchors its tiles at a face corner, the floor at the world origin — a one-time shift of the pattern when the dial leaves zero, accepted.
+- **Falloff stays off.** `reflectionFalloffStart/End` would fade reflections with height above the floor; RealityKit's mirror has no such depth, and one dial must read the same on both engines.
+- **RealityKit: copies, not sheen.** iOS RealityKit has no planar reflection pass, so the choice was between an IBL-only sheen (felt roughness from the dial — reflects the backdrop probe) and mirrored dice drawn into the felt. Copies won: a sheen never reflects the dice; from our mostly top-down camera a dielectric reflects ~4% at normal incidence, so it would read as nothing; and with no backdrop image there is no probe at all — the dial would do nothing on the default theme. The copies are the oldest trick in real-time graphics and show exactly what a floor mirror shows: the dice.
+- **The mirror is an improper transform.** `MirrorPose` (`Model/`, unit-tested) gives the copy a `(1, −1, 1)` local scale, the die's rotation conjugated by that mirror (x and z imaginary parts flipped), and the position reflected across `floorY`; `R′·(M v) = M·(R v)` for every vertex. Negative scale flips winding, and RealityKit does *not* compensate: with default culling the copy renders inside-out — solid looking, but its upward face shows the die's *top* value instead of the opposite face (measured: 2/2 and 4/4 without `faceCulling = .front`, 1/6 with it). Copies are synced from the dice every frame in `update` — derived, never simulated.
+- **Copies are unlit.** A lit copy sits in its die's shadow and renders black. `UnlitMaterial` with the dice's face textures and a 0.75 tint stands in for "a reflection is dimmer than its object" — the tint dims the source material's own tint, so a face whose texture failed (its material tints the face color instead) still mirrors in color. Glowing pips don't glow in the mirror — TD-13.
+- **Draw order beats depth: the copies paint over the felt.** A copy sits *under* the felt, where depth testing hides it. The first cut made the felt see-through (`opacity = 1 − dial`), and went through two failures: with the dome showing through, the table went 80% black at 0.8 where SceneKit's stayed green; with an opaque lit twin of the felt under the copies, the twin received the dice's shadow 23 cm below the surface — through the cloth that read as a shadow floating under a solid mirror (RealityKit has no per-entity *receive* flag; `DynamicLightShadowComponent` is cast-only). The mechanism that works keeps the felt opaque and untouched: felt and copies share a `ModelSortGroup(depthPass: .postPass)`, which draws its members' color in `order` and their depth afterwards — so the copies, ordered after the felt, paint on top of it at `opacity = dial`, and `copy × dial + felt × (1 − dial)` is exactly SceneKit's composite. The dice stay out of the group, so normal depth testing still lets a die hide the copy under it (measured top-down: no ghost over the die). One surface, one shadow, nothing floating. Copies cast no shadows — under the felt there is nothing for one to land on.
+- **A straight-down camera sees no reflection.** The mirror image of a resting die lies directly under it; both the home pose and the fit look straight down, so the dial reads only once the user orbits — which is what free orbiting is for. The `-orbit <deg>` dev flag parks the camera at an elevation every time the fit latches, because `simctl` has no finger: it is the reflection's measuring stick the way `-cameraLog` is the floor's.
