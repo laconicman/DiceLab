@@ -118,20 +118,26 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
 
 - **M11 — Camera floor.** The orbit can't dip under the felt: one shared `CameraOrbit.floorDegrees` (10°). Both engines drop their stock camera controls — `.allowsCameraControl` on SceneKit, `realityViewCameraControls(.orbit)` on RealityKit — for a shared `DragGesture`/`MagnifyGesture` driving `CameraOrbit.Pose` (azimuth / elevation / radius about the fitted cluster center), engine-free and unit-tested. Discharges TD-10, discharges TD-12. (PRs #42, #43; device check #44)
 
+- **M12 — Felt reflection.** One dial, `Appearance.felt.reflectivity`
+  (0…1, lenient-decoded like the other channels; a "Reflection" slider
+  in the editor's Table section), translated per engine. SceneKit: the
+  dial picks the geometry — `SCNFloor` with `reflectivity` above zero,
+  the thin box at zero — because TD-4's FloorPass spam turned out to be
+  a *zero* problem: re-measured at 152 lines per 10 s at
+  `reflectivity = 0`, silent at 0.5. `SCNFloor` UVs repeat every 100
+  world units (measured offscreen), so a photo felt tiles at the box's
+  density on either geometry. RealityKit
+  has no planar reflection: unlit mirrored copies of the dice under a
+  see-through felt (`MirrorPose` in `Model/`, unit-tested; copies cull
+  front faces because the mirror scale flips winding), IBL sheen
+  rejected. `-orbit <deg>` dev flag parks the camera obliquely — a
+  straight-down camera hides a floor reflection under the die that casts
+  it. Records TD-13.
+
 ## Next
 
-Planned — one session each, in this order (reflection before glass, so
-translucent dice are mirrored by a finished floor):
+Planned — one session each:
 
-- **Felt reflection.** The felt is a thin box *because* `SCNFloor`'s
-  reflection pass spammed the console at `reflectivity = 0` (TD-4); a
-  mirror finish puts that pass to work. SceneKit: `SCNFloor` with
-  `reflectivity` + `reflectionFalloffStart/End` (check the FloorPass log
-  goes quiet once the pass is used, and keep the UVs photo felt got from
-  the box). RealityKit has no planar reflection on iOS: mirrored dice
-  clones under a semi-transparent felt, or an IBL-only sheen that
-  reflects the backdrop but not the dice. The dial belongs to
-  `Appearance.felt`, translated per engine like roughness/metalness.
 - **Glass dice.** Translucent bodies, opaque ink, visible back faces,
   refraction. Model: a translucency dial on `Appearance` (lenient-decoded
   like the others) with an `AppearanceEditor` control. SceneKit:
