@@ -583,9 +583,9 @@ different hardware:
 
 | | SceneKit | RealityKit |
 |---|---|---|
-| mechanism | `SCNFloor.reflectivity` — the engine renders the scene mirrored and composites it *over* the cloth | unlit mirrored copies of the dice under a see-through felt, over an opaque lit twin of the felt |
-| at 0 | thin `SCNBox` (no pass exists) | opaque PBR felt, copies disabled |
-| above 0 | `SCNFloor`, reflectivity = dial, no falloff | felt `blending = .transparent(opacity: 1 − dial)`, copies enabled; where no copy is, the twin shows through — the cloth never darkens |
+| mechanism | `SCNFloor.reflectivity` — the engine renders the scene mirrored and composites it *over* the cloth | unlit mirrored copies of the dice drawn *over* the opaque felt at alpha = dial, through a post-pass `ModelSortGroup` |
+| at 0 | thin `SCNBox` (no pass exists) | the same opaque PBR felt, copies disabled |
+| above 0 | `SCNFloor`, reflectivity = dial, no falloff | copies enabled, `blending = .transparent(opacity: dial)`; the felt is untouched |
 | at 1 | cloth with opaque reflected dice | cloth with opaque copies |
 
 Measured, not assumed: SceneKit's composite keeps the cloth — the felt
@@ -628,7 +628,7 @@ the environment; both show the dice.
 - **RealityKit: copies, not sheen.** iOS RealityKit has no planar
   reflection pass, so the choice was between an IBL-only sheen (felt
   roughness from the dial — reflects the backdrop probe) and mirrored
-  dice under a transparent felt. Copies won: a sheen never reflects the
+  dice drawn into the felt. Copies won: a sheen never reflects the
   dice; from our mostly top-down camera a dielectric reflects ~4% at
   normal incidence, so it would read as nothing; and with no backdrop
   image there is no probe at all — the dial would do nothing on the
@@ -644,23 +644,30 @@ the environment; both show the dice.
   the opposite face (measured: 2/2 and 4/4 without `faceCulling =
   .front`, 1/6 with it). Copies are synced from the dice every frame in
   `update` — derived, never simulated.
-- **Copies are unlit.** Shadow maps don't know about transparency: a
-  lit copy sits in its die's shadow and renders black. `UnlitMaterial`
-  with the dice's face textures and a 0.75 tint stands in for "a
-  reflection is dimmer than its object." The felt itself still receives
-  the dice's shadows at `.transparent` (measured). Glowing pips don't
-  glow in the mirror — TD-13.
-- **The cloth never darkens.** The first cut let the dome show through
-  the see-through felt: at 0.8 the table went 80% black, where
-  SceneKit's stayed green. So under the copies lies an opaque twin of
-  the felt — a plane with the same material, lit like the felt because
-  the felt no longer casts shadows (`DynamicLightShadowComponent`;
-  nothing it could shadow is ever visible, and its shadow would have
-  blacked the twin out). Copies cast none either: a copy's shadow would
-  land on the twin as a dark blob, where a real mirror's shadow lies on
-  the plane the die already shades. Where no copy is, felt over
-  identical felt is just felt, at any dial value — the same composite
-  SceneKit's floor performs.
+- **Copies are unlit.** A lit copy sits in its die's shadow and renders
+  black. `UnlitMaterial` with the dice's face textures and a 0.75 tint
+  stands in for "a reflection is dimmer than its object" — the tint
+  dims the source material's own tint, so a face whose texture failed
+  (its material tints the face color instead) still mirrors in color.
+  Glowing pips don't glow in the mirror — TD-13.
+- **Draw order beats depth: the copies paint over the felt.** A copy
+  sits *under* the felt, where depth testing hides it. The first cut
+  made the felt see-through (`opacity = 1 − dial`), and went through
+  two failures: with the dome showing through, the table went 80%
+  black at 0.8 where SceneKit's stayed green; with an opaque lit twin
+  of the felt under the copies, the twin received the dice's shadow
+  23 cm below the surface — through the cloth that read as a shadow
+  floating under a solid mirror (RealityKit has no per-entity
+  *receive* flag; `DynamicLightShadowComponent` is cast-only). The
+  mechanism that works keeps the felt opaque and untouched: felt and
+  copies share a `ModelSortGroup(depthPass: .postPass)`, which draws
+  its members' color in `order` and their depth afterwards — so the
+  copies, ordered after the felt, paint on top of it at `opacity =
+  dial`, and `copy × dial + felt × (1 − dial)` is exactly SceneKit's
+  composite. The dice stay out of the group, so normal depth testing
+  still lets a die hide the copy under it (measured top-down: no ghost
+  over the die). One surface, one shadow, nothing floating. Copies
+  cast no shadows — under the felt there is nothing for one to land on.
 - **A straight-down camera sees no reflection.** The mirror image of a
   resting die lies directly under it; both the home pose and the fit
   look straight down, so the dial reads only once the user orbits —

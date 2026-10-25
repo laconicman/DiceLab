@@ -127,8 +127,9 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   `reflectivity = 0`, silent at 0.5. `SCNFloor` UVs repeat every 100
   world units (measured offscreen), so a photo felt tiles at the box's
   density on either geometry. RealityKit
-  has no planar reflection: unlit mirrored copies of the dice under a
-  see-through felt (`MirrorPose` in `Model/`, unit-tested; copies cull
+  has no planar reflection: unlit mirrored copies of the dice drawn
+  over the opaque felt at the dial's alpha through a post-pass
+  `ModelSortGroup` (`MirrorPose` in `Model/`, unit-tested; copies cull
   front faces because the mirror scale flips winding), IBL sheen
   rejected. `-orbit <deg>` dev flag parks the camera obliquely — a
   straight-down camera hides a floor reflection under the die that casts

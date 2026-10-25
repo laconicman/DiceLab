@@ -255,7 +255,6 @@ extension RealityTableController {
     /// five fixed entities.
     private enum EntityName {
         static let felt = "felt"
-        static let feltBacking = "feltBacking"
         static let keyLight = "keyLight"
         static let fillLight = "fillLight"
         static let backdropDome = "backdropDome"
@@ -390,37 +389,21 @@ extension RealityTableController {
         // infinite plane has no direct RK analog; a box is honest geometry.
         // The mesh overshoots the dome's radius so the rim is always hidden
         // behind it; the collision shape stays table-sized.
-        let skin = Self.feltSkin(for: theme.appearance.felt)
         let felt = Entity()
         felt.name = EntityName.felt
         let feltShape = ShapeResource.generateBox(
             size: [Bounds.span, Bounds.thickness, Bounds.span])
         felt.components.set(ModelComponent(
             mesh: .generateBox(size: [Bounds.feltSpan, Bounds.thickness, Bounds.feltSpan]),
-            materials: [Self.feltMaterial(skin: skin,
-                                        reflectivity: theme.appearance.felt.reflectivity)]))
-        // The felt's shadow would fall on the backing and black it out;
-        // nothing the felt could shadow is ever visible.
-        felt.components.set(DynamicLightShadowComponent(castsShadow: false))
+            materials: [Self.feltMaterial(for: theme.appearance.felt)]))
+        felt.components.set(ModelSortGroupComponent(
+            group: Self.mirrorSortGroup, order: Mirror.feltOrder))
         felt.components.set(CollisionComponent(shapes: [feltShape]))
         felt.components.set(PhysicsBodyComponent(
             shapes: [feltShape], density: 1,
             material: Self.tableMaterial, mode: .static))
         felt.position = [0, Bounds.floorY - Bounds.thickness / 2, 0]
         root.addChild(felt)
-
-        // Under the mirror copies, an opaque twin of the felt (M12): what
-        // the see-through felt reveals where no copy is must be the felt
-        // again — SceneKit's floor composites its reflection *over* the
-        // cloth and never removes it. A plane, not a box: nothing below it
-        // is ever seen. Lit like the felt because the felt casts no shadow.
-        let backing = Entity()
-        backing.name = EntityName.feltBacking
-        backing.components.set(ModelComponent(
-            mesh: .generatePlane(width: Bounds.feltSpan, depth: Bounds.feltSpan),
-            materials: [Self.feltMaterial(skin: skin, reflectivity: 0)]))
-        backing.position = [0, Mirror.backingY, 0]
-        root.addChild(backing)
 
         // Walls + ceiling: collision-only entities — no ModelComponent, so
         // nothing renders. That's the ECS version of `isHidden`: physics is
@@ -516,7 +499,8 @@ extension RealityTableController {
     func spawnDice(_ count: Int) {
         let faceMaterials = Self.materials(shape: dieShape,
                                            appearance: theme.appearance.die)
-        let mirrorMaterials = Self.mirrorMaterials(of: faceMaterials)
+        let mirrorMaterials = Self.mirrorMaterials(
+            of: faceMaterials, reflectivity: theme.appearance.felt.reflectivity)
         for position in Self.spawnPositions(count: count, shape: dieShape) {
             let die = Self.makeDie(at: position, shape: dieShape,
                                    appearance: theme.appearance.die)
@@ -524,10 +508,12 @@ extension RealityTableController {
             root.addChild(die)
             let mirror = ModelEntity(mesh: Self.dieMesh(for: dieShape),
                                      materials: mirrorMaterials)
-            // A copy's shadow would land on the backing as a dark blob
-            // under each copy; a real mirror's shadow lies on the plane
-            // itself, already drawn by the die.
+            // Under the felt there is nothing a copy's shadow could land on
+            // — the die already draws the one shadow a mirror shows — so
+            // the shadow map needn't carry the copies at all.
             mirror.components.set(DynamicLightShadowComponent(castsShadow: false))
+            mirror.components.set(ModelSortGroupComponent(
+                group: Self.mirrorSortGroup, order: Mirror.copyOrder))
             // Posed at birth, not on the first update tick — an identity
             // transform would stand a third die on the origin for a frame.
             mirror.transform = Self.mirrorTransform(for: die)
@@ -549,20 +535,15 @@ extension RealityTableController {
         previewDie?.components[ModelComponent.self]?.materials = materials
         // The mirrors wear unlit twins of the same skins — and the dial
         // toggles whether they draw at all.
-        let mirrorMaterials = Self.mirrorMaterials(of: materials)
+        let mirrorMaterials = Self.mirrorMaterials(
+            of: materials, reflectivity: appearance.felt.reflectivity)
         for mirror in mirrors {
             mirror.components[ModelComponent.self]?.materials = mirrorMaterials
             mirror.isEnabled = appearance.felt.reflectivity > 0
         }
-        let skin = Self.feltSkin(for: appearance.felt)
         if let felt = root.findEntity(named: EntityName.felt) {
             felt.components[ModelComponent.self]?.materials =
-                [Self.feltMaterial(skin: skin,
-                                   reflectivity: appearance.felt.reflectivity)]
-        }
-        if let backing = root.findEntity(named: EntityName.feltBacking) {
-            backing.components[ModelComponent.self]?.materials =
-                [Self.feltMaterial(skin: skin, reflectivity: 0)]
+                [Self.feltMaterial(for: appearance.felt)]
         }
         applyLighting(appearance.lighting, in: root)
         applyLighting(appearance.lighting, in: previewRoot)
@@ -642,41 +623,22 @@ extension RealityTableController {
         }
     }
 
-    /// The felt's diffuse as any material takes it — the photo, tiled at
-    /// the old density across the oversized mesh, or the flat color.
-    /// `usesImage` without a loadable file falls back to the flat color
-    /// rather than a broken texture.
-    private static func feltSkin(for felt: FeltAppearance)
-        -> (color: PhysicallyBasedMaterial.BaseColor, uvScale: SIMD2<Float>?) {
+    /// Color felt or the user's photo — `usesImage` without a loadable file
+    /// falls back to the flat color rather than a broken texture.
+    private static func feltMaterial(for felt: FeltAppearance) -> PhysicallyBasedMaterial {
+        var material = PhysicallyBasedMaterial()
         if felt.usesImage, let cgImage = UserImageStore.felt.load()?.cgImage,
-           let texture = try? TextureResource(image: cgImage, options: .init(semantic: .color)) {
+           let texture = try? TextureResource(
+               image: cgImage, options: .init(semantic: .color)) {
+            material.baseColor = .init(tint: .white, texture: .init(texture))
             // The felt mesh outspans the photo — a UV transform tiles it at
             // the old density instead of stretching it once across.
-            return (.init(tint: .white, texture: .init(texture)),
-                    SIMD2<Float>(repeating: Bounds.feltSpan / Bounds.span))
-        }
-        return (.init(tint: felt.color.uiColor), nil)
-    }
-
-    /// One felt material from the shared skin — the see-through felt takes
-    /// the dial's transparency, the opaque backing below it takes 0.
-    private static func feltMaterial(skin: (color: PhysicallyBasedMaterial.BaseColor,
-                                            uvScale: SIMD2<Float>?),
-                                     reflectivity: Double) -> PhysicallyBasedMaterial {
-        var material = PhysicallyBasedMaterial()
-        material.baseColor = skin.color
-        if let uvScale = skin.uvScale {
-            material.textureCoordinateTransform.scale = uvScale
+            material.textureCoordinateTransform.scale =
+                SIMD2<Float>(repeating: Bounds.feltSpan / Bounds.span)
+        } else {
+            material.baseColor = .init(tint: felt.color.uiColor)
         }
         material.roughness = 1.0
-        // The dial's transparency: opaque at 0, so the matte felt pays no
-        // blend pass; at 1 this layer is gone and the copies sit on the
-        // opaque twin below — cloth with opaque reflections, the same end
-        // state as SceneKit's floor at reflectivity 1.
-        if reflectivity > 0 {
-            material.blending = .transparent(
-                opacity: .init(floatLiteral: Float(1 - reflectivity)))
-        }
         return material
     }
 
@@ -835,14 +797,15 @@ extension RealityTableController {
 
     /// Reflection translation (M12). iOS RealityKit has no planar
     /// reflection pass, so the felt's mirror is the oldest trick in
-    /// real-time graphics: a mirrored copy of each die under a
-    /// see-through felt — the dial is how see-through. Copies are *unlit*
-    /// because shadow maps don't know about transparency: a lit copy sits
-    /// in its own die's shadow and renders black. Under the copies lies an
-    /// opaque twin of the felt, so what shows through where no copy is, is
-    /// the cloth again — SceneKit's floor composites its reflection over
-    /// the cloth and never removes it, and the first cut (dome showing
-    /// through) went 80% black at 0.8. Rejected: an IBL-only sheen
+    /// real-time graphics: a mirrored copy of each die drawn *over* the
+    /// opaque felt — the copies carry the dial as their alpha, so the
+    /// composite is `copy × dial + felt × (1 − dial)` where a copy is and
+    /// untouched felt elsewhere, the same composite SceneKit's floor
+    /// performs. Copies are *unlit* because a lit copy sits in its own
+    /// die's shadow and renders black. Rejected: a see-through felt over
+    /// an opaque twin — the twin still receives the dice's shadow 23 cm
+    /// under the surface, and through the cloth that reads as a shadow
+    /// floating under a solid mirror. Rejected: an IBL-only sheen
     /// (roughness from the dial) — it never reflects the dice, reads as a
     /// dielectric's 4% from our mostly top-down camera, and without a
     /// backdrop image there is no probe to reflect at all.
@@ -851,29 +814,54 @@ extension RealityTableController {
         /// its object, and the key light's shaded faces average well under
         /// white.
         static let tint: CGFloat = 0.75
-        /// The backing sits under the deepest copy a die can cast — the
-        /// mirrored ceiling, less a die — inside the felt box's thickness.
-        static var backingY: Float { Bounds.floorY - (Bounds.ceilingY - Bounds.floorY) - Bounds.dieEdge }
+        /// The felt paints first inside the sort group, every copy over it.
+        static let feltOrder: Int32 = 0
+        static let copyOrder: Int32 = 1
     }
 
-    /// Unlit twins of the face materials, culled *front*: `MirrorPose.scale`
-    /// flips the winding, and with default culling the copy renders
-    /// inside-out — solid-looking, only the pip values give it away
-    /// (measured: the copy showed its die's top value instead of the
-    /// opposite face). Takes the dice's materials rather than rebuilding
-    /// them — the unlit copies reuse the same `TextureResource`s, so a
-    /// slider tick's `applyAppearance` doesn't mint six textures again.
-    static func mirrorMaterials(of materials: [any RealityKit.Material]) -> [any RealityKit.Material] {
+    /// The copies' draw order (M12): a `.postPass` group draws its members'
+    /// color in `order`, depth afterwards — so draw order beats depth among
+    /// them, and a copy that physically sits under the felt paints on top of
+    /// it. Nothing else joins the group: the dice keep normal depth testing
+    /// against it, so a die still hides the copy under it.
+    static let mirrorSortGroup = ModelSortGroup(depthPass: .postPass)
+
+    /// Unlit twins of the face materials at the dial's alpha, culled
+    /// *front*: `MirrorPose.scale` flips the winding, and with default
+    /// culling the copy renders inside-out — solid-looking, only the pip
+    /// values give it away (measured: the copy showed its die's top value
+    /// instead of the opposite face). Takes the dice's materials rather
+    /// than rebuilding them — the unlit copies reuse the same
+    /// `TextureResource`s, so a slider tick's `applyAppearance` doesn't
+    /// mint six textures again. The tint carries the source material's own
+    /// color dimmed: when a face has no texture its material tints the
+    /// face color, and the copy must show that color at `tint`, not gray.
+    static func mirrorMaterials(of materials: [any RealityKit.Material],
+                                reflectivity: Double) -> [any RealityKit.Material] {
         materials.map { material in
+            let base = material as? PhysicallyBasedMaterial
             var unlit = UnlitMaterial()
-            unlit.color = .init(tint: UIColor(white: Mirror.tint, alpha: 1),
-                                texture: (material as? PhysicallyBasedMaterial)?.baseColor.texture)
+            unlit.color = .init(tint: Self.dimmed(base?.baseColor.tint),
+                                texture: base?.baseColor.texture)
+            unlit.blending = .transparent(
+                opacity: .init(floatLiteral: Float(reflectivity)))
             unlit.faceCulling = .front
             return unlit
         }
     }
 
-    /// The copy's pose for a die's current one.
+    /// `color` × `Mirror.tint` per channel — `.white` converts to the flat
+    /// gray the copies always wore, a tinted face color dims proportionally.
+    private static func dimmed(_ color: UIColor?) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        (color ?? .white).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return UIColor(red: r * Mirror.tint, green: g * Mirror.tint,
+                       blue: b * Mirror.tint, alpha: a)
+    }
+
+    /// Scale, conjugated rotation and reflected position together — the
+    /// reflected position alone would show an unmirrored die, pips on the
+    /// wrong faces.
     static func mirrorTransform(for die: Entity) -> Transform {
         Transform(scale: MirrorPose.scale,
                   rotation: MirrorPose.orientation(die.orientation),
