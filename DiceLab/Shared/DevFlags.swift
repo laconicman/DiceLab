@@ -69,4 +69,17 @@ enum DevFlags {
         else { return nil }
         return Double(arguments[index + 1])
     }()
+
+    /// `-orbit 30` — park the camera at this elevation (degrees, clamped
+    /// to the orbit band) about the fitted cluster every time the fit
+    /// latches. A straight-down camera hides a floor reflection under the
+    /// die that casts it, so reflection captures need the oblique view a
+    /// finger would give — and `simctl` has no finger.
+    static let orbitElevation: Double? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-orbit"),
+              index + 1 < arguments.count
+        else { return nil }
+        return Double(arguments[index + 1])
+    }()
 }

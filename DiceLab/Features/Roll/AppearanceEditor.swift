@@ -108,6 +108,7 @@ struct AppearanceEditor<Table: DiceTable>: View {
                                 appearance.wrappedValue = next
                             }
                         }
+                        sliderRow("Reflection", appearance.felt.reflectivity)
                         Picker("Lighting", selection: appearance.lighting) {
                             ForEach(LightingPreset.allCases, id: \.self) {
                                 Text($0.title).tag($0)
