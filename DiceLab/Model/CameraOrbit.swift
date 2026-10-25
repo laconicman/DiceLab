@@ -8,7 +8,7 @@ import simd
 /// survived device verification: SceneKit's `SCNCameraController` limits
 /// are bypassed by SwiftUI `SceneView`'s real-finger gesture path, and
 /// RealityKit's `.orbit` has no limit and keeps a hidden angle any clamp
-/// fights (both measured on PavP).
+/// fights (SceneKit measured on PavP, RealityKit in the simulator spike).
 enum CameraOrbit {
     /// Lowest elevation above the pivot's horizontal plane the orbit may
     /// reach, in degrees — the felt is never seen from below.
