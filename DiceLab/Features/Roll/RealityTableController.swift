@@ -85,6 +85,10 @@ final class RealityTableController: DiceTable {
     /// Internal so the `+Scene` extension can populate it during construction.
     var dice: [ModelEntity] = []
 
+    /// The dice's mirror images under the felt (M12) — one per die, enabled
+    /// only while the felt reflects, synced to their dice every frame.
+    var mirrors: [ModelEntity] = []
+
     /// Event subscriptions returned by `RealityViewContent.subscribe` —
     /// dropping them would unsubscribe, so they're retained here for the
     /// controller's lifetime.
@@ -273,6 +277,8 @@ final class RealityTableController: DiceTable {
     private func respawnDice() {
         for die in dice { die.removeFromParent() }
         dice = []
+        for mirror in mirrors { mirror.removeFromParent() }
+        mirrors = []
         rollID += 1 // a settle queued for the old dice must not publish
         isRolling = false
         lastRoll = nil
@@ -344,6 +350,7 @@ final class RealityTableController: DiceTable {
         // Outside the settle gate on purpose: the fit keeps easing after
         // the flag clears — that's what "stays fitted" means.
         updateCameraFit(dt: dt)
+        syncMirrors()
         probeBounds()
         // The floor's evidence: elevation about `orbitPivot` — the pivot
         // the gesture actually orbits, which is the dice cluster once the

@@ -127,20 +127,29 @@ struct FeltAppearance: Codable, Equatable, Hashable {
     /// re-materialing on equal values — same `usesImage` with a *new* file
     /// must still differ, or a replaced photo would never reach the felt.
     var revision = 0
+    /// How much of a mirror the felt is, 0…1: 0 is matte cloth (the
+    /// presets), 1 a full mirror with the cloth color gone. One number
+    /// both engines translate — SceneKit into `SCNFloor.reflectivity`,
+    /// RealityKit into felt opacity over mirrored dice (see Design.md,
+    /// "Felt reflection").
+    var reflectivity = 0.0
 
-    init(color: CodableColor, usesImage: Bool = false, revision: Int = 0) {
+    init(color: CodableColor, usesImage: Bool = false, revision: Int = 0,
+         reflectivity: Double = 0) {
         self.color = color
         self.usesImage = usesImage
         self.revision = revision
+        self.reflectivity = reflectivity
     }
 
-    /// `revision`/`usesImage` decode leniently — payloads written before a
-    /// field existed shouldn't bounce a stored theme back to the default.
+    /// Everything but `color` decodes leniently — payloads written before
+    /// a field existed shouldn't bounce a stored theme back to the default.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         color = try container.decode(CodableColor.self, forKey: .color)
         usesImage = try container.decodeIfPresent(Bool.self, forKey: .usesImage) ?? false
         revision = try container.decodeIfPresent(Int.self, forKey: .revision) ?? 0
+        reflectivity = try container.decodeIfPresent(Double.self, forKey: .reflectivity) ?? 0
     }
 }
 

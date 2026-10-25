@@ -20,7 +20,7 @@ struct AppearanceTests {
                                pipColor: CodableColor(red: 1, green: 0.9, blue: 0.1),
                                roughness: 0.8, metalness: 0.4, clearcoat: 0.6),
             felt: FeltAppearance(color: CodableColor(red: 0.1, green: 0.1, blue: 0.4),
-                                 usesImage: true),
+                                 usesImage: true, reflectivity: 0.4),
             lighting: .dramatic)
         let theme = Theme.custom(custom)
 
@@ -72,8 +72,9 @@ struct AppearanceTests {
 
     /// Payloads written before `revision` existed must still decode — a
     /// stored custom theme that bounced to default would silently lose the
-    /// user's look on upgrade. M9d added `emission` and `backdrop`; the same
-    /// M8-era payload must still decode, with the new channels defaulted.
+    /// user's look on upgrade. M9d added `emission` and `backdrop`, M12 the
+    /// felt's `reflectivity`; the same M8-era payload must still decode,
+    /// with the new channels defaulted.
     @Test("felt payloads without revision still decode")
     func legacyFeltPayload() throws {
         let json = #"{"custom":{"_0":{"die":{"faceColor":{"red":1,"green":1,"blue":1,"alpha":1},"pipColor":{"red":0,"green":0,"blue":0,"alpha":1},"roughness":0.35,"metalness":0,"clearcoat":0},"felt":{"color":{"red":0.05,"green":0.3,"blue":0.15,"alpha":1},"usesImage":true},"lighting":"studio"}}}"#
@@ -85,6 +86,7 @@ struct AppearanceTests {
         #expect(appearance.felt.usesImage && appearance.felt.revision == 0)
         // Fields that didn't exist when the payload was written land on
         // their defaults, not on a decode failure.
+        #expect(appearance.felt.reflectivity == 0)
         #expect(appearance.die.emission == EmissionAppearance())
         #expect(appearance.backdrop == BackdropAppearance())
     }

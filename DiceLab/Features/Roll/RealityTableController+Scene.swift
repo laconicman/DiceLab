@@ -119,6 +119,9 @@ extension RealityTableController {
             camera.orientation = cameraHomeOrientation
             orbitPivot = box.center
             fitConverged = true
+            if let degrees = DevFlags.orbitElevation {
+                park(camera, atElevationDegrees: Float(degrees))
+            }
             return
         }
         camera.position = CameraFit.damp(
@@ -192,6 +195,15 @@ extension RealityTableController {
         guard position.x.isFinite, position.y.isFinite,
               position.z.isFinite else { return }
         camera.look(at: orbitPivot, from: position, relativeTo: nil)
+    }
+
+    /// `-orbit` park: re-aim the converged camera at `degrees` elevation
+    /// about the current pivot — same math the drag gesture runs through.
+    private func park(_ camera: Entity, atElevationDegrees degrees: Float) {
+        let pose = CameraOrbit.pose(of: camera.position, about: orbitPivot)
+        place(camera, at: CameraOrbit.orbit(
+            pose, azimuthDelta: 0, elevationDelta: degrees * .pi / 180 - pose.elevation,
+            radiusScale: 1, radiusRange: Orbit.radiusRange))
     }
 
     private func setUpCamera() {
@@ -384,6 +396,8 @@ extension RealityTableController {
         felt.components.set(ModelComponent(
             mesh: .generateBox(size: [Bounds.feltSpan, Bounds.thickness, Bounds.feltSpan]),
             materials: [Self.feltMaterial(for: theme.appearance.felt)]))
+        felt.components.set(ModelSortGroupComponent(
+            group: Self.mirrorSortGroup, order: Mirror.feltOrder))
         felt.components.set(CollisionComponent(shapes: [feltShape]))
         felt.components.set(PhysicsBodyComponent(
             shapes: [feltShape], density: 1,
@@ -483,11 +497,29 @@ extension RealityTableController {
     }
 
     func spawnDice(_ count: Int) {
+        let faceMaterials = Self.materials(shape: dieShape,
+                                           appearance: theme.appearance.die)
+        let mirrorMaterials = Self.mirrorMaterials(
+            of: faceMaterials, reflectivity: theme.appearance.felt.reflectivity)
         for position in Self.spawnPositions(count: count, shape: dieShape) {
             let die = Self.makeDie(at: position, shape: dieShape,
                                    appearance: theme.appearance.die)
             dice.append(die)
             root.addChild(die)
+            let mirror = ModelEntity(mesh: Self.dieMesh(for: dieShape),
+                                     materials: mirrorMaterials)
+            // Under the felt there is nothing a copy's shadow could land on
+            // — the die already draws the one shadow a mirror shows — so
+            // the shadow map needn't carry the copies at all.
+            mirror.components.set(DynamicLightShadowComponent(castsShadow: false))
+            mirror.components.set(ModelSortGroupComponent(
+                group: Self.mirrorSortGroup, order: Mirror.copyOrder))
+            // Posed at birth, not on the first update tick — an identity
+            // transform would stand a third die on the origin for a frame.
+            mirror.transform = Self.mirrorTransform(for: die)
+            mirror.isEnabled = theme.appearance.felt.reflectivity > 0
+            mirrors.append(mirror)
+            root.addChild(mirror)
         }
     }
 
@@ -501,6 +533,14 @@ extension RealityTableController {
             die.components[ModelComponent.self]?.materials = materials
         }
         previewDie?.components[ModelComponent.self]?.materials = materials
+        // The mirrors wear unlit twins of the same skins — and the dial
+        // toggles whether they draw at all.
+        let mirrorMaterials = Self.mirrorMaterials(
+            of: materials, reflectivity: appearance.felt.reflectivity)
+        for mirror in mirrors {
+            mirror.components[ModelComponent.self]?.materials = mirrorMaterials
+            mirror.isEnabled = appearance.felt.reflectivity > 0
+        }
         if let felt = root.findEntity(named: EntityName.felt) {
             felt.components[ModelComponent.self]?.materials =
                 [Self.feltMaterial(for: appearance.felt)]
@@ -753,6 +793,89 @@ extension RealityTableController {
             }
         }
         return slots
+    }
+
+    /// Reflection translation (M12). iOS RealityKit has no planar
+    /// reflection pass, so the felt's mirror is the oldest trick in
+    /// real-time graphics: a mirrored copy of each die drawn *over* the
+    /// opaque felt — the copies carry the dial as their alpha, so the
+    /// composite is `copy × dial + felt × (1 − dial)` where a copy is and
+    /// untouched felt elsewhere, the same composite SceneKit's floor
+    /// performs. Copies are *unlit* because a lit copy sits in its own
+    /// die's shadow and renders black. Rejected: a see-through felt over
+    /// an opaque twin — the twin still receives the dice's shadow 23 cm
+    /// under the surface, and through the cloth that reads as a shadow
+    /// floating under a solid mirror. Rejected: an IBL-only sheen
+    /// (roughness from the dial) — it never reflects the dice, reads as a
+    /// dielectric's 4% from our mostly top-down camera, and without a
+    /// backdrop image there is no probe to reflect at all.
+    private enum Mirror {
+        /// Brightness of the unlit copies — a reflection reads dimmer than
+        /// its object, and the key light's shaded faces average well under
+        /// white.
+        static let tint: CGFloat = 0.75
+        /// The felt paints first inside the sort group, every copy over it.
+        static let feltOrder: Int32 = 0
+        static let copyOrder: Int32 = 1
+    }
+
+    /// The copies' draw order (M12): a `.postPass` group draws its members'
+    /// color in `order`, depth afterwards — so draw order beats depth among
+    /// them, and a copy that physically sits under the felt paints on top of
+    /// it. Nothing else joins the group: the dice keep normal depth testing
+    /// against it, so a die still hides the copy under it.
+    static let mirrorSortGroup = ModelSortGroup(depthPass: .postPass)
+
+    /// Unlit twins of the face materials at the dial's alpha, culled
+    /// *front*: `MirrorPose.scale` flips the winding, and with default
+    /// culling the copy renders inside-out — solid-looking, only the pip
+    /// values give it away (measured: the copy showed its die's top value
+    /// instead of the opposite face). Takes the dice's materials rather
+    /// than rebuilding them — the unlit copies reuse the same
+    /// `TextureResource`s, so a slider tick's `applyAppearance` doesn't
+    /// mint six textures again. The tint carries the source material's own
+    /// color dimmed: when a face has no texture its material tints the
+    /// face color, and the copy must show that color at `tint`, not gray.
+    static func mirrorMaterials(of materials: [any RealityKit.Material],
+                                reflectivity: Double) -> [any RealityKit.Material] {
+        materials.map { material in
+            let base = material as? PhysicallyBasedMaterial
+            var unlit = UnlitMaterial()
+            unlit.color = .init(tint: Self.dimmed(base?.baseColor.tint),
+                                texture: base?.baseColor.texture)
+            unlit.blending = .transparent(
+                opacity: .init(floatLiteral: Float(reflectivity)))
+            unlit.faceCulling = .front
+            return unlit
+        }
+    }
+
+    /// `color` × `Mirror.tint` per channel — `.white` converts to the flat
+    /// gray the copies always wore, a tinted face color dims proportionally.
+    private static func dimmed(_ color: UIColor?) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        (color ?? .white).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return UIColor(red: r * Mirror.tint, green: g * Mirror.tint,
+                       blue: b * Mirror.tint, alpha: a)
+    }
+
+    /// Scale, conjugated rotation and reflected position together — the
+    /// reflected position alone would show an unmirrored die, pips on the
+    /// wrong faces.
+    static func mirrorTransform(for die: Entity) -> Transform {
+        Transform(scale: MirrorPose.scale,
+                  rotation: MirrorPose.orientation(die.orientation),
+                  translation: MirrorPose.position(die.position, planeY: Bounds.floorY))
+    }
+
+    /// Each copy follows its die every frame — RealityKit owns the die's
+    /// transform (physics), so the mirror is derived, never simulated.
+    /// Disabled copies follow too: the dial turning them on mid-session
+    /// must not flash a copy at a stale pose for a frame.
+    func syncMirrors() {
+        for (die, mirror) in zip(dice, mirrors) {
+            mirror.transform = Self.mirrorTransform(for: die)
+        }
     }
 
     private static func faceMaterial(_ value: Int, shape: DieShape,

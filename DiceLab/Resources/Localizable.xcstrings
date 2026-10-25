@@ -766,6 +766,23 @@
         }
       }
     },
+    "Reflection" : {
+      "comment" : "Material slider: felt mirror finish",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reflection"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отражение"
+          }
+        }
+      }
+    },
     "Remove backdrop photo" : {
       "comment" : "Destructive button: clears the user-picked backdrop image",
       "localizations" : {
