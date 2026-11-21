@@ -92,6 +92,62 @@ enum DieFaceTexture {
                       shape: shape)
     }
 
+    /// Composite key for the mirror bake: every input that reaches the
+    /// pixels — diffuse ink, packed emission ink, the intensity alpha,
+    /// and the shape (pips vs numerals).
+    private struct MirrorInk: Hashable {
+        let face: CodableColor
+        let pip: CodableColor
+        let emissionFace: CodableColor
+        let emissionPip: CodableColor
+        let intensity: Double
+        let shape: DieShape
+    }
+
+    /// Baked composites for the RealityKit mirror copies (TD-13): the
+    /// diffuse face with its emission added on top — an `UnlitMaterial`
+    /// has no emissive channel, so the glow is baked into the texture.
+    /// `plusLighter` approximates the PBR `texture × intensity` add; the
+    /// draw alpha is `min(intensity, 1)`, so glow above 1× reads dimmer
+    /// in the mirror than on the die — accepted, the copy is already
+    /// dimmed. Nil when nothing emits: callers keep reusing the dice's
+    /// own `TextureResource`s, which costs nothing per slider tick.
+    @MainActor static func mirrorImages(for appearance: DieAppearance,
+                                        shape: DieShape) -> [UIImage]? {
+        let emission = appearance.emission
+        guard let emissionImages = emissionImages(for: appearance, shape: shape)
+        else { return nil }
+        let key = MirrorInk(face: appearance.faceColor, pip: appearance.pipColor,
+                            emissionFace: emission.packedFace,
+                            emissionPip: emission.packedPips,
+                            intensity: emission.intensity, shape: shape)
+        if let cached = mirrorImageCache[key] { return cached }
+        if mirrorImageCache.count >= 16 {
+            mirrorImageCache.removeAll(keepingCapacity: false)
+        }
+        let diffuse = images(for: appearance, shape: shape)
+        let alpha = CGFloat(min(emission.intensity, 1))
+        let drawn = (0..<shape.faceCount).map { index in
+            composite(base: diffuse[index], emission: emissionImages[index],
+                      alpha: alpha)
+        }
+        mirrorImageCache[key] = drawn
+        return drawn
+    }
+
+    @MainActor private static var mirrorImageCache: [MirrorInk: [UIImage]] = [:]
+
+    /// Base face with the emission image added on top — `plusLighter`
+    /// adds source to destination, which is what an emissive channel
+    /// does to a lit surface.
+    private static func composite(base: UIImage, emission: UIImage,
+                                  alpha: CGFloat) -> UIImage {
+        UIGraphicsImageRenderer(size: base.size).image { _ in
+            base.draw(at: .zero)
+            emission.draw(at: .zero, blendMode: .plusLighter, alpha: alpha)
+        }
+    }
+
     /// Runtime-drawn face: opaque fill + pips or a numeral. The fill must
     /// be opaque — transparent texture corners render as holes in the die
     /// face (the geometry's chamfer already provides the rounded look).

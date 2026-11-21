@@ -170,6 +170,50 @@ struct AppearanceTests {
                 != DieFaceTexture.images(for: die, shape: .d6)[0].pngData())
     }
 
+    /// TD-13: an unlit mirror copy has no emissive channel, so the glow
+    /// is baked into the composite — where pips emit the mirror must be
+    /// *brighter* than the plain face (additive, not a tint swap), and a
+    /// bare face corner must stay identical. Nothing emitting keeps the
+    /// nil gate so the reuse path costs nothing.
+    @Test("mirror images bake emission over the diffuse face")
+    func mirrorImagesBakeEmission() throws {
+        #expect(DieFaceTexture.mirrorImages(for: Appearance.ivory.die,
+                                            shape: .d6) == nil)
+        var die = Appearance.ivory.die
+        die.emission.pipColor = CodableColor(red: 1, green: 0, blue: 0)
+        die.emission.pipIntensity = 1
+        let composites = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        #expect(composites.count == 6)
+        let base = try #require(
+            rgba(DieFaceTexture.images(for: die, shape: .d6)[0]))
+        let mirror = try #require(rgba(composites[0]))
+        // Face 1's only mark is the center pip — red emission lands there.
+        let center = (mirror.height / 2 * mirror.width + mirror.width / 2) * 4
+        #expect(mirror.bytes[center] > base.bytes[center])
+        // A bare face corner has no emission — the bake must not shift it.
+        let corner = (10 * mirror.width + 10) * 4
+        #expect(mirror.bytes[corner] == base.bytes[corner])
+    }
+
+    /// Raw RGBA bytes for pixel assertions — both images go through the
+    /// same draw, so any row-order convention cancels between them.
+    private func rgba(_ image: UIImage) -> (width: Int, height: Int,
+                                             bytes: [UInt8])? {
+        guard let cgImage = image.cgImage else { return nil }
+        let width = cgImage.width, height = cgImage.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &bytes, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0,
+                                         width: width, height: height))
+        return (width, height, bytes)
+    }
+
     /// The editor gates every material control on `theme.kind == .custom` —
     /// pin the mapping it reads: presets report their own kind, custom
     /// reports custom regardless of payload.

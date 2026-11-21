@@ -500,7 +500,9 @@ extension RealityTableController {
         let faceMaterials = Self.materials(shape: dieShape,
                                            appearance: theme.appearance.die)
         let mirrorMaterials = Self.mirrorMaterials(
-            of: faceMaterials, reflectivity: theme.appearance.felt.reflectivity)
+            of: faceMaterials, appearance: theme.appearance.die,
+            shape: dieShape,
+            reflectivity: theme.appearance.felt.reflectivity)
         for position in Self.spawnPositions(count: count, shape: dieShape) {
             let die = Self.makeDie(at: position, shape: dieShape,
                                    appearance: theme.appearance.die)
@@ -536,7 +538,8 @@ extension RealityTableController {
         // The mirrors wear unlit twins of the same skins — and the dial
         // toggles whether they draw at all.
         let mirrorMaterials = Self.mirrorMaterials(
-            of: materials, reflectivity: appearance.felt.reflectivity)
+            of: materials, appearance: appearance.die, shape: dieShape,
+            reflectivity: appearance.felt.reflectivity)
         for mirror in mirrors {
             mirror.components[ModelComponent.self]?.materials = mirrorMaterials
             mirror.isEnabled = appearance.felt.reflectivity > 0
@@ -781,18 +784,27 @@ extension RealityTableController {
     /// value uses.
     static func materials(shape: DieShape,
                           appearance: DieAppearance) -> [any RealityKit.Material] {
+        slotFaceValues(shape: shape).map { value in
+            value > 0 ? faceMaterial(value, shape: shape, appearance: appearance)
+                      : PhysicallyBasedMaterial()
+        }
+    }
+
+    /// Face value per material slot — the centroid resolution
+    /// `materials` uses, shared so the mirror copies bind the same
+    /// slot→face mapping and can never disagree with the die they
+    /// reflect. 0 marks a slot no mesh part claimed.
+    static func slotFaceValues(shape: DieShape) -> [Int] {
         let mesh = dieMesh(for: shape)
-        var slots: [any RealityKit.Material] = (0..<mesh.expectedMaterialCount)
-            .map { _ in PhysicallyBasedMaterial() }
+        var values = [Int](repeating: 0, count: mesh.expectedMaterialCount)
         for model in mesh.contents.models {
             for part in model.parts {
-                guard part.materialIndex < slots.count else { continue }
-                let value = DieFace.value(facing: centroid(of: part), shape: shape)
-                slots[part.materialIndex] = faceMaterial(
-                    value, shape: shape, appearance: appearance)
+                guard part.materialIndex < values.count else { continue }
+                values[part.materialIndex] = DieFace.value(
+                    facing: centroid(of: part), shape: shape)
             }
         }
-        return slots
+        return values
     }
 
     /// Reflection translation (M12). iOS RealityKit has no planar
@@ -836,16 +848,35 @@ extension RealityTableController {
     /// mint six textures again. The tint carries the source material's own
     /// color dimmed: when a face has no texture its material tints the
     /// face color, and the copy must show that color at `tint`, not gray.
+    ///
+    /// Emission (TD-13): an unlit material has no emissive channel, so a
+    /// glowing die's copy would show plain pips. When the appearance
+    /// emits, `DieFaceTexture.mirrorImages` bakes base + glow into one
+    /// texture per face and the copy binds that instead — minting
+    /// composites per `applyAppearance`, the same cost class the dice's
+    /// own materials already pay. No emission keeps the reuse path.
     static func mirrorMaterials(of materials: [any RealityKit.Material],
+                                appearance: DieAppearance, shape: DieShape,
                                 reflectivity: Double) -> [any RealityKit.Material] {
-        materials.map { material in
-            let base = material as? PhysicallyBasedMaterial
+        let composites = DieFaceTexture.mirrorImages(for: appearance, shape: shape)
+        let values = composites == nil ? nil : slotFaceValues(shape: shape)
+        return materials.enumerated().map { index, material in
             var unlit = UnlitMaterial()
-            unlit.color = .init(tint: Self.dimmed(base?.baseColor.tint),
-                                texture: base?.baseColor.texture)
             unlit.blending = .transparent(
                 opacity: .init(floatLiteral: Float(reflectivity)))
             unlit.faceCulling = .front
+            if let composites, let values, index < values.count,
+               values[index] > 0,
+               let cgImage = composites[values[index] - 1].cgImage,
+               let texture = try? TextureResource(
+                   image: cgImage, options: .init(semantic: .color)) {
+                unlit.color = .init(tint: UIColor(white: Mirror.tint, alpha: 1),
+                                    texture: .init(texture))
+                return unlit
+            }
+            let base = material as? PhysicallyBasedMaterial
+            unlit.color = .init(tint: Self.dimmed(base?.baseColor.tint),
+                                texture: base?.baseColor.texture)
             return unlit
         }
     }
