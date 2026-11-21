@@ -860,13 +860,20 @@ extension RealityTableController {
     static func mirrorMaterials(of materials: [any RealityKit.Material],
                                 appearance: DieAppearance, shape: DieShape,
                                 reflectivity: Double) -> [any RealityKit.Material] {
-        let composites = DieFaceTexture.mirrorImages(for: appearance, shape: shape)
+        // Invisible mirrors don't earn baked composites — reflectivity 0
+        // disables every copy, so skip the 20-bitmap bake entirely.
+        let composites = reflectivity > 0
+            ? DieFaceTexture.mirrorImages(for: appearance, shape: shape)
+            : nil
         let values = composites == nil ? nil : slotFaceValues(shape: shape)
+        // Glass dice draw both windings, so their reflections must too —
+        // far-side ink reads through the near side's translucent body.
+        let doubleSided = appearance.translucency > 0
         return materials.enumerated().map { index, material in
             var unlit = UnlitMaterial()
             unlit.blending = .transparent(
                 opacity: .init(floatLiteral: Float(reflectivity)))
-            unlit.faceCulling = .front
+            unlit.faceCulling = doubleSided ? .none : .front
             if let composites, let values, index < values.count,
                values[index] > 0,
                let cgImage = composites[values[index] - 1].cgImage,
