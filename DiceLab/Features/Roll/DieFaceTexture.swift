@@ -46,6 +46,11 @@ enum DieFaceTexture {
         let pip: CodableColor
         let shape: DieShape
         let translucency: Double
+        /// Emission images carry a glow mask in alpha (opaque only where
+        /// the packed color is non-black) so the mirror composite adds
+        /// opacity exactly where light is added — pixels differ, so the
+        /// mask can't share a cache entry with the diffuse draw.
+        let glowMask: Bool
     }
 
     /// Face images per ink, drawn lazily and cached — identical for
@@ -60,22 +65,25 @@ enum DieFaceTexture {
     /// diffuse channel both engines bind, and the alpha both read as
     /// opacity when `translucency` is up (body α = color α × (1 − t),
     /// ink keeps the pip color's α). Emission draws through here too
-    /// with translucency 0: its alpha is never read, and an opaque
-    /// emission image keeps the composite bake honest.
+    /// with translucency 0 and `glowMask`: its alpha is a glow mask the
+    /// composite reads, while the engines' emission channels read RGB
+    /// only.
     @MainActor static func images(face: CodableColor, pip: CodableColor,
                                   shape: DieShape,
-                                  translucency: Double = 0) -> [UIImage] {
+                                  translucency: Double = 0,
+                                  glowMask: Bool = false) -> [UIImage] {
         // Clamp once: an out-of-range payload must not mint a negative-
         // alpha fill, and values that clamp alike share one cache entry.
         let t = min(max(translucency, 0), 1)
-        let key = Ink(face: face, pip: pip, shape: shape, translucency: t)
+        let key = Ink(face: face, pip: pip, shape: shape, translucency: t,
+                      glowMask: glowMask)
         if let cached = faceImageCache[key] { return cached }
         // Color sliders mint a key per sampled value — a long edit session
         // could grow the map without limit, so it resets past 16 entries.
         if faceImageCache.count >= 16 { faceImageCache.removeAll(keepingCapacity: false) }
         let drawn = (1...shape.faceCount).map {
             image(for: $0, shape: shape, face: face, pip: pip,
-                  bodyAlpha: 1 - CGFloat(t))
+                  bodyAlpha: 1 - CGFloat(t), glowMask: glowMask)
         }
         faceImageCache[key] = drawn
         return drawn
@@ -100,7 +108,7 @@ enum DieFaceTexture {
         let emission = appearance.emission
         guard emission.peak > 0 else { return nil }
         return images(face: emission.packedFace, pip: emission.packedPips,
-                      shape: shape)
+                      shape: shape, glowMask: true)
     }
 
     /// Composite key for the mirror bake: every input that reaches the
@@ -154,17 +162,17 @@ enum DieFaceTexture {
 
     /// Base face with the emission image added on top — `plusLighter`
     /// adds source to destination, which is what an emissive channel
-    /// does to a lit surface. The emission image is opaque, so the add
-    /// would drag the composite's alpha to 1 and a glass die's mirror
-    /// would grow a solid body; re-stamping the base with
-    /// `destinationIn` restores its alpha (and dims the added glow by
-    /// it — a glass reflection earns the dimming).
+    /// does to a lit surface. The emission image's alpha is a glow mask
+    /// (opaque only where its packed color is non-black), so the add
+    /// raises opacity exactly where light is added: a glass die's body
+    /// keeps its translucency in the reflection instead of growing a
+    /// solid dark one, and the body alpha no longer couples to the glow
+    /// intensity.
     private static func composite(base: UIImage, emission: UIImage,
                                   alpha: CGFloat) -> UIImage {
         UIGraphicsImageRenderer(size: base.size).image { _ in
             base.draw(at: .zero)
             emission.draw(at: .zero, blendMode: .plusLighter, alpha: alpha)
-            base.draw(at: .zero, blendMode: .destinationIn, alpha: 1)
         }
     }
 
@@ -172,16 +180,25 @@ enum DieFaceTexture {
     /// the color's own alpha × `bodyAlpha` — 1 for opaque dice, the
     /// translucency factor for glass — so the picker's opacity survives
     /// the dial; ink keeps the pip color's alpha untouched: glass you
-    /// can still read. The same image serves as diffuse RGB, SceneKit
-    /// `transparent` map, and RealityKit opacity texture.
+    /// can still read. `glowMask` zeroes the fill's alpha when the
+    /// packed emission color is black — the mirror composite then adds
+    /// opacity only where light is actually added. Ink is never masked:
+    /// opaque black pip ink is what keeps face glow off the pips.
+    /// The same image serves as diffuse RGB, SceneKit `transparent`
+    /// map, and RealityKit opacity texture.
     static func image(for value: Int, shape: DieShape,
                       face: CodableColor, pip: CodableColor,
-                      side: CGFloat = 256, bodyAlpha: CGFloat = 1) -> UIImage {
+                      side: CGFloat = 256, bodyAlpha: CGFloat = 1,
+                      glowMask: Bool = false) -> UIImage {
         let size = CGSize(width: side, height: side)
         let ink = pip.uiColor
+        // Below ~1/255 per channel the 8-bit bitmap quantizes to black
+        // anyway — masking it off keeps alpha honest with the pixels.
+        let emits = face.red + face.green + face.blue > 0.004
+        let fillAlpha = glowMask && !emits ? 0
+            : CGFloat(face.alpha) * bodyAlpha
         return UIGraphicsImageRenderer(size: size).image { _ in
-            face.uiColor.withAlphaComponent(
-                CGFloat(face.alpha) * bodyAlpha).setFill()
+            face.uiColor.withAlphaComponent(fillAlpha).setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
             switch shape {

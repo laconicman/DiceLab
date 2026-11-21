@@ -279,6 +279,16 @@ struct AppearanceTests {
         // And the body isn't the opaque black blob the bug produced —
         // the face color still reads through dimmed.
         #expect(mirror.bytes[(10 * w + 10) * 4] > 40)
+
+        // Low pip glow must not thin the glass body either: the glow
+        // mask keeps body alpha at the die's own 1 − t whatever the
+        // intensity — a dim glow can't make the reflection more
+        // transparent than the translucency dial says.
+        die.emission = EmissionAppearance(pipIntensity: 0.3)
+        let dim = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        let dimMirror = try #require(rgba(dim[0]))
+        #expect(abs(Int(dimMirror.bytes[bodyA]) - 128) <= 4)
     }
 
     /// Raw RGBA bytes for pixel assertions — both images go through the
