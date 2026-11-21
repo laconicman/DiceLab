@@ -58,10 +58,10 @@ enum DieFaceTexture {
 
     /// The cached faces, 1…`shape.faceCount`, keyed by ink alone — the
     /// diffuse channel both engines bind, and the alpha both read as
-    /// opacity when `translucency` is up (body α = 1 − t, ink α = 1).
-    /// Emission draws through here too with translucency 0: its alpha is
-    /// never read, and an opaque emission image keeps the composite
-    /// bake honest.
+    /// opacity when `translucency` is up (body α = color α × (1 − t),
+    /// ink keeps the pip color's α). Emission draws through here too
+    /// with translucency 0: its alpha is never read, and an opaque
+    /// emission image keeps the composite bake honest.
     @MainActor static func images(face: CodableColor, pip: CodableColor,
                                   shape: DieShape,
                                   translucency: Double = 0) -> [UIImage] {
@@ -154,28 +154,34 @@ enum DieFaceTexture {
 
     /// Base face with the emission image added on top — `plusLighter`
     /// adds source to destination, which is what an emissive channel
-    /// does to a lit surface.
+    /// does to a lit surface. The emission image is opaque, so the add
+    /// would drag the composite's alpha to 1 and a glass die's mirror
+    /// would grow a solid body; re-stamping the base with
+    /// `destinationIn` restores its alpha (and dims the added glow by
+    /// it — a glass reflection earns the dimming).
     private static func composite(base: UIImage, emission: UIImage,
                                   alpha: CGFloat) -> UIImage {
         UIGraphicsImageRenderer(size: base.size).image { _ in
             base.draw(at: .zero)
             emission.draw(at: .zero, blendMode: .plusLighter, alpha: alpha)
+            base.draw(at: .zero, blendMode: .destinationIn, alpha: 1)
         }
     }
 
     /// Runtime-drawn face: fill + pips or a numeral. The fill's alpha is
-    /// `bodyAlpha` — 1 for opaque dice, `1 − translucency` for glass —
-    /// while ink always draws at alpha 1: glass you can still read. The
-    /// same image serves as diffuse RGB, SceneKit `transparent` map, and
-    /// RealityKit opacity texture. Corners carry the fill's alpha, not
-    /// zero — the geometry's chamfer provides the rounded look.
+    /// the color's own alpha × `bodyAlpha` — 1 for opaque dice, the
+    /// translucency factor for glass — so the picker's opacity survives
+    /// the dial; ink keeps the pip color's alpha untouched: glass you
+    /// can still read. The same image serves as diffuse RGB, SceneKit
+    /// `transparent` map, and RealityKit opacity texture.
     static func image(for value: Int, shape: DieShape,
                       face: CodableColor, pip: CodableColor,
                       side: CGFloat = 256, bodyAlpha: CGFloat = 1) -> UIImage {
         let size = CGSize(width: side, height: side)
-        let ink = pip.uiColor.withAlphaComponent(1)
+        let ink = pip.uiColor
         return UIGraphicsImageRenderer(size: size).image { _ in
-            face.uiColor.withAlphaComponent(bodyAlpha).setFill()
+            face.uiColor.withAlphaComponent(
+                CGFloat(face.alpha) * bodyAlpha).setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
             switch shape {
@@ -228,7 +234,8 @@ enum DieFaceTexture {
     /// fits one emission channel.
     ///
     /// Translucency reuses the diffuse image's alpha as the transparency
-    /// map — body α = 1 − t, ink α = 1 — and turns the material double-
+    /// map — body α = color α × (1 − t), ink keeps the pip color's α —
+    /// and turns the material double-
     /// sided so the far side's ink reads through the near side's glass.
     @MainActor static func materials(for geometry: SCNGeometry, shape: DieShape,
                                      appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {

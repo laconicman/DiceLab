@@ -598,7 +598,7 @@ Measured, not assumed: SceneKit's composite keeps the cloth — the felt away fr
 
 M13 adds `DieAppearance.translucency` (0…1, default 0, lenient-decoded like every channel since M8): 0 is today's opaque resin, 1 a fully clear body. The presets stay at 0; the dial is a "Translucency" slider in the editor's Die section, and `-translucency <0…1>` shadows it for capture runs through `DieAppearance.effective` — the `-pace` pattern, never written back.
 
-The load-bearing decision is that **one image carries all three bindings**: the face texture's alpha is the translucency map — body α = `1 − t`, ink α = 1 — so the same `UIImage` serves as SceneKit's `transparent.contents`, RealityKit's opacity texture, and (unchanged) the diffuse RGB. Ink stays opaque at every setting: glass you can still read. `Ink` keys on the clamped translucency so slider ticks can't mint duplicate art, and emission images keep drawing opaque — their alpha is never read.
+The load-bearing decision is that **one image carries all three bindings**: the face texture's alpha is the translucency map — body α = the color's own alpha × `1 − t`, ink keeps the pip color's alpha (the dial never touches it) — so the same `UIImage` serves as SceneKit's `transparent.contents`, RealityKit's opacity texture, and (unchanged) the diffuse RGB. Ink stays at full strength at every setting: glass you can still read, and the color picker's opacity still works under the dial. `Ink` keys on the clamped translucency so slider ticks can't mint duplicate art, and emission images keep drawing opaque — their alpha is never read.
 
 | | SceneKit | RealityKit |
 |---|---|---|

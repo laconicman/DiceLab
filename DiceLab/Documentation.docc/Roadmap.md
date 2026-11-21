@@ -124,8 +124,9 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
 
 - **M13 — Glass dice.** `DieAppearance.translucency` (0…1, lenient-decoded;
   presets stay opaque; "Translucency" slider; `-translucency` dev flag).
-  One face texture carries all three bindings: alpha = `1 − t` on the body,
-  1 on the ink. SceneKit binds it as `transparent.contents` with
+  One face texture carries all three bindings: body α = color α ×
+  (1 − t), ink keeps the pip color's α. SceneKit binds it as
+  `transparent.contents` with
   `isDoubleSided` + `transparencyMode = .dualLayer` (`.aOne` A/B'd — dual
   layer sorts the two faces independently); RealityKit binds the same
   texture as `Opacity` under `blending = .transparent` with
