@@ -291,7 +291,7 @@ final class RealityTableController: DiceTable {
         previewDie?.components.set(ModelComponent(
             mesh: Self.dieMesh(for: dieShape),
             materials: Self.materials(shape: dieShape,
-                                      appearance: theme.appearance.die)))
+                                      appearance: theme.appearance.die.effective)))
         // Fresh bodies carry `PhysicsTune` defaults — re-apply the feel.
         applyDynamics()
     }

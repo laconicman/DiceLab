@@ -593,3 +593,30 @@ Measured, not assumed: SceneKit's composite keeps the cloth — the felt away fr
 - **Copies are unlit.** A lit copy sits in its die's shadow and renders black. `UnlitMaterial` with the dice's face textures and a 0.75 tint stands in for "a reflection is dimmer than its object" — the tint dims the source material's own tint, so a face whose texture failed (its material tints the face color instead) still mirrors in color. Emission has no channel to ride on an unlit material, so a glowing die gets baked composites instead (TD-13): `DieFaceTexture.mirrorImages` draws each face's diffuse and emission images into one `.plusLighter` image — emission at alpha `min(intensity, 1)`, so a peak above 1 glows at full strength in the mirror rather than proportionally, the approximation the unlit path accepts. The copies still ignore the backdrop probe's tint — TD-13's remaining half.
 - **Draw order beats depth: the copies paint over the felt.** A copy sits *under* the felt, where depth testing hides it. The first cut made the felt see-through (`opacity = 1 − dial`), and went through two failures: with the dome showing through, the table went 80% black at 0.8 where SceneKit's stayed green; with an opaque lit twin of the felt under the copies, the twin received the dice's shadow 23 cm below the surface — through the cloth that read as a shadow floating under a solid mirror (RealityKit has no per-entity *receive* flag; `DynamicLightShadowComponent` is cast-only). The mechanism that works keeps the felt opaque and untouched: felt and copies share a `ModelSortGroup(depthPass: .postPass)`, which draws its members' color in `order` and their depth afterwards — so the copies, ordered after the felt, paint on top of it at `opacity = dial`, and `copy × dial + felt × (1 − dial)` is exactly SceneKit's composite. The dice stay out of the group, so normal depth testing still lets a die hide the copy under it (measured top-down: no ghost over the die). One surface, one shadow, nothing floating. Copies cast no shadows — under the felt there is nothing for one to land on.
 - **A straight-down camera sees no reflection.** The mirror image of a resting die lies directly under it; both the home pose and the fit look straight down, so the dial reads only once the user orbits — which is what free orbiting is for. The `-orbit <deg>` dev flag parks the camera at an elevation every time the fit latches, because `simctl` has no finger: it is the reflection's measuring stick the way `-cameraLog` is the floor's.
+
+## Glass dice — one dial, alpha in the face texture
+
+M13 adds `DieAppearance.translucency` (0…1, default 0, lenient-decoded like every channel since M8): 0 is today's opaque resin, 1 a fully clear body. The presets stay at 0; the dial is a "Translucency" slider in the editor's Die section, and `-translucency <0…1>` shadows it for capture runs through `DieAppearance.effective` — the `-pace` pattern, never written back.
+
+The load-bearing decision is that **one image carries all three bindings**: the face texture's alpha is the translucency map — body α = `1 − t`, ink α = 1 — so the same `UIImage` serves as SceneKit's `transparent.contents`, RealityKit's opacity texture, and (unchanged) the diffuse RGB. Ink stays opaque at every setting: glass you can still read. `Ink` keys on the clamped translucency so slider ticks can't mint duplicate art, and emission images keep drawing opaque — their alpha is never read.
+
+| | SceneKit | RealityKit |
+|---|---|---|
+| mechanism | `transparent.contents` = the face image; `isDoubleSided`; `transparencyMode = .dualLayer` | `blending = .transparent(opacity: same texture)`; `faceCulling = .none` |
+| back faces | double-sided material — far-side ink reads through | both windings draw |
+| at 0 | untouched — the translucent branch doesn't exist | untouched |
+
+Measured on the iOS 27 simulator (neutral-bright pixel counts over the dice region, ivory theme):
+
+| translucency | SceneKit | RealityKit |
+|---|---|---|
+| 0 | 13 537 | 4 323 |
+| 0.6 | 0 | 5 |
+| 1.0 | 365 | 5 |
+
+Both engines respect the alpha channel — RealityKit's opacity sampler reads the *image alpha* of the same `.color`-semantic `TextureResource` bound for `baseColor`, so no dedicated opacity map or `swizzle` was needed. At 1.0 both leave only the ink: pip/numeral marks stay readable on the bare felt. `.dualLayer` vs `.aOne` was A/B'd: `.aOne` left ~1 000 dim-neutral pixels at 0.6 where `.dualLayer` left none — dual-layer sorts front and back faces independently, which is what a double-sided translucent solid wants; both are deprecated alongside SceneKit itself (TD-1), and `.dualLayer` stayed.
+
+- **Emission survives translucency on both engines** — the emission channel is independent of the blend path; captures with glowing pips over a 0.6 dial show the glow on the dice *and* in the felt reflection on both engines (the RealityKit mirror's glow is the TD-13 composite bake; SceneKit's `SCNFloor` reflects the scene natively).
+- **Refraction is deferred, not shipped.** SceneKit shader modifiers expose surface parameters but no scene-color/framebuffer input — true refraction wants an `SCNTechnique` render-to-texture pass. RealityKit `CustomMaterial` surface shaders modify material attributes the same way; there is no framebuffer read either, so its ceiling is environment-only. Recorded as TD-14.
+- **`fresnelExponent` was left out.** It is documented for the reflective/basic shading models; under `.physicallyBased` there is no measured use for it here, and the alpha map already gives the glass edge its read.
+- **Known limits.** A translucent die still casts a solid shadow — `castsShadow`/the shadow component are per-node, and per-pixel shadow alpha would need a custom shadow pass; accepted. Transparent sorting between overlapping dice is engine-managed — captures at the default count show no artifacts, a six-dice glass pile is untested. The RealityKit mirror composite inherits the face alpha (translucency joined `MirrorInk`'s key), so a glass die's reflection dims further — consistent, corner-case, accepted.

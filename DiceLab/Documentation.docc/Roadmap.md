@@ -122,23 +122,24 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
 - **M12 — Felt reflection.** One dial, `Appearance.felt.reflectivity` (0…1, lenient-decoded like the other channels; a "Reflection" slider in the editor's Table section), translated per engine. SceneKit: the dial picks the geometry — `SCNFloor` with `reflectivity` above zero, the thin box at zero — because TD-4's FloorPass spam turned out to be a *zero* problem: re-measured at 152 lines per 10 s at `reflectivity = 0`, silent at 0.5. `SCNFloor` UVs repeat every 100 world units (measured offscreen), so a photo felt tiles at the box's density on either geometry. RealityKit has no planar reflection: unlit mirrored copies of the dice drawn over the opaque felt at the dial's alpha through a post-pass `ModelSortGroup` (`MirrorPose` in `Model/`, unit-tested; copies cull front faces because the mirror scale flips winding), IBL sheen rejected. `-orbit <deg>` dev flag parks the camera obliquely — a straight-down camera hides a floor reflection under the die that casts it. Records TD-13. (PR #45)
   `MARKETING_VERSION: "1.2"`.
 
+- **M13 — Glass dice.** `DieAppearance.translucency` (0…1, lenient-decoded;
+  presets stay opaque; "Translucency" slider; `-translucency` dev flag).
+  One face texture carries all three bindings: alpha = `1 − t` on the body,
+  1 on the ink. SceneKit binds it as `transparent.contents` with
+  `isDoubleSided` + `transparencyMode = .dualLayer` (`.aOne` A/B'd — dual
+  layer sorts the two faces independently); RealityKit binds the same
+  texture as `Opacity` under `blending = .transparent` with
+  `faceCulling = .none` — measured to read the image's alpha channel, no
+  dedicated map needed. Emission rides both blend paths; the RealityKit
+  mirror composite gained translucency in `MirrorInk`'s key. Refraction
+  investigated and deferred to TD-14 — neither engine's material shader
+  can read the framebuffer cheaply. Sim-verified at t = 0 / 0.6 / 1.0 on
+  both engines; `fresnelExponent` considered and left out (inert under
+  `.physicallyBased`). Discharges the emission half of TD-13.
+
 ## Next
 
-Planned — one session each:
-
-- **Glass dice.** Translucent bodies, opaque ink, visible back faces,
-  refraction. Model: a translucency dial on `Appearance` (lenient-decoded
-  like the others) with an `AppearanceEditor` control. SceneKit:
-  `transparency` + `transparencyMode = .dualLayer` (convex bodies) +
-  `fresnelExponent`; refraction isn't in its lighting models — a fragment
-  shader modifier bending the environment lookup, or an `SCNTechnique`
-  screen-space pass. RealityKit: `PhysicallyBasedMaterial` transparent
-  blending for the body; refraction would need `CustomMaterial` and
-  can't read the framebuffer (to verify) — environment-only. Face
-  textures gain meaningful alpha (ink opaque, body translucent) and the
-  M9d packed-emission glow needs re-checking against translucency.
-
-- Open learning surface: device-time haptic/tuning pass, scripted camera
+Open learning surface: device-time haptic/tuning pass, scripted camera
   moments (would revisit TD-3's default-on toggle), a second skin family,
   or RealityKit-vs-SceneKit performance measurement. Voice-trigger design
   (Speech framework, permissions, per-locale grammar).

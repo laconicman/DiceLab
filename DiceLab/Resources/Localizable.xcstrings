@@ -1316,6 +1316,23 @@
           }
         }
       }
+    },
+    "Translucency" : {
+      "comment" : "Material slider: how much light passes through the die body",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translucency"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прозрачность"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

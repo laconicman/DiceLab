@@ -497,15 +497,16 @@ extension RealityTableController {
     }
 
     func spawnDice(_ count: Int) {
+        let dieAppearance = theme.appearance.die.effective
         let faceMaterials = Self.materials(shape: dieShape,
-                                           appearance: theme.appearance.die)
+                                           appearance: dieAppearance)
         let mirrorMaterials = Self.mirrorMaterials(
-            of: faceMaterials, appearance: theme.appearance.die,
+            of: faceMaterials, appearance: dieAppearance,
             shape: dieShape,
             reflectivity: theme.appearance.felt.reflectivity)
         for position in Self.spawnPositions(count: count, shape: dieShape) {
             let die = Self.makeDie(at: position, shape: dieShape,
-                                   appearance: theme.appearance.die)
+                                   appearance: dieAppearance)
             dice.append(die)
             root.addChild(die)
             let mirror = ModelEntity(mesh: Self.dieMesh(for: dieShape),
@@ -530,7 +531,8 @@ extension RealityTableController {
     /// reassignment; felt and lights are found by name.
     func applyAppearance() {
         let appearance = theme.appearance
-        let materials = Self.materials(shape: dieShape, appearance: appearance.die)
+        let dieAppearance = appearance.die.effective
+        let materials = Self.materials(shape: dieShape, appearance: dieAppearance)
         for die in dice {
             die.components[ModelComponent.self]?.materials = materials
         }
@@ -538,7 +540,7 @@ extension RealityTableController {
         // The mirrors wear unlit twins of the same skins — and the dial
         // toggles whether they draw at all.
         let mirrorMaterials = Self.mirrorMaterials(
-            of: materials, appearance: appearance.die, shape: dieShape,
+            of: materials, appearance: dieAppearance, shape: dieShape,
             reflectivity: appearance.felt.reflectivity)
         for mirror in mirrors {
             mirror.components[ModelComponent.self]?.materials = mirrorMaterials
@@ -717,7 +719,7 @@ extension RealityTableController {
         let die = ModelEntity(
             mesh: Self.dieMesh(for: dieShape),
             materials: Self.materials(shape: dieShape,
-                                      appearance: theme.appearance.die))
+                                      appearance: theme.appearance.die.effective))
         previewRoot.addChild(die)
         previewDie = die
 
@@ -912,12 +914,13 @@ extension RealityTableController {
     private static func faceMaterial(_ value: Int, shape: DieShape,
                                      appearance: DieAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
-        if let image = DieFaceTexture.images(for: appearance,
-                                             shape: shape)[value - 1].cgImage,
+        var faceTexture: PhysicallyBasedMaterial.Texture?
+        if let cgImage = DieFaceTexture.images(for: appearance,
+                                               shape: shape)[value - 1].cgImage,
            let texture = try? TextureResource(
-               image: image, options: .init(semantic: .color)) {
-            material.baseColor = .init(tint: .white,
-                                       texture: .init(texture))
+               image: cgImage, options: .init(semantic: .color)) {
+            faceTexture = .init(texture)
+            material.baseColor = .init(tint: .white, texture: faceTexture)
         } else {
             // Texture generation shouldn't sink the die — fall back to the
             // flat face color; the die is still playable.
@@ -926,6 +929,16 @@ extension RealityTableController {
         material.roughness = .init(floatLiteral: Float(appearance.roughness))
         material.metallic = .init(floatLiteral: Float(appearance.metalness))
         material.clearcoat = .init(floatLiteral: Float(appearance.clearcoat))
+        // Glass (M13): the same alpha-bearing face image doubles as the
+        // opacity texture — body α = 1 − translucency, ink α = 1 — and
+        // both faces draw so the far side's ink reads through. Whether
+        // the sampler reads the alpha channel is a measured question
+        // (Design.md, "Glass dice"), not an assumed one.
+        if appearance.translucency > 0, let faceTexture {
+            material.blending = .transparent(
+                opacity: .init(scale: 1, texture: faceTexture))
+            material.faceCulling = .none
+        }
         // Emission is a texture here too, with `emissiveIntensity` carrying
         // the peak — the same split as the SceneKit `emission` channel.
         // The color parameter must stay unset: a non-black `EmissiveColor`

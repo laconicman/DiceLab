@@ -37,13 +37,15 @@ enum DieFaceTexture {
         [0.5, 0.0], [0.067, 0.75], [0.933, 0.75],
     ]
 
-    /// Cache key: only the shape and the two ink colors reach the pixels —
-    /// finish channels shape the material, not the texture, so keying by
-    /// them would duplicate identical images on every slider edit.
+    /// Cache key: the ink colors, shape, and translucency reach the
+    /// pixels — finish channels shape the material, not the texture, so
+    /// keying by them would duplicate identical images on every slider
+    /// edit.
     private struct Ink: Hashable {
         let face: CodableColor
         let pip: CodableColor
         let shape: DieShape
+        let translucency: Double
     }
 
     /// Face images per ink, drawn lazily and cached — identical for
@@ -55,28 +57,37 @@ enum DieFaceTexture {
     @MainActor private static var faceImageCache: [Ink: [UIImage]] = [:]
 
     /// The cached faces, 1…`shape.faceCount`, keyed by ink alone — the
-    /// diffuse and emission channels both draw through here; a
-    /// packed-emission ink that happens to match a diffuse ink shares the
-    /// same images.
+    /// diffuse channel both engines bind, and the alpha both read as
+    /// opacity when `translucency` is up (body α = 1 − t, ink α = 1).
+    /// Emission draws through here too with translucency 0: its alpha is
+    /// never read, and an opaque emission image keeps the composite
+    /// bake honest.
     @MainActor static func images(face: CodableColor, pip: CodableColor,
-                                  shape: DieShape) -> [UIImage] {
-        let key = Ink(face: face, pip: pip, shape: shape)
+                                  shape: DieShape,
+                                  translucency: Double = 0) -> [UIImage] {
+        // Clamp once: an out-of-range payload must not mint a negative-
+        // alpha fill, and values that clamp alike share one cache entry.
+        let t = min(max(translucency, 0), 1)
+        let key = Ink(face: face, pip: pip, shape: shape, translucency: t)
         if let cached = faceImageCache[key] { return cached }
         // Color sliders mint a key per sampled value — a long edit session
         // could grow the map without limit, so it resets past 16 entries.
         if faceImageCache.count >= 16 { faceImageCache.removeAll(keepingCapacity: false) }
         let drawn = (1...shape.faceCount).map {
-            image(for: $0, shape: shape, face: face, pip: pip)
+            image(for: $0, shape: shape, face: face, pip: pip,
+                  bodyAlpha: 1 - CGFloat(t))
         }
         faceImageCache[key] = drawn
         return drawn
     }
 
     /// The diffuse channel — the RealityKit path binds the same images
-    /// through `TextureResource`; generation stays in one place.
+    /// through `TextureResource` for color and opacity; generation stays
+    /// in one place.
     @MainActor static func images(for appearance: DieAppearance,
                                   shape: DieShape) -> [UIImage] {
-        images(face: appearance.faceColor, pip: appearance.pipColor, shape: shape)
+        images(face: appearance.faceColor, pip: appearance.pipColor,
+               shape: shape, translucency: appearance.translucency)
     }
 
     /// The emission channel as images, or nil when nothing emits: the
@@ -94,13 +105,15 @@ enum DieFaceTexture {
 
     /// Composite key for the mirror bake: every input that reaches the
     /// pixels — diffuse ink, packed emission ink, the intensity alpha,
-    /// and the shape (pips vs numerals).
+    /// translucency (the base's alpha rides into the composite), and the
+    /// shape (pips vs numerals).
     private struct MirrorInk: Hashable {
         let face: CodableColor
         let pip: CodableColor
         let emissionFace: CodableColor
         let emissionPip: CodableColor
         let intensity: Double
+        let translucency: Double
         let shape: DieShape
     }
 
@@ -120,7 +133,9 @@ enum DieFaceTexture {
         let key = MirrorInk(face: appearance.faceColor, pip: appearance.pipColor,
                             emissionFace: emission.packedFace,
                             emissionPip: emission.packedPips,
-                            intensity: emission.intensity, shape: shape)
+                            intensity: emission.intensity,
+                            translucency: min(max(appearance.translucency, 0), 1),
+                            shape: shape)
         if let cached = mirrorImageCache[key] { return cached }
         if mirrorImageCache.count >= 16 {
             mirrorImageCache.removeAll(keepingCapacity: false)
@@ -148,20 +163,24 @@ enum DieFaceTexture {
         }
     }
 
-    /// Runtime-drawn face: opaque fill + pips or a numeral. The fill must
-    /// be opaque — transparent texture corners render as holes in the die
-    /// face (the geometry's chamfer already provides the rounded look).
+    /// Runtime-drawn face: fill + pips or a numeral. The fill's alpha is
+    /// `bodyAlpha` — 1 for opaque dice, `1 − translucency` for glass —
+    /// while ink always draws at alpha 1: glass you can still read. The
+    /// same image serves as diffuse RGB, SceneKit `transparent` map, and
+    /// RealityKit opacity texture. Corners carry the fill's alpha, not
+    /// zero — the geometry's chamfer provides the rounded look.
     static func image(for value: Int, shape: DieShape,
                       face: CodableColor, pip: CodableColor,
-                      side: CGFloat = 256) -> UIImage {
+                      side: CGFloat = 256, bodyAlpha: CGFloat = 1) -> UIImage {
         let size = CGSize(width: side, height: side)
+        let ink = pip.uiColor.withAlphaComponent(1)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            face.uiColor.setFill()
+            face.uiColor.withAlphaComponent(bodyAlpha).setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
             switch shape {
             case .d6:
-                pip.uiColor.setFill()
+                ink.setFill()
                 let margin = side * 0.24
                 let step = (side - 2 * margin) / 2
                 let radius = side * 0.085
@@ -178,10 +197,10 @@ enum DieFaceTexture {
                 // it glued to the baseline instead of floating free.
                 let attributes: [NSAttributedString.Key: Any] = [
                     .font: UIFont.boldSystemFont(ofSize: side * Numeral.pointScale),
-                    .foregroundColor: pip.uiColor,
+                    .foregroundColor: ink,
                     .underlineStyle: (value == 6 || value == 9)
                         ? NSUnderlineStyle.single.rawValue : 0,
-                    .underlineColor: pip.uiColor,
+                    .underlineColor: ink,
                 ]
                 let text = NSAttributedString(string: String(value),
                                               attributes: attributes)
@@ -207,10 +226,15 @@ enum DieFaceTexture {
     /// `emission.intensity` carries the peak while the texture holds the
     /// face-vs-pip ratio, which is the only way "glowing pips, dark body"
     /// fits one emission channel.
+    ///
+    /// Translucency reuses the diffuse image's alpha as the transparency
+    /// map — body α = 1 − t, ink α = 1 — and turns the material double-
+    /// sided so the far side's ink reads through the near side's glass.
     @MainActor static func materials(for geometry: SCNGeometry, shape: DieShape,
                                      appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {
         let images = images(for: appearance, shape: shape)
         let emissionImages = emissionImages(for: appearance, shape: shape)
+        let translucent = appearance.translucency > 0
         return materialAxes(of: geometry).map { direction in
             let value = DieFace.value(facing: direction, shape: shape)
             let material = SCNMaterial()
@@ -219,6 +243,11 @@ enum DieFaceTexture {
             material.roughness.contents = NSNumber(value: appearance.roughness)
             material.metalness.contents = NSNumber(value: appearance.metalness)
             material.clearCoat.contents = NSNumber(value: appearance.clearcoat)
+            if translucent {
+                material.transparent.contents = images[value - 1]
+                material.isDoubleSided = true
+                material.transparencyMode = .dualLayer
+            }
             if let emissionImages {
                 material.emission.contents = emissionImages[value - 1]
                 material.emission.intensity = CGFloat(appearance.emission.intensity)

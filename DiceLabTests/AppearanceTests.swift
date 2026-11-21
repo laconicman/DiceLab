@@ -18,7 +18,8 @@ struct AppearanceTests {
         let custom = Appearance(
             die: DieAppearance(faceColor: CodableColor(red: 0.2, green: 0.3, blue: 0.8),
                                pipColor: CodableColor(red: 1, green: 0.9, blue: 0.1),
-                               roughness: 0.8, metalness: 0.4, clearcoat: 0.6),
+                               roughness: 0.8, metalness: 0.4, clearcoat: 0.6,
+                               translucency: 0.4),
             felt: FeltAppearance(color: CodableColor(red: 0.1, green: 0.1, blue: 0.4),
                                  usesImage: true, reflectivity: 0.4),
             lighting: .dramatic)
@@ -88,6 +89,7 @@ struct AppearanceTests {
         // their defaults, not on a decode failure.
         #expect(appearance.felt.reflectivity == 0)
         #expect(appearance.die.emission == EmissionAppearance())
+        #expect(appearance.die.translucency == 0)
         #expect(appearance.backdrop == BackdropAppearance())
     }
 
@@ -194,6 +196,38 @@ struct AppearanceTests {
         // A bare face corner has no emission — the bake must not shift it.
         let corner = (10 * mirror.width + 10) * 4
         #expect(mirror.bytes[corner] == base.bytes[corner])
+
+        // A glass die's composite must not collide with the opaque one's
+        // cache entry — translucency is in the key (TD-13 + M13).
+        die.translucency = 0.5
+        let glass = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        #expect(glass[0].pngData() != composites[0].pngData())
+    }
+
+    /// M13: the face image's alpha is the translucency contract — body
+    /// pixels carry 1 − t, ink pixels stay 1. The same image feeds
+    /// SceneKit's `transparent` map and RealityKit's opacity texture,
+    /// so the split has to live in the pixels, and an opaque theme must
+    /// keep alpha 1 everywhere (the pre-M13 images were opaque).
+    @Test("face image alpha splits body from ink")
+    func faceImageAlpha() throws {
+        var glass = Appearance.ivory.die
+        glass.translucency = 0.6
+        let glassFace = try #require(
+            rgba(DieFaceTexture.images(for: glass, shape: .d6)[0]))
+        // Face 1's only mark is the center pip.
+        let bodyAlpha = (10 * glassFace.width + 10) * 4 + 3
+        #expect(abs(Int(glassFace.bytes[bodyAlpha]) - 102) <= 1) // 0.4 × 255
+        let inkAlpha = (glassFace.height / 2 * glassFace.width
+                        + glassFace.width / 2) * 4 + 3
+        #expect(glassFace.bytes[inkAlpha] == 255)
+        // t = 0 stays fully opaque — presets and default themes are
+        // pixel-identical to the pre-M13 art.
+        let opaque = try #require(
+            rgba(DieFaceTexture.images(for: Appearance.ivory.die,
+                                       shape: .d6)[0]))
+        #expect(opaque.bytes[bodyAlpha] == 255)
     }
 
     /// Raw RGBA bytes for pixel assertions — both images go through the

@@ -508,7 +508,7 @@ extension DiceTableController {
     func spawnDice(_ count: Int) {
         for position in Self.spawnPositions(count: count, shape: dieShape) {
             let die = Self.makeDie(at: position, shape: dieShape,
-                                   appearance: theme.appearance.die)
+                                   appearance: theme.appearance.die.effective)
             dice.append(die)
             scene.rootNode.addChildNode(die)
         }
@@ -547,14 +547,15 @@ extension DiceTableController {
     /// reassignment; felt and lights are found by name.
     func applyAppearance() {
         let appearance = theme.appearance
+        let dieAppearance = appearance.die.effective
         for die in dice {
             guard let geometry = die.geometry else { continue }
             geometry.materials = DieFaceTexture.materials(
-                for: geometry, shape: dieShape, appearance: appearance.die)
+                for: geometry, shape: dieShape, appearance: dieAppearance)
         }
         if let geometry = previewDie?.geometry {
             geometry.materials = DieFaceTexture.materials(
-                for: geometry, shape: dieShape, appearance: appearance.die)
+                for: geometry, shape: dieShape, appearance: dieAppearance)
         }
         applyFelt(appearance.felt)
         applyLighting(appearance.lighting, in: scene.rootNode)
@@ -637,7 +638,7 @@ extension DiceTableController {
         camera.look(at: SCNVector3Zero)
 
         let die = Self.makeDie(at: SCNVector3Zero, shape: dieShape,
-                               appearance: theme.appearance.die)
+                               appearance: theme.appearance.die.effective)
         die.physicsBody = nil
         die.runAction(SCNAction.repeatForever(
             SCNAction.rotateBy(x: Preview.spinX, y: Preview.spinY, z: 0,
