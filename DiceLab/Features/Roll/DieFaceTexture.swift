@@ -62,9 +62,10 @@ enum DieFaceTexture {
     @MainActor private static var faceImageCache: [Ink: [UIImage]] = [:]
 
     /// The cached faces, 1…`shape.faceCount`, keyed by ink alone — the
-    /// diffuse channel both engines bind, and the alpha both read as
-    /// opacity when `translucency` is up (body α = color α × (1 − t),
-    /// ink keeps the pip color's α). Emission draws through here too
+    /// diffuse channel both engines bind, with the translucency split
+    /// in its alpha (body α = color α × (1 − t), ink keeps the pip
+    /// color's α): SceneKit's `transparent` map reads it directly,
+    /// RealityKit through `opacityImages`. Emission draws through here too
     /// with translucency 0 and `glowMask`: its alpha is a glow mask the
     /// composite reads, while the engines' emission channels read RGB
     /// only.
@@ -90,8 +91,7 @@ enum DieFaceTexture {
     }
 
     /// The diffuse channel — the RealityKit path binds the same images
-    /// through `TextureResource` for color and opacity; generation stays
-    /// in one place.
+    /// through `TextureResource`; generation stays in one place.
     @MainActor static func images(for appearance: DieAppearance,
                                   shape: DieShape) -> [UIImage] {
         images(face: appearance.faceColor, pip: appearance.pipColor,
@@ -201,8 +201,8 @@ enum DieFaceTexture {
     /// packed emission color is black — the mirror composite then adds
     /// opacity only where light is actually added. Ink is never masked:
     /// opaque black pip ink is what keeps face glow off the pips.
-    /// The same image serves as diffuse RGB, SceneKit `transparent`
-    /// map, and RealityKit opacity texture.
+    /// The same image serves as diffuse RGB and SceneKit `transparent`
+    /// map; RealityKit's opacity slot gets `opacityImages`.
     static func image(for value: Int, shape: DieShape,
                       face: CodableColor, pip: CodableColor,
                       side: CGFloat = 256, bodyAlpha: CGFloat = 1,
