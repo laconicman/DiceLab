@@ -141,6 +141,6 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
 ## Next
 
 Open learning surface: device-time haptic/tuning pass, scripted camera
-  moments (would revisit TD-3's default-on toggle), a second skin family,
-  or RealityKit-vs-SceneKit performance measurement. Voice-trigger design
-  (Speech framework, permissions, per-locale grammar).
+moments (would revisit TD-3's default-on toggle), a second skin family,
+or RealityKit-vs-SceneKit performance measurement. Voice-trigger design
+(Speech framework, permissions, per-locale grammar).

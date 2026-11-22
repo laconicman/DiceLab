@@ -206,9 +206,10 @@ struct AppearanceTests {
     }
 
     /// M13: the face image's alpha is the translucency contract — body
-    /// pixels carry 1 − t, ink pixels stay 1. The same image feeds
-    /// SceneKit's `transparent` map and RealityKit's opacity texture,
-    /// so the split has to live in the pixels, and an opaque theme must
+    /// pixels carry color α × (1 − t), ink keeps the pip color's α.
+    /// SceneKit's `transparent` map and RealityKit's opacity map both
+    /// derive from it, so the split has to live in the pixels, and an
+    /// opaque theme must
     /// keep alpha 1 everywhere (the pre-M13 images were opaque).
     @Test("face image alpha splits body from ink")
     func faceImageAlpha() throws {
@@ -275,9 +276,10 @@ struct AppearanceTests {
     }
 
     /// A glass die's mirror composite must keep the body's alpha — the
-    /// emission image is opaque, so a naive plusLighter bake drove the
+    /// emission image was opaque once, so the plusLighter bake drove the
     /// composite to alpha 1 and the reflection showed a solid black
-    /// body. Pips still glow at full alpha.
+    /// body; its glow mask now adds alpha only where light is added.
+    /// Pips still glow at full alpha.
     @Test("glass + emission composite keeps the body's alpha")
     func glassEmissionCompositeAlpha() throws {
         var die = Appearance.ivory.die
