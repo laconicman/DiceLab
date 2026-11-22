@@ -82,4 +82,29 @@ enum DevFlags {
         else { return nil }
         return Double(arguments[index + 1])
     }()
+
+    /// `-translucency 0.6` — transient translucency override for glass-
+    /// dice captures; shadows the stored dial without writing it back
+    /// (the `-pace` pattern). Clamped to the dial's 0…1 — out-of-range
+    /// values have no meaning to stress-test here.
+    static let translucencyOverride: Double? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-translucency"),
+              index + 1 < arguments.count,
+              let value = Double(arguments[index + 1])
+        else { return nil }
+        return min(max(value, 0), 1)
+    }()
+}
+
+extension DieAppearance {
+    /// The die skin material builders should see: `-translucency`
+    /// shadows the stored dial for the process lifetime — transient
+    /// like `-pace`, never written back to the persisted theme.
+    var effective: DieAppearance {
+        guard let override = DevFlags.translucencyOverride else { return self }
+        var copy = self
+        copy.translucency = override
+        return copy
+    }
 }

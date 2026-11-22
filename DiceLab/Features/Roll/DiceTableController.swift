@@ -243,7 +243,7 @@ final class DiceTableController: NSObject {
         // A shape change lands here too: the preview die must match the
         // table's geometry, not just its paint.
         previewDie?.geometry = Self.dieGeometry(
-            for: dieShape, appearance: theme.appearance.die)
+            for: dieShape, appearance: theme.appearance.die.effective)
         // Fresh bodies carry default damping — re-apply the tuned feel.
         applyDynamics()
     }

@@ -31,16 +31,24 @@ struct DieAppearance: Codable, Equatable, Hashable {
     var metalness: Double = 0
     var clearcoat: Double = 0
     var emission = EmissionAppearance()
+    /// How much the die's body lets light through, 0…1: 0 is opaque
+    /// (the presets), 1 a fully clear body. The dial never touches the
+    /// ink — the face image's alpha carries the split (body α = color α
+    /// × (1 − t), ink keeps the pip color's α). See Design.md,
+    /// "Glass dice".
+    var translucency: Double = 0
 
     init(faceColor: CodableColor, pipColor: CodableColor,
          roughness: Double = 0.35, metalness: Double = 0,
-         clearcoat: Double = 0, emission: EmissionAppearance = EmissionAppearance()) {
+         clearcoat: Double = 0, emission: EmissionAppearance = EmissionAppearance(),
+         translucency: Double = 0) {
         self.faceColor = faceColor
         self.pipColor = pipColor
         self.roughness = roughness
         self.metalness = metalness
         self.clearcoat = clearcoat
         self.emission = emission
+        self.translucency = translucency
     }
 
     /// All fields decode leniently — the synthesized decoder would bounce
@@ -55,6 +63,7 @@ struct DieAppearance: Codable, Equatable, Hashable {
         clearcoat = try container.decodeIfPresent(Double.self, forKey: .clearcoat) ?? 0
         emission = try container.decodeIfPresent(EmissionAppearance.self, forKey: .emission)
             ?? EmissionAppearance()
+        translucency = try container.decodeIfPresent(Double.self, forKey: .translucency) ?? 0
     }
 }
 

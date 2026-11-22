@@ -497,13 +497,16 @@ extension RealityTableController {
     }
 
     func spawnDice(_ count: Int) {
+        let dieAppearance = theme.appearance.die.effective
         let faceMaterials = Self.materials(shape: dieShape,
-                                           appearance: theme.appearance.die)
+                                           appearance: dieAppearance)
         let mirrorMaterials = Self.mirrorMaterials(
-            of: faceMaterials, reflectivity: theme.appearance.felt.reflectivity)
+            of: faceMaterials, appearance: dieAppearance,
+            shape: dieShape,
+            reflectivity: theme.appearance.felt.reflectivity)
         for position in Self.spawnPositions(count: count, shape: dieShape) {
             let die = Self.makeDie(at: position, shape: dieShape,
-                                   appearance: theme.appearance.die)
+                                   appearance: dieAppearance)
             dice.append(die)
             root.addChild(die)
             let mirror = ModelEntity(mesh: Self.dieMesh(for: dieShape),
@@ -528,7 +531,8 @@ extension RealityTableController {
     /// reassignment; felt and lights are found by name.
     func applyAppearance() {
         let appearance = theme.appearance
-        let materials = Self.materials(shape: dieShape, appearance: appearance.die)
+        let dieAppearance = appearance.die.effective
+        let materials = Self.materials(shape: dieShape, appearance: dieAppearance)
         for die in dice {
             die.components[ModelComponent.self]?.materials = materials
         }
@@ -536,7 +540,8 @@ extension RealityTableController {
         // The mirrors wear unlit twins of the same skins — and the dial
         // toggles whether they draw at all.
         let mirrorMaterials = Self.mirrorMaterials(
-            of: materials, reflectivity: appearance.felt.reflectivity)
+            of: materials, appearance: dieAppearance, shape: dieShape,
+            reflectivity: appearance.felt.reflectivity)
         for mirror in mirrors {
             mirror.components[ModelComponent.self]?.materials = mirrorMaterials
             mirror.isEnabled = appearance.felt.reflectivity > 0
@@ -714,7 +719,7 @@ extension RealityTableController {
         let die = ModelEntity(
             mesh: Self.dieMesh(for: dieShape),
             materials: Self.materials(shape: dieShape,
-                                      appearance: theme.appearance.die))
+                                      appearance: theme.appearance.die.effective))
         previewRoot.addChild(die)
         previewDie = die
 
@@ -781,18 +786,27 @@ extension RealityTableController {
     /// value uses.
     static func materials(shape: DieShape,
                           appearance: DieAppearance) -> [any RealityKit.Material] {
+        slotFaceValues(shape: shape).map { value in
+            value > 0 ? faceMaterial(value, shape: shape, appearance: appearance)
+                      : PhysicallyBasedMaterial()
+        }
+    }
+
+    /// Face value per material slot — the centroid resolution
+    /// `materials` uses, shared so the mirror copies bind the same
+    /// slot→face mapping and can never disagree with the die they
+    /// reflect. 0 marks a slot no mesh part claimed.
+    static func slotFaceValues(shape: DieShape) -> [Int] {
         let mesh = dieMesh(for: shape)
-        var slots: [any RealityKit.Material] = (0..<mesh.expectedMaterialCount)
-            .map { _ in PhysicallyBasedMaterial() }
+        var values = [Int](repeating: 0, count: mesh.expectedMaterialCount)
         for model in mesh.contents.models {
             for part in model.parts {
-                guard part.materialIndex < slots.count else { continue }
-                let value = DieFace.value(facing: centroid(of: part), shape: shape)
-                slots[part.materialIndex] = faceMaterial(
-                    value, shape: shape, appearance: appearance)
+                guard part.materialIndex < values.count else { continue }
+                values[part.materialIndex] = DieFace.value(
+                    facing: centroid(of: part), shape: shape)
             }
         }
-        return slots
+        return values
     }
 
     /// Reflection translation (M12). iOS RealityKit has no planar
@@ -836,16 +850,42 @@ extension RealityTableController {
     /// mint six textures again. The tint carries the source material's own
     /// color dimmed: when a face has no texture its material tints the
     /// face color, and the copy must show that color at `tint`, not gray.
+    ///
+    /// Emission (TD-13): an unlit material has no emissive channel, so a
+    /// glowing die's copy would show plain pips. When the appearance
+    /// emits, `DieFaceTexture.mirrorImages` bakes base + glow into one
+    /// texture per face and the copy binds that instead — minting
+    /// composites per `applyAppearance`, the same cost class the dice's
+    /// own materials already pay. No emission keeps the reuse path.
     static func mirrorMaterials(of materials: [any RealityKit.Material],
+                                appearance: DieAppearance, shape: DieShape,
                                 reflectivity: Double) -> [any RealityKit.Material] {
-        materials.map { material in
-            let base = material as? PhysicallyBasedMaterial
+        // Invisible mirrors don't earn baked composites — reflectivity 0
+        // disables every copy, so skip the 20-bitmap bake entirely.
+        let composites = reflectivity > 0
+            ? DieFaceTexture.mirrorImages(for: appearance, shape: shape)
+            : nil
+        let values = composites == nil ? nil : slotFaceValues(shape: shape)
+        // Glass dice draw both windings, so their reflections must too —
+        // far-side ink reads through the near side's translucent body.
+        let doubleSided = appearance.translucency > 0
+        return materials.enumerated().map { index, material in
             var unlit = UnlitMaterial()
-            unlit.color = .init(tint: Self.dimmed(base?.baseColor.tint),
-                                texture: base?.baseColor.texture)
             unlit.blending = .transparent(
                 opacity: .init(floatLiteral: Float(reflectivity)))
-            unlit.faceCulling = .front
+            unlit.faceCulling = doubleSided ? .none : .front
+            if let composites, let values, index < values.count,
+               values[index] > 0,
+               let cgImage = composites[values[index] - 1].cgImage,
+               let texture = try? TextureResource(
+                   image: cgImage, options: .init(semantic: .color)) {
+                unlit.color = .init(tint: UIColor(white: Mirror.tint, alpha: 1),
+                                    texture: .init(texture))
+                return unlit
+            }
+            let base = material as? PhysicallyBasedMaterial
+            unlit.color = .init(tint: Self.dimmed(base?.baseColor.tint),
+                                texture: base?.baseColor.texture)
             return unlit
         }
     }
@@ -895,6 +935,19 @@ extension RealityTableController {
         material.roughness = .init(floatLiteral: Float(appearance.roughness))
         material.metallic = .init(floatLiteral: Float(appearance.metalness))
         material.clearcoat = .init(floatLiteral: Float(appearance.clearcoat))
+        // Glass (M13): the opacity slot takes the face alpha as its own
+        // grayscale map — the sampler reads a color channel, not alpha
+        // (measured; Design.md, "Glass dice") — and both faces draw so
+        // the far side's ink reads through.
+        if appearance.translucency > 0,
+           let cgImage = DieFaceTexture.opacityImages(
+               for: appearance, shape: shape)[value - 1].cgImage,
+           let opacity = try? TextureResource(
+               image: cgImage, options: .init(semantic: .raw)) {
+            material.blending = .transparent(
+                opacity: .init(scale: 1, texture: .init(opacity)))
+            material.faceCulling = .none
+        }
         // Emission is a texture here too, with `emissiveIntensity` carrying
         // the peak — the same split as the SceneKit `emission` channel.
         // The color parameter must stay unset: a non-black `EmissiveColor`

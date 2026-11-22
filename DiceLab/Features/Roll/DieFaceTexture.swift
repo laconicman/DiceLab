@@ -37,13 +37,20 @@ enum DieFaceTexture {
         [0.5, 0.0], [0.067, 0.75], [0.933, 0.75],
     ]
 
-    /// Cache key: only the shape and the two ink colors reach the pixels —
-    /// finish channels shape the material, not the texture, so keying by
-    /// them would duplicate identical images on every slider edit.
+    /// Cache key: the ink colors, shape, and translucency reach the
+    /// pixels — finish channels shape the material, not the texture, so
+    /// keying by them would duplicate identical images on every slider
+    /// edit.
     private struct Ink: Hashable {
         let face: CodableColor
         let pip: CodableColor
         let shape: DieShape
+        let translucency: Double
+        /// Emission images carry a glow mask in alpha (opaque only where
+        /// the packed color is non-black) so the mirror composite adds
+        /// opacity exactly where light is added — pixels differ, so the
+        /// mask can't share a cache entry with the diffuse draw.
+        let glowMask: Bool
     }
 
     /// Face images per ink, drawn lazily and cached — identical for
@@ -55,18 +62,29 @@ enum DieFaceTexture {
     @MainActor private static var faceImageCache: [Ink: [UIImage]] = [:]
 
     /// The cached faces, 1…`shape.faceCount`, keyed by ink alone — the
-    /// diffuse and emission channels both draw through here; a
-    /// packed-emission ink that happens to match a diffuse ink shares the
-    /// same images.
+    /// diffuse channel both engines bind, with the translucency split
+    /// in its alpha (body α = color α × (1 − t), ink keeps the pip
+    /// color's α): SceneKit's `transparent` map reads it directly,
+    /// RealityKit through `opacityImages`. Emission draws through here too
+    /// with translucency 0 and `glowMask`: its alpha is a glow mask the
+    /// composite reads, while the engines' emission channels read RGB
+    /// only.
     @MainActor static func images(face: CodableColor, pip: CodableColor,
-                                  shape: DieShape) -> [UIImage] {
-        let key = Ink(face: face, pip: pip, shape: shape)
+                                  shape: DieShape,
+                                  translucency: Double = 0,
+                                  glowMask: Bool = false) -> [UIImage] {
+        // Clamp once: an out-of-range payload must not mint a negative-
+        // alpha fill, and values that clamp alike share one cache entry.
+        let t = min(max(translucency, 0), 1)
+        let key = Ink(face: face, pip: pip, shape: shape, translucency: t,
+                      glowMask: glowMask)
         if let cached = faceImageCache[key] { return cached }
         // Color sliders mint a key per sampled value — a long edit session
         // could grow the map without limit, so it resets past 16 entries.
         if faceImageCache.count >= 16 { faceImageCache.removeAll(keepingCapacity: false) }
         let drawn = (1...shape.faceCount).map {
-            image(for: $0, shape: shape, face: face, pip: pip)
+            image(for: $0, shape: shape, face: face, pip: pip,
+                  bodyAlpha: 1 - CGFloat(t), glowMask: glowMask)
         }
         faceImageCache[key] = drawn
         return drawn
@@ -76,7 +94,25 @@ enum DieFaceTexture {
     /// through `TextureResource`; generation stays in one place.
     @MainActor static func images(for appearance: DieAppearance,
                                   shape: DieShape) -> [UIImage] {
-        images(face: appearance.faceColor, pip: appearance.pipColor, shape: shape)
+        images(face: appearance.faceColor, pip: appearance.pipColor,
+               shape: shape, translucency: appearance.translucency)
+    }
+
+    /// The face alpha as an opaque grayscale map, for RealityKit's
+    /// opacity slot: that sampler reads a *color* channel of its texture,
+    /// not the alpha (measured — bound to the face image itself it made
+    /// the white body opaque and the black ink clear). Gray level = the
+    /// alpha `images(for:)` carries: body = color α × (1 − t), ink = the
+    /// pip α composited over it.
+    @MainActor static func opacityImages(for appearance: DieAppearance,
+                                         shape: DieShape) -> [UIImage] {
+        let t = min(max(appearance.translucency, 0), 1)
+        let body = appearance.faceColor.alpha * (1 - t)
+        let ink = appearance.pipColor.alpha
+            + body * (1 - appearance.pipColor.alpha)
+        return images(face: CodableColor(red: body, green: body, blue: body),
+                      pip: CodableColor(red: ink, green: ink, blue: ink),
+                      shape: shape)
     }
 
     /// The emission channel as images, or nil when nothing emits: the
@@ -89,23 +125,102 @@ enum DieFaceTexture {
         let emission = appearance.emission
         guard emission.peak > 0 else { return nil }
         return images(face: emission.packedFace, pip: emission.packedPips,
-                      shape: shape)
+                      shape: shape, glowMask: true)
     }
 
-    /// Runtime-drawn face: opaque fill + pips or a numeral. The fill must
-    /// be opaque — transparent texture corners render as holes in the die
-    /// face (the geometry's chamfer already provides the rounded look).
+    /// Composite key for the mirror bake: every input that reaches the
+    /// pixels — diffuse ink, packed emission ink, the intensity alpha,
+    /// translucency (the base's alpha rides into the composite), and the
+    /// shape (pips vs numerals).
+    private struct MirrorInk: Hashable {
+        let face: CodableColor
+        let pip: CodableColor
+        let emissionFace: CodableColor
+        let emissionPip: CodableColor
+        let intensity: Double
+        let translucency: Double
+        let shape: DieShape
+    }
+
+    /// Baked composites for the RealityKit mirror copies (TD-13): the
+    /// diffuse face with its emission added on top — an `UnlitMaterial`
+    /// has no emissive channel, so the glow is baked into the texture.
+    /// `plusLighter` approximates the PBR `texture × intensity` add; the
+    /// draw alpha is `min(intensity, 1)`, so glow above 1× reads dimmer
+    /// in the mirror than on the die — accepted, the copy is already
+    /// dimmed. Nil when nothing emits: callers keep reusing the dice's
+    /// own `TextureResource`s, which costs nothing per slider tick.
+    @MainActor static func mirrorImages(for appearance: DieAppearance,
+                                        shape: DieShape) -> [UIImage]? {
+        let emission = appearance.emission
+        guard let emissionImages = emissionImages(for: appearance, shape: shape)
+        else { return nil }
+        let key = MirrorInk(face: appearance.faceColor, pip: appearance.pipColor,
+                            emissionFace: emission.packedFace,
+                            emissionPip: emission.packedPips,
+                            intensity: emission.intensity,
+                            translucency: min(max(appearance.translucency, 0), 1),
+                            shape: shape)
+        if let cached = mirrorImageCache[key] { return cached }
+        if mirrorImageCache.count >= 16 {
+            mirrorImageCache.removeAll(keepingCapacity: false)
+        }
+        let diffuse = images(for: appearance, shape: shape)
+        let alpha = CGFloat(min(emission.intensity, 1))
+        let drawn = (0..<shape.faceCount).map { index in
+            composite(base: diffuse[index], emission: emissionImages[index],
+                      alpha: alpha)
+        }
+        mirrorImageCache[key] = drawn
+        return drawn
+    }
+
+    @MainActor private static var mirrorImageCache: [MirrorInk: [UIImage]] = [:]
+
+    /// Base face with the emission image added on top — `plusLighter`
+    /// adds source to destination, which is what an emissive channel
+    /// does to a lit surface. The emission image's alpha is a glow mask
+    /// (opaque only where its packed color is non-black), so the add
+    /// raises opacity exactly where light is added: a glass die's body
+    /// keeps its translucency in the reflection instead of growing a
+    /// solid dark one, and the body alpha no longer couples to the glow
+    /// intensity.
+    private static func composite(base: UIImage, emission: UIImage,
+                                  alpha: CGFloat) -> UIImage {
+        UIGraphicsImageRenderer(size: base.size).image { _ in
+            base.draw(at: .zero)
+            emission.draw(at: .zero, blendMode: .plusLighter, alpha: alpha)
+        }
+    }
+
+    /// Runtime-drawn face: fill + pips or a numeral. The fill's alpha is
+    /// the color's own alpha × `bodyAlpha` — 1 for opaque dice, the
+    /// translucency factor for glass — so the picker's opacity survives
+    /// the dial; ink keeps the pip color's alpha untouched: glass you
+    /// can still read. `glowMask` zeroes the fill's alpha when the
+    /// packed emission color is black — the mirror composite then adds
+    /// opacity only where light is actually added. Ink is never masked:
+    /// opaque black pip ink is what keeps face glow off the pips.
+    /// The same image serves as diffuse RGB and SceneKit `transparent`
+    /// map; RealityKit's opacity slot gets `opacityImages`.
     static func image(for value: Int, shape: DieShape,
                       face: CodableColor, pip: CodableColor,
-                      side: CGFloat = 256) -> UIImage {
+                      side: CGFloat = 256, bodyAlpha: CGFloat = 1,
+                      glowMask: Bool = false) -> UIImage {
         let size = CGSize(width: side, height: side)
+        let ink = pip.uiColor
+        // Below ~1/255 per channel the 8-bit bitmap quantizes to black
+        // anyway — masking it off keeps alpha honest with the pixels.
+        let emits = face.red + face.green + face.blue > 0.004
+        let fillAlpha = glowMask && !emits ? 0
+            : CGFloat(face.alpha) * bodyAlpha
         return UIGraphicsImageRenderer(size: size).image { _ in
-            face.uiColor.setFill()
+            face.uiColor.withAlphaComponent(fillAlpha).setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
             switch shape {
             case .d6:
-                pip.uiColor.setFill()
+                ink.setFill()
                 let margin = side * 0.24
                 let step = (side - 2 * margin) / 2
                 let radius = side * 0.085
@@ -122,10 +237,10 @@ enum DieFaceTexture {
                 // it glued to the baseline instead of floating free.
                 let attributes: [NSAttributedString.Key: Any] = [
                     .font: UIFont.boldSystemFont(ofSize: side * Numeral.pointScale),
-                    .foregroundColor: pip.uiColor,
+                    .foregroundColor: ink,
                     .underlineStyle: (value == 6 || value == 9)
                         ? NSUnderlineStyle.single.rawValue : 0,
-                    .underlineColor: pip.uiColor,
+                    .underlineColor: ink,
                 ]
                 let text = NSAttributedString(string: String(value),
                                               attributes: attributes)
@@ -151,10 +266,16 @@ enum DieFaceTexture {
     /// `emission.intensity` carries the peak while the texture holds the
     /// face-vs-pip ratio, which is the only way "glowing pips, dark body"
     /// fits one emission channel.
+    ///
+    /// Translucency reuses the diffuse image's alpha as the transparency
+    /// map — body α = color α × (1 − t), ink keeps the pip color's α —
+    /// and turns the material double-
+    /// sided so the far side's ink reads through the near side's glass.
     @MainActor static func materials(for geometry: SCNGeometry, shape: DieShape,
                                      appearance: DieAppearance = Appearance.ivory.die) -> [SCNMaterial] {
         let images = images(for: appearance, shape: shape)
         let emissionImages = emissionImages(for: appearance, shape: shape)
+        let translucent = appearance.translucency > 0
         return materialAxes(of: geometry).map { direction in
             let value = DieFace.value(facing: direction, shape: shape)
             let material = SCNMaterial()
@@ -163,6 +284,11 @@ enum DieFaceTexture {
             material.roughness.contents = NSNumber(value: appearance.roughness)
             material.metalness.contents = NSNumber(value: appearance.metalness)
             material.clearCoat.contents = NSNumber(value: appearance.clearcoat)
+            if translucent {
+                material.transparent.contents = images[value - 1]
+                material.isDoubleSided = true
+                material.transparencyMode = .dualLayer
+            }
             if let emissionImages {
                 material.emission.contents = emissionImages[value - 1]
                 material.emission.intensity = CGFloat(appearance.emission.intensity)

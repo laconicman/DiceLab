@@ -18,7 +18,8 @@ struct AppearanceTests {
         let custom = Appearance(
             die: DieAppearance(faceColor: CodableColor(red: 0.2, green: 0.3, blue: 0.8),
                                pipColor: CodableColor(red: 1, green: 0.9, blue: 0.1),
-                               roughness: 0.8, metalness: 0.4, clearcoat: 0.6),
+                               roughness: 0.8, metalness: 0.4, clearcoat: 0.6,
+                               translucency: 0.4),
             felt: FeltAppearance(color: CodableColor(red: 0.1, green: 0.1, blue: 0.4),
                                  usesImage: true, reflectivity: 0.4),
             lighting: .dramatic)
@@ -88,6 +89,7 @@ struct AppearanceTests {
         // their defaults, not on a decode failure.
         #expect(appearance.felt.reflectivity == 0)
         #expect(appearance.die.emission == EmissionAppearance())
+        #expect(appearance.die.translucency == 0)
         #expect(appearance.backdrop == BackdropAppearance())
     }
 
@@ -168,6 +170,160 @@ struct AppearanceTests {
         #expect(emission?.count == 6)
         #expect(emission?[0].pngData()
                 != DieFaceTexture.images(for: die, shape: .d6)[0].pngData())
+    }
+
+    /// TD-13: an unlit mirror copy has no emissive channel, so the glow
+    /// is baked into the composite — where pips emit the mirror must be
+    /// *brighter* than the plain face (additive, not a tint swap), and a
+    /// bare face corner must stay identical. Nothing emitting keeps the
+    /// nil gate so the reuse path costs nothing.
+    @Test("mirror images bake emission over the diffuse face")
+    func mirrorImagesBakeEmission() throws {
+        #expect(DieFaceTexture.mirrorImages(for: Appearance.ivory.die,
+                                            shape: .d6) == nil)
+        var die = Appearance.ivory.die
+        die.emission.pipColor = CodableColor(red: 1, green: 0, blue: 0)
+        die.emission.pipIntensity = 1
+        let composites = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        #expect(composites.count == 6)
+        let base = try #require(
+            rgba(DieFaceTexture.images(for: die, shape: .d6)[0]))
+        let mirror = try #require(rgba(composites[0]))
+        // Face 1's only mark is the center pip — red emission lands there.
+        let center = (mirror.height / 2 * mirror.width + mirror.width / 2) * 4
+        #expect(mirror.bytes[center] > base.bytes[center])
+        // A bare face corner has no emission — the bake must not shift it.
+        let corner = (10 * mirror.width + 10) * 4
+        #expect(mirror.bytes[corner] == base.bytes[corner])
+
+        // A glass die's composite must not collide with the opaque one's
+        // cache entry — translucency is in the key (TD-13 + M13).
+        die.translucency = 0.5
+        let glass = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        #expect(glass[0].pngData() != composites[0].pngData())
+    }
+
+    /// M13: the face image's alpha is the translucency contract — body
+    /// pixels carry color α × (1 − t), ink keeps the pip color's α.
+    /// SceneKit's `transparent` map and RealityKit's opacity map both
+    /// derive from it, so the split has to live in the pixels, and an
+    /// opaque theme must
+    /// keep alpha 1 everywhere (the pre-M13 images were opaque).
+    @Test("face image alpha splits body from ink")
+    func faceImageAlpha() throws {
+        var glass = Appearance.ivory.die
+        glass.translucency = 0.6
+        let glassFace = try #require(
+            rgba(DieFaceTexture.images(for: glass, shape: .d6)[0]))
+        // Face 1's only mark is the center pip.
+        let bodyAlpha = (10 * glassFace.width + 10) * 4 + 3
+        #expect(abs(Int(glassFace.bytes[bodyAlpha]) - 102) <= 1) // 0.4 × 255
+        let inkAlpha = (glassFace.height / 2 * glassFace.width
+                        + glassFace.width / 2) * 4 + 3
+        #expect(glassFace.bytes[inkAlpha] == 255)
+        // t = 0 stays fully opaque — presets and default themes are
+        // pixel-identical to the pre-M13 art.
+        let opaque = try #require(
+            rgba(DieFaceTexture.images(for: Appearance.ivory.die,
+                                       shape: .d6)[0]))
+        #expect(opaque.bytes[bodyAlpha] == 255)
+    }
+
+    /// RealityKit's opacity sampler reads color, not alpha — the map
+    /// must carry the face image's alpha split as opaque gray.
+    @Test("opacity map mirrors the face alpha as opaque gray")
+    func opacityMapMatchesFaceAlpha() throws {
+        var glass = Appearance.ivory.die
+        glass.translucency = 0.6
+        let map = try #require(
+            rgba(DieFaceTexture.opacityImages(for: glass, shape: .d6)[0]))
+        let body = (10 * map.width + 10) * 4
+        let ink = (map.height / 2 * map.width + map.width / 2) * 4
+        #expect(abs(Int(map.bytes[body]) - 102) <= 1) // 0.4 × 255
+        #expect(map.bytes[body + 3] == 255)
+        #expect(map.bytes[ink] == 255)
+    }
+
+    /// The color picker's own opacity must survive the translucency
+    /// dial: body alpha = color alpha × (1 − t). Ink draws over the
+    /// body with its own alpha, so a pip pixel composites source-over —
+    /// pip α + body α × (1 − pip α). Before the fix
+    /// `withAlphaComponent` replaced the color's alpha outright — a
+    /// picker opacity edit rendered nothing.
+    @Test("color alpha multiplies the translucency factor")
+    func colorAlphaSurvivesTranslucency() throws {
+        var die = Appearance.ivory.die
+        die.faceColor = CodableColor(red: 0.8, green: 0.2, blue: 0.2,
+                                     alpha: 0.5)
+        die.pipColor = CodableColor(red: 1, green: 1, blue: 1, alpha: 0.5)
+        let face = try #require(
+            rgba(DieFaceTexture.images(for: die, shape: .d6)[0]))
+        let w = face.width
+        let bodyA = (10 * w + 10) * 4 + 3
+        let inkA = (face.height / 2 * w + w / 2) * 4 + 3
+        // t = 0: body 0.5; the pip composites 0.5 over it → 0.75.
+        #expect(abs(Int(face.bytes[bodyA]) - 128) <= 2)
+        #expect(abs(Int(face.bytes[inkA]) - 191) <= 3)
+        // t = 0.5: body halves again (0.5 × 0.5 = 0.25); the pip
+        // composites 0.5 over 0.25 → 0.625. Ink is not forced opaque.
+        die.translucency = 0.5
+        let glass = try #require(
+            rgba(DieFaceTexture.images(for: die, shape: .d6)[0]))
+        #expect(abs(Int(glass.bytes[bodyA]) - 64) <= 2)
+        #expect(abs(Int(glass.bytes[inkA]) - 159) <= 3)
+    }
+
+    /// A glass die's mirror composite must keep the body's alpha — the
+    /// emission image was opaque once, so the plusLighter bake drove the
+    /// composite to alpha 1 and the reflection showed a solid black
+    /// body; its glow mask now adds alpha only where light is added.
+    /// Pips still glow at full alpha.
+    @Test("glass + emission composite keeps the body's alpha")
+    func glassEmissionCompositeAlpha() throws {
+        var die = Appearance.ivory.die
+        die.translucency = 0.5
+        die.emission = EmissionAppearance(pipIntensity: 1)
+        let composites = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        let mirror = try #require(rgba(composites[0]))
+        let w = mirror.width
+        let bodyA = (10 * w + 10) * 4 + 3
+        let inkA = (mirror.height / 2 * w + w / 2) * 4 + 3
+        #expect(abs(Int(mirror.bytes[bodyA]) - 128) <= 4)
+        #expect(mirror.bytes[inkA] == 255)
+        // And the body isn't the opaque black blob the bug produced —
+        // the face color still reads through dimmed.
+        #expect(mirror.bytes[(10 * w + 10) * 4] > 40)
+
+        // Low pip glow must not thin the glass body either: the glow
+        // mask keeps body alpha at the die's own 1 − t whatever the
+        // intensity — a dim glow can't make the reflection more
+        // transparent than the translucency dial says.
+        die.emission = EmissionAppearance(pipIntensity: 0.3)
+        let dim = try #require(
+            DieFaceTexture.mirrorImages(for: die, shape: .d6))
+        let dimMirror = try #require(rgba(dim[0]))
+        #expect(abs(Int(dimMirror.bytes[bodyA]) - 128) <= 4)
+    }
+
+    /// Raw RGBA bytes for pixel assertions — both images go through the
+    /// same draw, so any row-order convention cancels between them.
+    private func rgba(_ image: UIImage) -> (width: Int, height: Int,
+                                             bytes: [UInt8])? {
+        guard let cgImage = image.cgImage else { return nil }
+        let width = cgImage.width, height = cgImage.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &bytes, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0,
+                                         width: width, height: height))
+        return (width, height, bytes)
     }
 
     /// The editor gates every material control on `theme.kind == .custom` —

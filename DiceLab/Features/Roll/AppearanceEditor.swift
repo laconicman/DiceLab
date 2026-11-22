@@ -78,6 +78,7 @@ struct AppearanceEditor<Table: DiceTable>: View {
                         sliderRow("Roughness", appearance.die.roughness)
                         sliderRow("Metalness", appearance.die.metalness)
                         sliderRow("Clearcoat", appearance.die.clearcoat)
+                        sliderRow("Translucency", appearance.die.translucency)
                     }
                     Section("Emission") {
                         ColorPicker("Face glow",
