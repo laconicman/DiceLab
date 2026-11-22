@@ -921,13 +921,12 @@ extension RealityTableController {
     private static func faceMaterial(_ value: Int, shape: DieShape,
                                      appearance: DieAppearance) -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
-        var faceTexture: PhysicallyBasedMaterial.Texture?
-        if let cgImage = DieFaceTexture.images(for: appearance,
-                                               shape: shape)[value - 1].cgImage,
+        if let image = DieFaceTexture.images(for: appearance,
+                                             shape: shape)[value - 1].cgImage,
            let texture = try? TextureResource(
-               image: cgImage, options: .init(semantic: .color)) {
-            faceTexture = .init(texture)
-            material.baseColor = .init(tint: .white, texture: faceTexture)
+               image: image, options: .init(semantic: .color)) {
+            material.baseColor = .init(tint: .white,
+                                       texture: .init(texture))
         } else {
             // Texture generation shouldn't sink the die — fall back to the
             // flat face color; the die is still playable.
@@ -936,14 +935,17 @@ extension RealityTableController {
         material.roughness = .init(floatLiteral: Float(appearance.roughness))
         material.metallic = .init(floatLiteral: Float(appearance.metalness))
         material.clearcoat = .init(floatLiteral: Float(appearance.clearcoat))
-        // Glass (M13): the same alpha-bearing face image doubles as the
-        // opacity texture — body α = 1 − translucency, ink α = 1 — and
-        // both faces draw so the far side's ink reads through. Whether
-        // the sampler reads the alpha channel is a measured question
-        // (Design.md, "Glass dice"), not an assumed one.
-        if appearance.translucency > 0, let faceTexture {
+        // Glass (M13): the opacity slot takes the face alpha as its own
+        // grayscale map — the sampler reads a color channel, not alpha
+        // (measured; Design.md, "Glass dice") — and both faces draw so
+        // the far side's ink reads through.
+        if appearance.translucency > 0,
+           let cgImage = DieFaceTexture.opacityImages(
+               for: appearance, shape: shape)[value - 1].cgImage,
+           let opacity = try? TextureResource(
+               image: cgImage, options: .init(semantic: .raw)) {
             material.blending = .transparent(
-                opacity: .init(scale: 1, texture: faceTexture))
+                opacity: .init(scale: 1, texture: .init(opacity)))
             material.faceCulling = .none
         }
         // Emission is a texture here too, with `emissiveIntensity` carrying

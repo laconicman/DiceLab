@@ -129,9 +129,9 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   `transparent.contents` with
   `isDoubleSided` + `transparencyMode = .dualLayer` (`.aOne` A/B'd — dual
   layer sorts the two faces independently); RealityKit binds the same
-  texture as `Opacity` under `blending = .transparent` with
-  `faceCulling = .none` — measured to read the image's alpha channel, no
-  dedicated map needed. Emission rides both blend paths; the RealityKit
+  split as a grayscale map under `blending = .transparent` with
+  `faceCulling = .none` — its opacity sampler reads a color channel, not
+  the image's alpha (measured). Emission rides both blend paths; the RealityKit
   mirror composite gained translucency in `MirrorInk`'s key. Refraction
   investigated and deferred to TD-14 — neither engine's material shader
   can read the framebuffer cheaply. Sim-verified at t = 0 / 0.6 / 1.0 on

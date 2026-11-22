@@ -98,6 +98,23 @@ enum DieFaceTexture {
                shape: shape, translucency: appearance.translucency)
     }
 
+    /// The face alpha as an opaque grayscale map, for RealityKit's
+    /// opacity slot: that sampler reads a *color* channel of its texture,
+    /// not the alpha (measured — bound to the face image itself it made
+    /// the white body opaque and the black ink clear). Gray level = the
+    /// alpha `images(for:)` carries: body = color α × (1 − t), ink = the
+    /// pip α composited over it.
+    @MainActor static func opacityImages(for appearance: DieAppearance,
+                                         shape: DieShape) -> [UIImage] {
+        let t = min(max(appearance.translucency, 0), 1)
+        let body = appearance.faceColor.alpha * (1 - t)
+        let ink = appearance.pipColor.alpha
+            + body * (1 - appearance.pipColor.alpha)
+        return images(face: CodableColor(red: body, green: body, blue: body),
+                      pip: CodableColor(red: ink, green: ink, blue: ink),
+                      shape: shape)
+    }
+
     /// The emission channel as images, or nil when nothing emits: the
     /// packed colors put each part's *share of the peak* in the texture so
     /// the material's scalar intensity can carry the magnitude (see

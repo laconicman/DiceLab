@@ -230,6 +230,21 @@ struct AppearanceTests {
         #expect(opaque.bytes[bodyAlpha] == 255)
     }
 
+    /// RealityKit's opacity sampler reads color, not alpha — the map
+    /// must carry the face image's alpha split as opaque gray.
+    @Test("opacity map mirrors the face alpha as opaque gray")
+    func opacityMapMatchesFaceAlpha() throws {
+        var glass = Appearance.ivory.die
+        glass.translucency = 0.6
+        let map = try #require(
+            rgba(DieFaceTexture.opacityImages(for: glass, shape: .d6)[0]))
+        let body = (10 * map.width + 10) * 4
+        let ink = (map.height / 2 * map.width + map.width / 2) * 4
+        #expect(abs(Int(map.bytes[body]) - 102) <= 1) // 0.4 × 255
+        #expect(map.bytes[body + 3] == 255)
+        #expect(map.bytes[ink] == 255)
+    }
+
     /// The color picker's own opacity must survive the translucency
     /// dial: body alpha = color alpha × (1 − t). Ink draws over the
     /// body with its own alpha, so a pip pixel composites source-over —

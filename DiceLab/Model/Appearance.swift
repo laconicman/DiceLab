@@ -32,10 +32,10 @@ struct DieAppearance: Codable, Equatable, Hashable {
     var clearcoat: Double = 0
     var emission = EmissionAppearance()
     /// How much the die's body lets light through, 0…1: 0 is opaque
-    /// (the presets), 1 a fully clear body. Ink stays opaque — the
-    /// face image's alpha carries the split (body α = 1 − t, ink α = 1),
-    /// so the same texture serves as SceneKit's `transparent` map and
-    /// RealityKit's opacity texture. See Design.md, "Glass dice".
+    /// (the presets), 1 a fully clear body. The dial never touches the
+    /// ink — the face image's alpha carries the split (body α = color α
+    /// × (1 − t), ink keeps the pip color's α). See Design.md,
+    /// "Glass dice".
     var translucency: Double = 0
 
     init(faceColor: CodableColor, pipColor: CodableColor,
