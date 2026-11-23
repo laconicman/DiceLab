@@ -87,14 +87,32 @@ struct SpeechTests {
         #expect(!synth.isSpeaking)
 
         speech.speak(RollResult(faces: [4]))   // must park — "5" is still owed
+        #expect(synth.spoken == ["6"])         // "4" did not start immediately
+        #expect(synth.stops == 2)
         await drain()
         #expect(synth.spoken == ["6", "4"])
     }
 
-    /// Let the `Task { @MainActor }` hop inside the delegate callbacks
-    /// land — yields, not sleeps, so the test can't flake on a timer.
+    /// `didFinish` is the other half of the release path — a parked
+    /// result must speak on natural completion too, not only on cancel.
+    @Test("a natural finish also releases the parked result")
+    func finishReleases() async {
+        let synth = MockSynthesizer()
+        let speech = SpeechController(synthesizer: synth)
+
+        speech.speak(RollResult(faces: [6]))
+        speech.speak(RollResult(faces: [5]))   // parks
+        synth.finish()
+        await drain()
+        #expect(synth.spoken == ["6", "5"])
+    }
+
+    /// Barrier for the `Task { @MainActor }` hop inside the delegate
+    /// callbacks: a no-op enqueued after it — MainActor is serial, so
+    /// when this returns the hop has already run. Yields can't promise
+    /// that; the stop test would pass without the callback ever firing.
     private func drain() async {
-        for _ in 0..<3 { await Task.yield() }
+        await MainActor.run { }
     }
 }
 
