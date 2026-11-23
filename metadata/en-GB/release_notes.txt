@@ -1,7 +1,5 @@
-DiceLab 1.2 brings a second die and a table that reflects.
+DiceLab 1.3 adds glass dice.
 
-• d20 — a twenty-sided die beside the d6, one shape per table; numerals with underlined 6 and 9
-• Felt reflection — a Reflection dial in the appearance editor mirrors the dice in the cloth, on both engines
-• Camera floor — the orbit can't dip under the felt; drag to orbit and pinch to zoom between rolls
+• Translucency — a new dial in the appearance editor turns the dice to frosted glass, on both engines
 
 Tell us how the throws feel — feedback shapes where the lab goes next.
