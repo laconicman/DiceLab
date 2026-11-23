@@ -186,7 +186,10 @@ inside `applyLighting` never port, same lesson as physics constants.
   trigger is the published result — engine-free — so the controllers never
   hear about it, and `settings.speech` is `@AppStorage` like
   `settings.engine`: a setting the scene doesn't touch doesn't belong on
-  the controller.
+  the controller. Utterances serialize through the synthesizer's delegate:
+  a settle during speech parks the newest result in a one-deep `pending`
+  slot, released on `didFinish`/`didCancel` — `stopSpeaking` + an
+  immediate `speak` drops the second utterance (TD-16).
 
 M9d grows the model by the two channels presets couldn't express —
 emission and backdrop — and *seals* the presets: the material dials now
