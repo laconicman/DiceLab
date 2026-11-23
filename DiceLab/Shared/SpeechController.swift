@@ -3,8 +3,24 @@ import AVFoundation
 /// Speaks settled roll totals — the legacy app's `isResultAsSpeechEnabled`
 /// revived. No permissions needed; `AVSpeechSynthesizer` shares the media
 /// audio session, so it obeys the silent switch like the haptic knock does.
-final class SpeechController {
-    private let synthesizer = AVSpeechSynthesizer()
+@MainActor
+final class SpeechController: NSObject {
+    private let synthesizer: AVSpeechSynthesizer
+    /// A settle that lands mid-utterance can't `speak` right away:
+    /// enqueuing behind the readout would voice stale totals, and
+    /// `stopSpeaking` + immediate `speak` drops the new utterance — the
+    /// synthesizer won't take one in the same beat (TD-16). The newest
+    /// result parks here until the delegate reports the interrupted
+    /// utterance over.
+    private var pending: RollResult?
+
+    /// The synthesizer is a parameter so tests can drive the lifecycle
+    /// without the real one's timing; the app always takes the default.
+    init(synthesizer: AVSpeechSynthesizer = AVSpeechSynthesizer()) {
+        self.synthesizer = synthesizer
+        super.init()
+        synthesizer.delegate = self
+    }
 
     /// What a settled roll sounds like — pure text so tests can pin it.
     /// Just the total: "8", not "3 plus 5 equals 8" — the equation read
@@ -13,22 +29,58 @@ final class SpeechController {
     /// default `AVSpeechUtterance` voice follows the resolved locale.
     /// Pinning a voice per locale is the voice-roll milestone's call —
     /// nothing here preempts it.
-    static func text(for result: RollResult) -> String {
+    nonisolated static func text(for result: RollResult) -> String {
         String(localized: "speech.total",
                defaultValue: "\(result.total)",
                comment: "Spoken roll result — the settled total alone")
     }
 
     /// A new roll interrupts the previous utterance — the stale readout of
-    /// a superseded result is worse than a clipped one.
+    /// a superseded result is worse than a clipped one. `pending != nil`
+    /// means a parked result is still owed its turn, so a settle inside
+    /// the delegate-hop gap parks too rather than speaking ahead of it.
     func speak(_ result: RollResult) {
+        guard synthesizer.isSpeaking || pending != nil else {
+            speakNow(result)
+            return
+        }
         synthesizer.stopSpeaking(at: .immediate)
-        synthesizer.speak(AVSpeechUtterance(string: Self.text(for: result)))
+        pending = result
     }
 
     /// The toggle going off mid-sentence should mean silence now, not
-    /// after the current utterance finishes.
+    /// after the current utterance finishes — and nothing parked speaks
+    /// after it either.
     func stop() {
+        pending = nil
         synthesizer.stopSpeaking(at: .immediate)
+    }
+
+    private func speakNow(_ result: RollResult) {
+        synthesizer.speak(AVSpeechUtterance(string: Self.text(for: result)))
+    }
+
+    private func speakPending() {
+        guard let result = pending else { return }
+        pending = nil
+        speakNow(result)
+    }
+}
+
+extension SpeechController: AVSpeechSynthesizerDelegate {
+    /// The synthesizer reports on its own queue; `pending` is main-actor
+    /// state, so every callback hops back before touching it.
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
+                                       didFinish utterance: AVSpeechUtterance) {
+        utteranceEnded()
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
+                                       didCancel utterance: AVSpeechUtterance) {
+        utteranceEnded()
+    }
+
+    private nonisolated func utteranceEnded() {
+        Task { @MainActor in self.speakPending() }
     }
 }
