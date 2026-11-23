@@ -137,6 +137,7 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   can read the framebuffer cheaply. Sim-verified at t = 0 / 0.6 / 1.0 on
   both engines; `fresnelExponent` considered and left out (inert under
   `.physicallyBased`). Discharges the emission half of TD-13.
+  `MARKETING_VERSION: "1.3"`.
 
 ## Next
 
