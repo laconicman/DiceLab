@@ -5,7 +5,7 @@ import AVFoundation
 /// audio session, so it obeys the silent switch like the haptic knock does.
 @MainActor
 final class SpeechController: NSObject {
-    private let synthesizer = AVSpeechSynthesizer()
+    private let synthesizer: AVSpeechSynthesizer
     /// A settle that lands mid-utterance can't `speak` right away:
     /// enqueuing behind the readout would voice stale totals, and
     /// `stopSpeaking` + immediate `speak` drops the new utterance — the
@@ -14,7 +14,10 @@ final class SpeechController: NSObject {
     /// utterance over.
     private var pending: RollResult?
 
-    override init() {
+    /// The synthesizer is a parameter so tests can drive the lifecycle
+    /// without the real one's timing; the app always takes the default.
+    init(synthesizer: AVSpeechSynthesizer = AVSpeechSynthesizer()) {
+        self.synthesizer = synthesizer
         super.init()
         synthesizer.delegate = self
     }

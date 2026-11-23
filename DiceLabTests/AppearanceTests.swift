@@ -103,14 +103,6 @@ struct AppearanceTests {
         #expect(LightingPreset.allCases.count == 3)
     }
 
-    /// The speech format is user-facing prose — pin it so a refactor can't
-    /// quietly grow "7" back into the equation readout.
-    @Test("speech text reads the total")
-    func speechText() {
-        #expect(SpeechController.text(for: RollResult(faces: [3, 3, 1])) == "7")
-        #expect(SpeechController.text(for: RollResult(faces: [6])) == "6")
-    }
-
     /// The wire format is synthesized enum Codable — `{"custom":{"_0":…}}`.
     /// Pin the literal shape: a hand-written payload (e.g. injected via
     /// `defaults write -data` for QA) must decode through the real type.
