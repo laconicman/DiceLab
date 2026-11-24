@@ -56,10 +56,14 @@ final class DiceTableController: NSObject {
     /// is ~15 N·s, so the hardest felt-slam lands at full intensity.
     private let haptics = HapticsController(maxImpulse: 15)
 
-    /// `-impulseLog` bookkeeping: impulses gathered during a roll, then
-    /// summarized at settle — the data a `maxImpulse` recalibration needs.
+    /// Roll bookkeeping: `rollImpulses` feeds the `-impulseLog` settle
+    /// summary — the data a `maxImpulse` recalibration needs.
+    /// `rollStartedAt` is always set in `roll()`: the settle timeout's
+    /// clock (TD-5) reads it every frame, the summary only under the
+    /// flag. Uptime, not `Date` — a wall-clock correction mid-roll
+    /// shouldn't move the deadline.
     private var rollImpulses: [Float] = []
-    private var rollStartedAt: Date?
+    private var rollStartedAt: TimeInterval?
 
     /// The last backdrop `applyBackdrop` rendered — `applyAppearance`
     /// re-applies every channel on any edit, and a slider drag shouldn't
@@ -239,6 +243,7 @@ final class DiceTableController: NSObject {
         isRolling = false
         lastRoll = nil
         history = []
+        rollStartedAt = nil // per-roll clock — a stale stamp helps nothing
         probeEscaped = [] // a fresh dice set re-earns its escape reports
         fitConverged = false // refit to the fresh spawn cluster
         lastFitPositions = [] // stale deltas would read as phantom speed
@@ -265,10 +270,8 @@ final class DiceTableController: NSObject {
         fitConverged = false // a fresh throw re-owns the camera
         fitSawFlight = false // and the speed gate re-arms from scratch
         fitArmed = false
-        if DevFlags.impulseLog {
-            rollImpulses = []
-            rollStartedAt = Date()
-        }
+        rollImpulses = []
+        rollStartedAt = ProcessInfo.processInfo.systemUptime
         for die in dice {
             // Clear momentum first: a re-throw is a fresh throw, not a
             // compounding of whatever the die was doing — and bounding the
@@ -326,7 +329,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
             // landed after it.
             if let generation = sync.withLock({ $0.rolling ? $0.rollID : nil }),
                isRolling, sync.withLock({ $0.rollID == generation }),
-               dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) {
+               diceSettled {
                 let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation, shape: dieShape) })
                 devTrace("publish total=\(result.total)")
                 lastRoll = result
@@ -334,7 +337,9 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 if history.count > 20 { history.removeFirst() }
                 isRolling = false
                 sync.withLock { $0.rolling = false }
-                if let started = rollStartedAt { logImpulseSummary(since: started) }
+                if DevFlags.impulseLog, let started = rollStartedAt {
+                    logImpulseSummary(since: started)
+                }
                 probeRest()
                 onRollSettled?(result)
             }
@@ -367,10 +372,35 @@ extension DiceTableController: SCNSceneRendererDelegate {
         }
     }
 
+    /// The settle predicate: every die's `isResting`, or the shared
+    /// wall-clock ceiling — whichever lands first. `isResting` alone can
+    /// stay false forever on a die wedged against a wall (TD-5); the UX
+    /// promise is that a throw always ends.
+    private var diceSettled: Bool {
+        dice.allSatisfy { $0.physicsBody?.isResting ?? false } || rollTimedOut
+    }
+
+    /// The TD-5 backstop, shared with the RealityKit controller:
+    /// monotonic seconds since `roll()` — `systemUptime`, so a wall-clock
+    /// correction mid-roll can't move the deadline. The shipped ceiling
+    /// scales by pace — honest settle wall-time is ~1/pace, so the guard
+    /// tracks the world's clock instead of firing mid-roll on slow
+    /// motion; `-settleTimeout` shadows it absolutely, for smoke runs. A
+    /// timeout publish reports the faces as they lie — possibly
+    /// mid-tumble — which is the guard's job: a wedged die's rest pose is
+    /// arbitrary anyway. (The wedged die keeps the render pump alive —
+    /// that's what lets this check run at all.)
+    private var rollTimedOut: Bool {
+        guard let started = rollStartedAt else { return false }
+        let ceiling = DevFlags.settleTimeoutOverride
+            ?? SettleTimeout.ceiling(pace: DevFlags.paceOverride ?? dynamics.pace)
+        return ProcessInfo.processInfo.systemUptime - started >= ceiling
+    }
+
     /// The `-impulseLog` summary: one line per settled roll — enough to
     /// pick `maxImpulse` from the observed ceiling instead of guessing.
-    private func logImpulseSummary(since start: Date) {
-        let elapsed = Date().timeIntervalSince(start)
+    private func logImpulseSummary(since start: TimeInterval) {
+        let elapsed = ProcessInfo.processInfo.systemUptime - start
         let maxImpulse = rollImpulses.max() ?? 0
         let mean = rollImpulses.isEmpty ? 0 : rollImpulses.reduce(0, +) / Float(rollImpulses.count)
         print(String(format: "[DiceLab] settled %.2fs — %d contacts, impulse max %.3f mean %.3f N·s",
