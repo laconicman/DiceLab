@@ -182,14 +182,16 @@ inside `applyLighting` never port, same lesson as physics constants.
   a statue — `makeDie` minus physics on SceneKit, a bare `ModelEntity` on
   RealityKit.
 - **Speech is view-layer feedback.** `SpeechController` wraps
-  `AVSpeechSynthesizer`; `RollScreen` speaks `lastRoll` on change. The
-  trigger is the published result — engine-free — so the controllers never
-  hear about it, and `settings.speech` is `@AppStorage` like
-  `settings.engine`: a setting the scene doesn't touch doesn't belong on
-  the controller. Utterances serialize through the synthesizer's delegate:
-  a settle during speech parks the newest result in a one-deep `pending`
-  slot, released on `didFinish`/`didCancel` — `stopSpeaking` + an
-  immediate `speak` drops the second utterance (TD-16).
+  `AVSpeechSynthesizer`; `RollScreen` feeds it from `DiceTable`'s
+  `onRollSettled` — a synchronous publish-path callback, not `onChange`:
+  delivery lagged a publish by 141 s on device until an unrelated update
+  committed (TD-16). The controllers never hear about the synthesizer, and
+  `settings.speech` is `@AppStorage` like `settings.engine`: a setting
+  the scene doesn't touch doesn't belong on the controller. Utterances
+  serialize through the synthesizer's delegate: a settle during speech
+  parks the newest result in a one-deep `pending` slot, released on
+  `didFinish`/`didCancel` — `stopSpeaking` + an immediate `speak` drops
+  the second utterance.
 
 M9d grows the model by the two channels presets couldn't express —
 emission and backdrop — and *seals* the presets: the material dials now

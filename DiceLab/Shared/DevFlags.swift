@@ -95,6 +95,22 @@ enum DevFlags {
         else { return nil }
         return min(max(value, 0), 1)
     }()
+
+    /// `-speechLog` — trace `SpeechController`'s park/release lifecycle
+    /// to stdout (`devicectl … --console`). The simulator can't verify
+    /// audible speech, so device runs are where the delegate path earns
+    /// its evidence — this is the probe for TD-16-class bugs. The same
+    /// flag also traces the roll pipeline (`throw`/`publish`/`onChange`)
+    /// via `devTrace`, so a silent settle shows which link broke.
+    static let speechLog = ProcessInfo.processInfo.arguments.contains("-speechLog")
+}
+
+/// Shared probe writer for `-speechLog` runs — one uptime-stamped format
+/// across the publish/speak chain so device traces line up. Distinct
+/// `[trace]` prefix from `SpeechController`'s `[speech]` lifecycle lines.
+func devTrace(_ event: String) {
+    guard DevFlags.speechLog else { return }
+    print("[trace] \(String(format: "%.2f", ProcessInfo.processInfo.systemUptime)) \(event)")
 }
 
 extension DieAppearance {

@@ -40,6 +40,9 @@ final class DiceTableController: NSObject {
     /// configuration would be meaningless).
     private(set) var history: [RollResult] = []
 
+    /// Synchronous settle announcement — `DiceTable.onRollSettled`.
+    var onRollSettled: (@MainActor (RollResult) -> Void)?
+
     /// Bumped per throw; the settle task compares against it so a re-roll
     /// can't be completed by the previous roll's queued publish. Behind a
     /// `Mutex` because two readers live off-main — the physics contact
@@ -255,6 +258,7 @@ final class DiceTableController: NSObject {
     /// `(1, 24, 2)` to every die — correlated, repeatable rolls. Randomizing
     /// per die is what makes consecutive rolls differ.
     func roll() {
+        devTrace("throw")
         sync.withLock { $0.rollID += 1; $0.rolling = true }
         probeEscaped = []
         isRolling = true
@@ -324,6 +328,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
                isRolling, sync.withLock({ $0.rollID == generation }),
                dice.allSatisfy({ $0.physicsBody?.isResting ?? false }) {
                 let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation, shape: dieShape) })
+                devTrace("publish total=\(result.total)")
                 lastRoll = result
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }
@@ -331,6 +336,7 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 sync.withLock { $0.rolling = false }
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
                 probeRest()
+                onRollSettled?(result)
             }
             // The camera fit must keep easing *after* the rolling flag
             // clears — the settle publish above is what lands it — so it
