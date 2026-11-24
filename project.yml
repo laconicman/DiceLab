@@ -27,6 +27,7 @@ targets:
         # No encryption beyond the OS's own — the build answers export compliance itself.
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: DiceLab/Info.plist
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # String Catalog: compiler extraction feeds Resources/Localizable.xcstrings.
         SWIFT_EMIT_LOC_STRINGS: YES

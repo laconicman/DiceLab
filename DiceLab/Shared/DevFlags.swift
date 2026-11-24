@@ -75,8 +75,10 @@ enum DevFlags {
     /// for the process lifetime without writing anything back (the
     /// `-pace` pattern). Clamped at 0: a negative says nothing 0 doesn't
     /// — "publish on the next frame," which is how the timeout gets
-    /// verified while dice still move. Pair with `-autoroll`.
-    static let settleTimeoutOverride: TimeInterval? = {
+    /// verified while dice still move. Pair with `-autoroll`. `var`, not
+    /// `let`: `dicelab://settleTimeout/<s>` rewrites it on a running app —
+    /// still process-lifetime, never persisted.
+    static var settleTimeoutOverride: TimeInterval? = {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-settleTimeout"),
               index + 1 < arguments.count,

@@ -56,6 +56,14 @@ private struct WindowRoot: View {
                 // a quick toggle panel; .large gives the editor room.
                 .presentationDetents([.medium, .large])
         }
+        // `dicelab://` — the runtime twin of launch-arg DevFlags, for
+        // driving a device build without relaunching (TD-5's device
+        // pass needed exactly this).
+        .onOpenURL { url in
+            guard let command = DebugURL.command(from: url) else { return }
+            DebugURL.perform(command, sceneKit: sceneKitTable,
+                             reality: realityTable, engine: $engine)
+        }
     }
 
     /// Dev driver: `-appearanceeditor` lands directly in the editor so its
