@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Testing
 @testable import DiceLab
@@ -51,3 +52,4 @@ struct DebugURLTests {
         #expect(command("dicelab://") == nil)
     }
 }
+#endif
