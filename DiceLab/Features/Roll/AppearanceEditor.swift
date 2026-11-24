@@ -73,8 +73,10 @@ struct AppearanceEditor<Table: DiceTable>: View {
                 }
                 if table.theme.kind == .custom {
                     Section("Die") {
-                        ColorPicker("Face", selection: color(appearance.die.faceColor))
-                        ColorPicker("Pips", selection: color(appearance.die.pipColor))
+                        ColorPicker("Face", selection: dieColor(appearance.die.faceColor),
+                                    supportsOpacity: false)
+                        ColorPicker("Pips", selection: dieColor(appearance.die.pipColor),
+                                    supportsOpacity: false)
                         sliderRow("Roughness", appearance.die.roughness)
                         sliderRow("Metalness", appearance.die.metalness)
                         sliderRow("Clearcoat", appearance.die.clearcoat)
@@ -204,6 +206,20 @@ struct AppearanceEditor<Table: DiceTable>: View {
     private func color(_ binding: Binding<CodableColor>) -> Binding<Color> {
         Binding(get: { binding.wrappedValue.color },
                 set: { binding.wrappedValue = CodableColor($0) })
+    }
+
+    /// Die colors are opaque by contract — the Translucency dial is the
+    /// only glass channel (TD-15), so the pickers hide their opacity
+    /// slider (`supportsOpacity: false`) and the setter pins alpha even
+    /// if a translucent color arrives anyway. The pin is die-scoped:
+    /// felt and emission colors keep the shared `color(_:)`.
+    private func dieColor(_ binding: Binding<CodableColor>) -> Binding<Color> {
+        Binding(get: { binding.wrappedValue.color },
+                set: {
+                    var pinned = CodableColor($0)
+                    pinned.alpha = 1
+                    binding.wrappedValue = pinned
+                })
     }
 
     /// `LocalizedStringKey` so each call-site literal reaches the string

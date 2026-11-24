@@ -118,6 +118,25 @@ struct AppearanceTests {
         #expect(appearance.lighting == .dramatic)
     }
 
+    /// TD-15: the Translucency dial is the only glass channel, so die
+    /// colors decode pinned to alpha 1 — a stored picker opacity rendered
+    /// differently per engine. RGB survives the pin; the scope is
+    /// `DieAppearance`-only, so emission and felt colors keep their alpha.
+    @Test("die colors decode opaque; felt and emission keep alpha")
+    func dieColorAlphaPinnedOnDecode() throws {
+        let json = #"{"custom":{"_0":{"die":{"faceColor":{"red":0.8,"green":0.2,"blue":0.2,"alpha":0.5},"pipColor":{"red":1,"green":1,"blue":1,"alpha":0.25},"roughness":0.35,"metalness":0,"clearcoat":0,"emission":{"faceColor":{"red":1,"green":0,"blue":0,"alpha":0.5},"faceIntensity":1,"pipColor":{"red":0,"green":1,"blue":0,"alpha":0.5},"pipIntensity":0.5}},"felt":{"color":{"red":0.05,"green":0.3,"blue":0.15,"alpha":0.5},"usesImage":false},"lighting":"studio"}}}"#
+        let theme = try JSONDecoder().decode(Theme.self, from: Data(json.utf8))
+        guard case .custom(let appearance) = theme else {
+            Issue.record("expected .custom, got \(theme)")
+            return
+        }
+        #expect(appearance.die.faceColor.alpha == 1)
+        #expect(appearance.die.pipColor.alpha == 1)
+        #expect(appearance.die.faceColor.red == 0.8)
+        #expect(appearance.die.emission.faceColor.alpha == 0.5)
+        #expect(appearance.felt.color.alpha == 0.5)
+    }
+
     /// Emission packing is the contract the material code depends on:
     /// texture pixels carry each part's share of the peak, the material
     /// scalar carries the clamped peak. Face-vs-pip ratios must survive.

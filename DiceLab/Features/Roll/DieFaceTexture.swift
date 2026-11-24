@@ -103,7 +103,8 @@ enum DieFaceTexture {
     /// not the alpha (measured — bound to the face image itself it made
     /// the white body opaque and the black ink clear). Gray level = the
     /// alpha `images(for:)` carries: body = color α × (1 − t), ink = the
-    /// pip α composited over it.
+    /// pip α composited over it — with die colors pinned opaque (TD-15)
+    /// that reduces to body = 1 − t, ink = 1.
     @MainActor static func opacityImages(for appearance: DieAppearance,
                                          shape: DieShape) -> [UIImage] {
         let t = min(max(appearance.translucency, 0), 1)
@@ -195,14 +196,17 @@ enum DieFaceTexture {
 
     /// Runtime-drawn face: fill + pips or a numeral. The fill's alpha is
     /// the color's own alpha × `bodyAlpha` — 1 for opaque dice, the
-    /// translucency factor for glass — so the picker's opacity survives
-    /// the dial; ink keeps the pip color's alpha untouched: glass you
-    /// can still read. `glowMask` zeroes the fill's alpha when the
-    /// packed emission color is black — the mirror composite then adds
-    /// opacity only where light is actually added. Ink is never masked:
-    /// opaque black pip ink is what keeps face glow off the pips.
-    /// The same image serves as diffuse RGB and SceneKit `transparent`
-    /// map; RealityKit's opacity slot gets `opacityImages`.
+    /// translucency factor for glass. Die colors arrive pinned to alpha
+    /// 1 (decode and the editor both force it — TD-15), so the dial is
+    /// the only glass channel; the multiply stays for callers whose
+    /// colors carry alpha of their own — emission packing. Ink keeps
+    /// the pip color's alpha untouched: glass you can still read.
+    /// `glowMask` zeroes the fill's alpha when the packed emission color
+    /// is black — the mirror composite then adds opacity only where
+    /// light is actually added. Ink is never masked: opaque black pip
+    /// ink is what keeps face glow off the pips. The same image serves
+    /// as diffuse RGB and SceneKit `transparent` map; RealityKit's
+    /// opacity slot gets `opacityImages`.
     static func image(for value: Int, shape: DieShape,
                       face: CodableColor, pip: CodableColor,
                       side: CGFloat = 256, bodyAlpha: CGFloat = 1,
