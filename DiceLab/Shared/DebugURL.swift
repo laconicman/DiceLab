@@ -93,10 +93,15 @@ enum DebugURL {
                 + "pace=\(pace) settleCeiling=\(ceiling)s "
                 + "isRolling=\(table.isRolling)")
         case .pace(let value):
-            // Both controllers share the persisted key; writing both
-            // keeps the inactive one from rolling back on reactivation.
-            sceneKit.dynamics.pace = value
-            reality.dynamics.pace = value
+            // Both controllers share the persisted key, and every
+            // `dynamics` write persists the whole pace×viscosity pair —
+            // the inactive one's cache is stale, so it writes FIRST and
+            // the live controller (`table`) LAST, or its old viscosity
+            // would win the shared key. The stale copy re-syncs on its
+            // next `sceneActivated` → `reloadSettings`.
+            let inactive: DiceTable = effective == .sceneKit ? reality : sceneKit
+            inactive.dynamics.pace = value
+            table.dynamics.pace = value
         case .settleTimeout(let value):
             DevFlags.settleTimeoutOverride = value
         case .engine(let value):
