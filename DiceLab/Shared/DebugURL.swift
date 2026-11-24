@@ -41,14 +41,18 @@ enum DebugURL {
         case "roll": return .roll
         case "state": return .state
         case "pace":
-            guard let argument, let value = Double(argument) else { return nil }
+            // `Double("nan")` parses; isFinite keeps it out of the dial —
+            // a NaN pace would persist and poison `ceiling(pace:)`.
+            guard let argument, let value = Double(argument),
+                  value.isFinite else { return nil }
             // The dial's own range: this writes the persisted setting,
             // so an absurd value would poison every later launch. The
             // unclamped escape stays `-pace` at launch.
             return .pace(min(max(value, RollDynamics.paceRange.lowerBound),
                              RollDynamics.paceRange.upperBound))
         case "settletimeout":
-            guard let argument, let value = Double(argument) else { return nil }
+            guard let argument, let value = Double(argument),
+                  value.isFinite else { return nil }
             return .settleTimeout(max(0, value))
         case "engine":
             guard let argument,

@@ -25,6 +25,7 @@ struct DebugURLTests {
         #expect(command("dicelab://pace/-3") == .pace(RollDynamics.paceRange.lowerBound))
         #expect(command("dicelab://pace") == nil)
         #expect(command("dicelab://pace/fast") == nil)
+        #expect(command("dicelab://pace/nan") == nil) // isFinite guard
     }
 
     @Test("settleTimeout parses with the flag's zero floor")
@@ -32,6 +33,7 @@ struct DebugURLTests {
         #expect(command("dicelab://settleTimeout/2") == .settleTimeout(2))
         #expect(command("dicelab://settleTimeout/-1") == .settleTimeout(0))
         #expect(command("dicelab://settleTimeout") == nil)
+        #expect(command("dicelab://settleTimeout/nan") == nil)
     }
 
     @Test("engine matches rawValue case-insensitively")
