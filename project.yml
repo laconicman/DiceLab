@@ -27,13 +27,20 @@ targets:
         # No encryption beyond the OS's own — the build answers export compliance itself.
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_FILE: DiceLab/Info.plist
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # String Catalog: compiler extraction feeds Resources/Localizable.xcstrings.
         SWIFT_EMIT_LOC_STRINGS: YES
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+      configs:
+        # The dicelab:// debug scheme registers only in Debug builds — a
+        # release plist must not vend an externally openable URL. XcodeGen
+        # auto-fills INFOPLIST_FILE per config, so both are set explicitly.
+        Debug:
+          INFOPLIST_FILE: DiceLab/Info-Debug.plist
+        Release:
+          INFOPLIST_FILE: DiceLab/Info-Release.plist
   DiceLabTests:
     type: bundle.unit-test
     platform: iOS

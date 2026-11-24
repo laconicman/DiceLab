@@ -268,7 +268,10 @@ The port's real findings, SceneKit → RealityKit:
   micro-bounces keep resetting RealityKit's frame count (TD-5) — so the
   publish path also fires on a shared elapsed-time ceiling,
   `SettleTimeout.seconds` (15 s at pace 1, `-settleTimeout` shadows it),
-  whichever lands first. The stamp is `systemUptime`, not `Date` — a
+  whichever lands first. In DEBUG builds the `dicelab://settleTimeout/<s>`
+  debug URL rewrites the same override on a running app — the next settle
+  check uses the new deadline immediately; Release has neither the scheme
+  nor the handler. The stamp is `systemUptime`, not `Date` — a
   wall-clock correction mid-roll can't move the deadline. The ceiling
   scales by pace — honest settle wall-time is ~1/pace on both engines,
   so a fixed ceiling would fire
