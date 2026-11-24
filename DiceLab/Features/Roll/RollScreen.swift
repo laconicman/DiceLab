@@ -35,6 +35,20 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             }
             .onAppear {
                 table.sceneActivated()
+                // Speech rides the settle event, not the render pipeline:
+                // a repeated total produces an identical view tree, and
+                // SwiftUI can defer `onChange` delivery until an unrelated
+                // update commits — the announcement dropped exactly on
+                // repeats (TD-16, device-verified). The controller calls
+                // back synchronously at publish; the toggle is read live
+                // so a mid-session flip still gates.
+                let speechController = speech
+                table.onRollSettled = { result in
+                    let enabled = UserDefaults.standard.object(forKey: TableSettings.speech) as? Bool ?? true
+                    guard enabled else { return }
+                    devTrace("settled \(result.total) → speak")
+                    speechController.speak(result)
+                }
                 // Dev driver: `xcrun simctl launch … -autoroll` exercises
                 // throw → settle → publish without manual tapping.
                 if DevFlags.autoroll {
@@ -44,15 +58,7 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
                     showingSettings = true
                 }
             }
-            // Speech rides the published result, not the physics — the view
-            // observes `lastRoll`, so the trigger is engine-free and the
-            // controllers never hear about AVSpeechSynthesizer.
-            // Keyed on `id`: RollResult equality compares faces, and two
-            // identical rolls are still two announcements.
-            .onChange(of: table.lastRoll?.id) { _, _ in
-                guard speechEnabled, let roll = table.lastRoll else { return }
-                speech.speak(roll)
-            }
+            .onDisappear { table.onRollSettled = nil }
             .onChange(of: speechEnabled) { _, enabled in
                 if !enabled { speech.stop() }
             }

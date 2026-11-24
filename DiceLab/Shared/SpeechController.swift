@@ -41,42 +41,76 @@ final class SpeechController: NSObject {
     /// the delegate-hop gap parks too rather than speaking ahead of it.
     func speak(_ result: RollResult) {
         guard synthesizer.isSpeaking || pending != nil else {
+            trace("speak \(result.total): idle → now")
             speakNow(result)
             return
         }
-        synthesizer.stopSpeaking(at: .immediate)
+        let hadPending = pending != nil
+        // The Bool is "did it actually stop something" — false means no
+        // didCancel is owed, which the park logic has to know about.
+        let stopped = synthesizer.stopSpeaking(at: .immediate)
         pending = result
+        trace("speak \(result.total): speaking=\(synthesizer.isSpeaking) hadPending=\(hadPending) stop=\(stopped) → parked")
     }
 
     /// The toggle going off mid-sentence should mean silence now, not
     /// after the current utterance finishes — and nothing parked speaks
     /// after it either.
     func stop() {
+        let hadPending = pending != nil
         pending = nil
         synthesizer.stopSpeaking(at: .immediate)
+        trace("stop: hadPending=\(hadPending)")
     }
 
     private func speakNow(_ result: RollResult) {
-        synthesizer.speak(AVSpeechUtterance(string: Self.text(for: result)))
+        let text = Self.text(for: result)
+        let session = AVAudioSession.sharedInstance()
+        let route = session.currentRoute.outputs.map(\.portType.rawValue).joined(separator: "+")
+        trace("speakNow \"\(text)\" session=\(session.category.rawValue) route=\(route) otherAudio=\(session.isOtherAudioPlaying)")
+        synthesizer.speak(AVSpeechUtterance(string: text))
     }
 
     private func speakPending() {
-        guard let result = pending else { return }
+        guard let result = pending else {
+            trace("speakPending: empty")
+            return
+        }
         pending = nil
+        trace("speakPending: release \(result.total) isSpeaking=\(synthesizer.isSpeaking)")
         speakNow(result)
+    }
+
+    /// `-speechLog` probe — see `DevFlags.speechLog`. `nonisolated` so the
+    /// delegate callbacks can trace before they hop. The uptime stamp
+    /// separates a dropped enqueue (instant lifecycle) from a real one.
+    private nonisolated func trace(_ event: String) {
+        guard DevFlags.speechLog else { return }
+        print("[speech] \(String(format: "%.2f", ProcessInfo.processInfo.systemUptime)) \(event)")
     }
 }
 
 extension SpeechController: AVSpeechSynthesizerDelegate {
     /// The synthesizer reports on its own queue; `pending` is main-actor
     /// state, so every callback hops back before touching it.
+    /// Fires when the synth actually starts voicing an utterance — the
+    /// "did audio happen" signal `didFinish` can't give (it fires even
+    /// for a silently dropped enqueue).
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
+                                       willSpeakRangeOfSpeechString characterRange: NSRange,
+                                       utterance: AVSpeechUtterance) {
+        trace("willSpeak \"\(utterance.speechString)\"")
+    }
+
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                                        didFinish utterance: AVSpeechUtterance) {
+        trace("delegate didFinish \"\(utterance.speechString)\"")
         utteranceEnded()
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer,
                                        didCancel utterance: AVSpeechUtterance) {
+        trace("delegate didCancel \"\(utterance.speechString)\"")
         utteranceEnded()
     }
 

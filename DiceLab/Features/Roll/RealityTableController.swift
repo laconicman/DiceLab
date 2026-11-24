@@ -41,6 +41,9 @@ final class RealityTableController: DiceTable {
     /// changes, same contract as the SceneKit controller.
     private(set) var history: [RollResult] = []
 
+    /// Synchronous settle announcement — `DiceTable.onRollSettled`.
+    var onRollSettled: (@MainActor (RollResult) -> Void)?
+
     /// Bumped per throw; queued settle checks compare against it so a re-roll
     /// can't be completed by the previous roll's in-flight frame callback.
     private var rollID = 0
@@ -300,6 +303,7 @@ final class RealityTableController: DiceTable {
     /// SceneKit throw. Magnitudes are re-tuned for meters — the numbers do
     /// not port between engines, the *shape* of the code does.
     func roll() {
+        devTrace("throw")
         rollID += 1
         steadyFrames = 0
         probeEscaped = []
@@ -339,7 +343,9 @@ final class RealityTableController: DiceTable {
             if steadyFrames >= Rest.requiredFrames {
                 steadyFrames = 0
                 let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation, shape: dieShape) })
+                devTrace("publish total=\(result.total)")
                 lastRoll = result
+                onRollSettled?(result)
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }
                 isRolling = false

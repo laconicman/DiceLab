@@ -17,6 +17,13 @@ protocol DiceTable: AnyObject, Observable {
     var lastRoll: RollResult? { get }
     /// Settled rolls, oldest first, capped — cleared when the dice set changes.
     var history: [RollResult] { get }
+    /// Fires synchronously on the publish path, on the main actor.
+    /// Once-per-settle announcements can't ride `onChange(of: lastRoll)`:
+    /// a repeated total renders an identical view tree, and SwiftUI can
+    /// defer the action until an unrelated update commits — the speech
+    /// callback would go silent exactly when the total repeats (TD-16,
+    /// device-verified). Views that need the event subscribe here.
+    var onRollSettled: (@MainActor (RollResult) -> Void)? { get set }
     /// 1…6 dice on the table; respawns the dice when changed.
     var dieCount: Int { get set }
     /// The shape every die on the table takes; respawns the dice when
