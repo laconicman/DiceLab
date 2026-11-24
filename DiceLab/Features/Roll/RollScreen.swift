@@ -35,17 +35,15 @@ struct RollScreen<Table: DiceTable, SceneContent: View>: View {
             }
             .onAppear {
                 table.sceneActivated()
-                // Speech rides the settle event, not the render pipeline:
-                // a repeated total produces an identical view tree, and
-                // SwiftUI can defer `onChange` delivery until an unrelated
-                // update commits — the announcement dropped exactly on
-                // repeats (TD-16, device-verified). The controller calls
-                // back synchronously at publish; the toggle is read live
-                // so a mid-session flip still gates.
+                // Speech rides the settle event, not `onChange` delivery:
+                // the action lagged a publish by 141 s on device until an
+                // unrelated update committed — the announcement dropped
+                // on repeats (TD-16). The controller calls back
+                // synchronously at publish; the toggle is read live so a
+                // mid-session flip still gates.
                 let speechController = speech
                 table.onRollSettled = { result in
-                    let enabled = UserDefaults.standard.object(forKey: TableSettings.speech) as? Bool ?? true
-                    guard enabled else { return }
+                    guard TableSettings.storedSpeech() else { return }
                     devTrace("settled \(result.total) → speak")
                     speechController.speak(result)
                 }

@@ -345,12 +345,12 @@ final class RealityTableController: DiceTable {
                 let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation, shape: dieShape) })
                 devTrace("publish total=\(result.total)")
                 lastRoll = result
-                onRollSettled?(result)
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }
                 isRolling = false
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
                 probeRest()
+                onRollSettled?(result)
             }
         }
         // Outside the settle gate on purpose: the fit keeps easing after

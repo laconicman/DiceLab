@@ -65,9 +65,11 @@ final class SpeechController: NSObject {
 
     private func speakNow(_ result: RollResult) {
         let text = Self.text(for: result)
-        let session = AVAudioSession.sharedInstance()
-        let route = session.currentRoute.outputs.map(\.portType.rawValue).joined(separator: "+")
-        trace("speakNow \"\(text)\" session=\(session.category.rawValue) route=\(route) otherAudio=\(session.isOtherAudioPlaying)")
+        if DevFlags.speechLog {
+            let session = AVAudioSession.sharedInstance()
+            let route = session.currentRoute.outputs.map(\.portType.rawValue).joined(separator: "+")
+            trace("speakNow \"\(text)\" session=\(session.category.rawValue) route=\(route) otherAudio=\(session.isOtherAudioPlaying)")
+        }
         synthesizer.speak(AVSpeechUtterance(string: text))
     }
 

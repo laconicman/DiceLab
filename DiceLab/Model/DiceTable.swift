@@ -19,10 +19,9 @@ protocol DiceTable: AnyObject, Observable {
     var history: [RollResult] { get }
     /// Fires synchronously on the publish path, on the main actor.
     /// Once-per-settle announcements can't ride `onChange(of: lastRoll)`:
-    /// a repeated total renders an identical view tree, and SwiftUI can
-    /// defer the action until an unrelated update commits — the speech
-    /// callback would go silent exactly when the total repeats (TD-16,
-    /// device-verified). Views that need the event subscribe here.
+    /// delivery lagged a publish by 141 s on device until an unrelated
+    /// view update committed (TD-16). Views that need the event
+    /// subscribe here.
     var onRollSettled: (@MainActor (RollResult) -> Void)? { get set }
     /// 1…6 dice on the table; respawns the dice when changed.
     var dieCount: Int { get set }
@@ -92,9 +91,9 @@ enum TableSettings {
     static let haptics = "settings.haptics"
     static let sound = "settings.sound"
     static let soundVolume = "settings.soundVolume"
-    /// Speech is view-layer feedback (it observes `lastRoll`), so it lives
-    /// as `@AppStorage` like `engine` — not on the controllers, which hold
-    /// only settings that shape the scene.
+    /// Speech is view-layer feedback (it rides `onRollSettled`), so it
+    /// lives as `@AppStorage` like `engine` — not on the controllers,
+    /// which hold only settings that shape the scene.
     static let speech = "settings.speech"
     /// History-panel visibility — the same class as `speech`: chrome
     /// reading `history`, not a scene property, so `@AppStorage` on the
@@ -131,6 +130,12 @@ enum TableSettings {
     /// slider is how a user tames it. Clamped 0…1 like the other dials.
     static func storedSoundVolume(defaults: UserDefaults = .standard) -> Double {
         min(max(defaults.object(forKey: soundVolume) as? Double ?? 1, 0), 1)
+    }
+
+    /// Absent or corrupt reads as enabled — speech is on-by-default
+    /// feedback, matching the `@AppStorage` declaration's initial value.
+    static func storedSpeech(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: speech) as? Bool ?? true
     }
 
     /// The stored theme, or a migration from M6's `settings.skin` rawValue —

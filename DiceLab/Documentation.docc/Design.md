@@ -184,9 +184,8 @@ inside `applyLighting` never port, same lesson as physics constants.
 - **Speech is view-layer feedback.** `SpeechController` wraps
   `AVSpeechSynthesizer`; `RollScreen` feeds it from `DiceTable`'s
   `onRollSettled` — a synchronous publish-path callback, not `onChange`:
-  a repeated total renders an identical view tree and SwiftUI deferred
-  the action until an unrelated commit, muting exactly the repeats
-  (TD-16). The controllers never hear about the synthesizer, and
+  delivery lagged a publish by 141 s on device until an unrelated update
+  committed (TD-16). The controllers never hear about the synthesizer, and
   `settings.speech` is `@AppStorage` like `settings.engine`: a setting
   the scene doesn't touch doesn't belong on the controller. Utterances
   serialize through the synthesizer's delegate: a settle during speech

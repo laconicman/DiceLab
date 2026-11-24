@@ -330,13 +330,13 @@ extension DiceTableController: SCNSceneRendererDelegate {
                 let result = RollResult(faces: dice.map { DieFace.up(of: $0.presentation.simdOrientation, shape: dieShape) })
                 devTrace("publish total=\(result.total)")
                 lastRoll = result
-                onRollSettled?(result)
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }
                 isRolling = false
                 sync.withLock { $0.rolling = false }
                 if let started = rollStartedAt { logImpulseSummary(since: started) }
                 probeRest()
+                onRollSettled?(result)
             }
             // The camera fit must keep easing *after* the rolling flag
             // clears — the settle publish above is what lands it — so it
