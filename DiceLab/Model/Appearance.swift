@@ -34,8 +34,9 @@ struct DieAppearance: Codable, Equatable, Hashable {
     /// How much the die's body lets light through, 0…1: 0 is opaque
     /// (the presets), 1 a fully clear body. The dial never touches the
     /// ink — the face image's alpha carries the split (body α = color α
-    /// × (1 − t), ink keeps the pip color's α). See Design.md,
-    /// "Glass dice".
+    /// × (1 − t), ink keeps the pip color's α). Die colors are pinned to
+    /// alpha 1 on decode and in the editor, so the dial is the only glass
+    /// channel (TD-15). See Design.md, "Glass dice".
     var translucency: Double = 0
 
     init(faceColor: CodableColor, pipColor: CodableColor,
@@ -58,6 +59,12 @@ struct DieAppearance: Codable, Equatable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         faceColor = try container.decode(CodableColor.self, forKey: .faceColor)
         pipColor = try container.decode(CodableColor.self, forKey: .pipColor)
+        // TD-15: the Translucency dial is the only glass channel — a
+        // stored picker opacity renders differently per engine, so die
+        // colors decode opaque. The pin lives here, not on CodableColor:
+        // felt and emission colors share the type and keep their alpha.
+        faceColor.alpha = 1
+        pipColor.alpha = 1
         roughness = try container.decodeIfPresent(Double.self, forKey: .roughness) ?? 0.35
         metalness = try container.decodeIfPresent(Double.self, forKey: .metalness) ?? 0
         clearcoat = try container.decodeIfPresent(Double.self, forKey: .clearcoat) ?? 0
