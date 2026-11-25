@@ -109,8 +109,8 @@ private struct WindowRoot: View {
 /// `dicelab://` dispatch — compiled out of Release builds. An externally
 /// openable URL must not mutate persisted settings or the settle ceiling
 /// in a build that ships (Devin Review security finding); the scheme
-/// itself is also only registered for Debug via `INFOPLIST_FILE` in
-/// `project.yml`, so in Release this modifier is a passthrough and no
+/// itself is also only registered for Debug via per-config `INFOPLIST_FILE`
+/// in `project.xcproj`, so in Release this modifier is a passthrough and no
 /// handler exists to receive a URL even if one arrives.
 private struct DebugURLHandler: ViewModifier {
     let sceneKitTable: DiceTableController

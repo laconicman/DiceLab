@@ -1,7 +1,9 @@
 # DiceLab — agent notes
 
-- `project.yml` is the source of truth; run `xcodegen generate` before building —
-  never hand-edit `DiceLab.xcodeproj/`.
+- `DiceLab.xcodeproj/project.xcproj` is the committed source of truth (Xcode
+  27.2 JSON format, JSON5) — edit it in Xcode, with `xcrun xcodeproj`, or via
+  `xcrun xcprojformatter`. Both source folders are filesystem-synchronized,
+  so new files need no project edits.
 - GitHub milestones mirror the docs' M-numbering: every PR gets the milestone for
   the M-batch it belongs to, and the milestone must exist — create it if missing.
   `gh pr edit --milestone` only sees *open* milestones; assign by number instead:

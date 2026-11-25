@@ -10,10 +10,9 @@ and RealityKit (ECS) — switchable in Settings, the M7 comparison exercise.
 ## Requirements
 
 - iOS 18+ (the RealityKit engine needs `RealityView`)
-- Xcode 26+
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) — the `.xcodeproj` is
-  generated, not committed: run `xcodegen` after cloning or changing
-  `project.yml`.
+- Xcode 27.2+ — `DiceLab.xcodeproj/project.xcproj` is the committed project
+  file in Xcode's JSON format (JSON5). Xcode 26 can't open it; 27.0/27.1
+  can build it but only 27.2 converts or edits it via `xcrun xcodeproj`.
 
 ## Documentation
 
@@ -26,7 +25,7 @@ tech-debt register — live in `DiceLab/Documentation.docc/` and render via
 Milestone merges get an annotated `v<major>.<sub>` tag — `v1.2` is M12 — and
 pushing it runs the release workflow, which asserts the tag matches
 `MARKETING_VERSION` and publishes a GitHub release with generated notes.
-`MARKETING_VERSION` in `project.yml` tracks the latest tag; bump it in the
+`MARKETING_VERSION` in `project.xcproj` tracks the latest tag; bump it in the
 milestone's closeout commit.
 
 ## License

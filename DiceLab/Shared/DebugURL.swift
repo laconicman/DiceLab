@@ -13,8 +13,9 @@ import SwiftUI
 ///
 /// DEBUG builds only: an externally openable URL must never mutate
 /// persisted settings or the settle ceiling in a build that ships — the
-/// scheme isn't even registered in Release (`project.yml` scopes
-/// `INFOPLIST_FILE` to the Debug config), and this file compiles out.
+/// scheme isn't even registered in Release (per-config `INFOPLIST_FILE`
+/// in `project.xcproj` — only `Info-Debug.plist` declares it), and this
+/// file compiles out.
 enum DebugURL {
     enum Command: Equatable {
         /// Throw every die on the effective engine's table.

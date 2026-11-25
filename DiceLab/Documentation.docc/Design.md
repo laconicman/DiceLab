@@ -420,15 +420,14 @@ per-player color maps each roll to the player who threw it.
 
 M9e added `Resources/Localizable.xcstrings` — Xcode's String Catalog —
 with `SWIFT_EMIT_LOC_STRINGS`/`LOCALIZATION_PREFERS_STRING_CATALOGS` set
-in `project.yml` (XcodeGen doesn't set them itself). English and Russian
+in the app target's `build-settings`. English and Russian
 ship with 1.0 — the ru pass validated the funnel's premise (adding a
 locale was pure data: 72 keys localized without a code audit, with
 `settings.dieCount`'s `variations.plural` block living in the same JSON
-— one/few/many/other per Russian plural rules). XcodeGen also needs
-`options.knownRegions: [en, Base, ru]` set in `project.yml` for
-`-exportLocalizations` and Xcode's UI to see the catalog's locales
-(undocumented in XcodeGen's ProjectSpec but works on 2.46.0; compiled
-`ru.lproj` lands in the `.app` either way).
+— one/few/many/other per Russian plural rules). The project's
+`localizations` block (`en` development; `Base`, `ru` supported) is what
+`-exportLocalizations` and Xcode's UI read for the catalog's locales
+(compiled `ru.lproj` lands in the `.app`).
 
 - **Literal keys by default.** `Text("Roll")` extracts the literal as its
   own key — self-documenting and free. Dotted keys (`roll.equation`,
