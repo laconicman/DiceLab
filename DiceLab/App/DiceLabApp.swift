@@ -56,6 +56,12 @@ private struct WindowRoot: View {
                 // a quick toggle panel; .large gives the editor room.
                 .presentationDetents([.medium, .large])
         }
+        // `dicelab://` — the runtime twin of launch-arg DevFlags, for
+        // driving a device build without relaunching (TD-5's device
+        // pass needed exactly this). DEBUG only: see DebugURLHandler.
+        .modifier(DebugURLHandler(sceneKitTable: sceneKitTable,
+                                  realityTable: realityTable,
+                                  engine: $engine))
     }
 
     /// Dev driver: `-appearanceeditor` lands directly in the editor so its
@@ -97,5 +103,29 @@ private struct WindowRoot: View {
     private var realityPreview: AnyView {
         AnyView(RealityDiePreview(root: realityTable.previewRoot,
                                   die: realityTable.previewDie))
+    }
+}
+
+/// `dicelab://` dispatch — compiled out of Release builds. An externally
+/// openable URL must not mutate persisted settings or the settle ceiling
+/// in a build that ships (Devin Review security finding); the scheme
+/// itself is also only registered for Debug via `INFOPLIST_FILE` in
+/// `project.yml`, so in Release this modifier is a passthrough and no
+/// handler exists to receive a URL even if one arrives.
+private struct DebugURLHandler: ViewModifier {
+    let sceneKitTable: DiceTableController
+    let realityTable: RealityTableController
+    @Binding var engine: DiceEngine
+
+    func body(content: Content) -> some View {
+        #if DEBUG
+        content.onOpenURL { url in
+            guard let command = DebugURL.command(from: url) else { return }
+            DebugURL.perform(command, sceneKit: sceneKitTable,
+                             reality: realityTable, engine: $engine)
+        }
+        #else
+        content
+        #endif
     }
 }

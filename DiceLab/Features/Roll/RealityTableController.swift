@@ -78,10 +78,14 @@ final class RealityTableController: DiceTable {
     /// ceiling leaves hard hits near 1.0 and typical ones ~0.3.
     private let haptics = HapticsController(maxImpulse: 0.12)
 
-    /// `-impulseLog` bookkeeping: impulses gathered during a roll, then
-    /// summarized at settle — the data a `maxImpulse` recalibration needs.
+    /// Roll bookkeeping: `rollImpulses` feeds the `-impulseLog` settle
+    /// summary — the data a `maxImpulse` recalibration needs.
+    /// `rollStartedAt` is always set in `roll()`: the settle timeout's
+    /// clock (TD-5) reads it every update, the summary only under the
+    /// flag. Uptime, not `Date` — a wall-clock correction mid-roll
+    /// shouldn't move the deadline.
     private var rollImpulses: [Float] = []
-    private var rollStartedAt: Date?
+    private var rollStartedAt: TimeInterval?
 
     /// Dice currently on the table — `ModelEntity` because the impulse
     /// methods live on `HasPhysicsBody`, which bare `Entity` lacks.
@@ -286,6 +290,7 @@ final class RealityTableController: DiceTable {
         isRolling = false
         lastRoll = nil
         history = []
+        rollStartedAt = nil // per-roll clock — a stale stamp helps nothing
         probeEscaped = [] // a fresh dice set re-earns its escape reports
         fitConverged = false // refit to the fresh spawn cluster
         spawnDice(dieCount)
@@ -311,10 +316,8 @@ final class RealityTableController: DiceTable {
         fitConverged = false // a fresh throw re-owns the camera
         fitSawFlight = false // and the speed gate re-arms from scratch
         fitArmed = false
-        if DevFlags.impulseLog {
-            rollImpulses = []
-            rollStartedAt = Date()
-        }
+        rollImpulses = []
+        rollStartedAt = ProcessInfo.processInfo.systemUptime
         for die in dice {
             // Clear momentum first: a re-throw is a fresh throw, not a
             // compounding of whatever the die was doing.
@@ -340,7 +343,10 @@ final class RealityTableController: DiceTable {
                     && simd_length(motion.angularVelocity) < Rest.angular
             }
             steadyFrames = settled ? steadyFrames + 1 : 0
-            if steadyFrames >= Rest.requiredFrames {
+            // `steadyFrames` is the engine's own rest definition; the
+            // wall-clock ceiling covers the case it never lands — a die
+            // wedged on a wall keeps resetting the count (TD-5).
+            if steadyFrames >= Rest.requiredFrames || rollTimedOut {
                 steadyFrames = 0
                 let result = RollResult(faces: dice.map { DieFace.up(of: $0.orientation, shape: dieShape) })
                 devTrace("publish total=\(result.total)")
@@ -348,7 +354,9 @@ final class RealityTableController: DiceTable {
                 history.append(result)
                 if history.count > 20 { history.removeFirst() }
                 isRolling = false
-                if let started = rollStartedAt { logImpulseSummary(since: started) }
+                if DevFlags.impulseLog, let started = rollStartedAt {
+                    logImpulseSummary(since: started)
+                }
                 probeRest()
                 onRollSettled?(result)
             }
@@ -379,12 +387,28 @@ final class RealityTableController: DiceTable {
 
     /// The `-impulseLog` summary: one line per settled roll — enough to
     /// pick `maxImpulse` from the observed ceiling instead of guessing.
-    private func logImpulseSummary(since start: Date) {
-        let elapsed = Date().timeIntervalSince(start)
+    private func logImpulseSummary(since start: TimeInterval) {
+        let elapsed = ProcessInfo.processInfo.systemUptime - start
         let maxImpulse = rollImpulses.max() ?? 0
         let mean = rollImpulses.isEmpty ? 0 : rollImpulses.reduce(0, +) / Float(rollImpulses.count)
         print(String(format: "[DiceLab] settled %.2fs — %d contacts, impulse max %.3f mean %.3f N·s",
                      elapsed, rollImpulses.count, maxImpulse, mean))
+    }
+
+    /// The TD-5 backstop, shared with the SceneKit controller:
+    /// monotonic seconds since `roll()` — `systemUptime`, so a wall-clock
+    /// correction mid-roll can't move the deadline. The shipped ceiling
+    /// scales by pace — honest settle wall-time is ~1/pace, so the guard
+    /// tracks the world's clock instead of firing mid-roll on slow
+    /// motion; `-settleTimeout` shadows it absolutely, for smoke runs. A
+    /// timeout publish reports the faces as they lie — possibly
+    /// mid-tumble — which is the guard's job: a wedged die's rest pose is
+    /// arbitrary anyway.
+    private var rollTimedOut: Bool {
+        guard let started = rollStartedAt else { return false }
+        let ceiling = DevFlags.settleTimeoutOverride
+            ?? SettleTimeout.ceiling(pace: DevFlags.paceOverride ?? dynamics.pace)
+        return ProcessInfo.processInfo.systemUptime - started >= ceiling
     }
 
     /// Velocity magnitudes under which a die counts as still — tuned for

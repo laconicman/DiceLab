@@ -263,7 +263,22 @@ The port's real findings, SceneKit → RealityKit:
   `physicsBody.isResting`; RealityKit exposes only velocity, read through
   `PhysicsMotionComponent` on a per-frame `SceneEvents.Update`. Ours:
   |v| < 2 cm/s and |ω| < 0.3 rad/s sustained 15 frames. Honest bookkeeping —
-  and it survives an engine swap.
+  and it survives an engine swap. Either signal can still hold false
+  forever — `isResting` never flips on a wall-wedged die, and
+  micro-bounces keep resetting RealityKit's frame count (TD-5) — so the
+  publish path also fires on a shared elapsed-time ceiling,
+  `SettleTimeout.seconds` (15 s at pace 1, `-settleTimeout` shadows it),
+  whichever lands first. In DEBUG builds the `dicelab://settleTimeout/<s>`
+  debug URL rewrites the same override on a running app — the next settle
+  check uses the new deadline immediately; Release has neither the scheme
+  nor the handler. The stamp is `systemUptime`, not `Date` — a
+  wall-clock correction mid-roll can't move the deadline. The ceiling
+  scales by pace — honest settle wall-time is ~1/pace on both engines,
+  so a fixed ceiling would fire
+  mid-roll at the slowest dial settings — floored at
+  `SettleTimeout.minPace` so the unclamped `-pace` flag can't divide by
+  zero. A timeout publish reports the faces as they lie, possibly
+  mid-tumble: the guard exists for wedges, not for pacing.
 - **CCD exists on RealityKit.** `isContinuousCollisionDetectionEnabled` is
   the per-body tunneling guard SceneKit withholds (the API exists but is
   sphere-shapes-only). It is a mitigation, not a guarantee: the discrete

@@ -70,6 +70,23 @@ enum DevFlags {
         return Double(arguments[index + 1])
     }()
 
+    /// `-settleTimeout 2` — transient settle-ceiling override for smoke
+    /// runs; shadows the pace-scaled `SettleTimeout` ceiling absolutely
+    /// for the process lifetime without writing anything back (the
+    /// `-pace` pattern). Clamped at 0: a negative says nothing 0 doesn't
+    /// — "publish on the next frame," which is how the timeout gets
+    /// verified while dice still move. Pair with `-autoroll`. `var`, not
+    /// `let`: `dicelab://settleTimeout/<s>` rewrites it on a running app —
+    /// still process-lifetime, never persisted.
+    static var settleTimeoutOverride: TimeInterval? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-settleTimeout"),
+              index + 1 < arguments.count,
+              let value = Double(arguments[index + 1])
+        else { return nil }
+        return max(0, value)
+    }()
+
     /// `-orbit 30` — park the camera at this elevation (degrees, clamped
     /// to the orbit band) about the fitted cluster every time the fit
     /// latches. A straight-down camera hides a floor reflection under the
