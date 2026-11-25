@@ -27,7 +27,11 @@ jobs:
           [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ] || \
             { echo "release titles need an annotated tag (git tag -a)"; exit 1; }
           TAG=${GITHUB_REF_NAME#v}
-          VER=$(sed -n 's/.*MARKETING_VERSION: *"\(.*\)".*/\1/p' project.yml)
+          # project.xcproj is JSON5 (trailing commas) — parse the one setting
+          # as text rather than feeding it to a strict JSON decoder. Config-
+          # conditional keys ("MARKETING_VERSION[config=Debug]") match too; the
+          # assert fails loudly if they ever disagree.
+          VER=$(python3 -c 'import re; t=open("DiceLab.xcodeproj/project.xcproj").read(); v=set(re.findall(r"\"MARKETING_VERSION(?:\[[^\]]*\])?\"\s*:\s*\"([^\"]+)\"", t)); assert len(v)==1, f"MARKETING_VERSION missing or split: {v}"; print(v.pop())')
           [ "$VER" = "$TAG" ] || { echo "tag $GITHUB_REF_NAME != MARKETING_VERSION $VER"; exit 1; }
 
       - name: Create release
