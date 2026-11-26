@@ -617,10 +617,29 @@ extension DiceTableController {
     }
 
     /// The preview world's staging — die-scale, so `Bounds` doesn't apply.
+    /// The camera replicates RealityKit's preview framing: the same 40°
+    /// vertical field of view and view elevation, at a distance that puts
+    /// the 3-unit die at the RealityKit die's angular size (a 0.03 m die
+    /// seen from ~0.097 m). SceneKit's die is 100× the meter scale, so the
+    /// same angle lands ~9.7 units out — `(0, 5.5, 8)` keeps the 34.5°
+    /// elevation and doubles as the distance match.
     private enum Preview {
-        static let cameraPosition = SCNVector3(x: 0, y: 2.4, z: 3.2)
+        static let cameraFieldOfView: CGFloat = 40
+        static let cameraPosition = SCNVector3(x: 0, y: 5.5, z: 8)
         static let keyPosition = SCNVector3(x: 0, y: 6, z: 4)
         static let fillWhiteness: CGFloat = 0.4
+        /// A dark ground slab under the die — a floating die can't be
+        /// judged. It sits *below* the spinning die's lowest reach (the
+        /// 3-unit cube's vertex radius ≈ 2.6 about its center), so the
+        /// tumble never clips the surface; the die hovers just above it
+        /// and its shadow does the grounding. Finite in depth so the far
+        /// edge makes a horizon — the backdrop stays visible above it
+        /// (it's an editable setting the preview must still show).
+        static let floorTopY: Float = -2.7
+        static let floorWidth: CGFloat = 80
+        static let floorDepth: CGFloat = 20
+        static let floorCenterZ: Float = 6
+        static let floorColor = UIColor(white: 0.12, alpha: 1)
         static let spinX: CGFloat = 0.9
         static let spinY: CGFloat = 1.6
         static let spinDuration: TimeInterval = 3
@@ -633,9 +652,15 @@ extension DiceTableController {
     private func setUpPreview() {
         let camera = SCNNode()
         camera.camera = SCNCamera()
+        camera.camera?.fieldOfView = Preview.cameraFieldOfView
         camera.position = Preview.cameraPosition
         previewScene.rootNode.addChildNode(camera)
-        camera.look(at: SCNVector3Zero)
+        // `look(at:)` alone leaves this oblique downward view vertically
+        // inverted — the floor lands above the die. The flipped `up` keeps
+        // world-up on screen so the ground reads below the die, matching
+        // RealityKit's preview (which needs the same correction).
+        camera.look(at: SCNVector3Zero, up: SCNVector3(0, -1, 0),
+                    localFront: SCNVector3(0, 0, -1))
 
         let die = Self.makeDie(at: SCNVector3Zero, shape: dieShape,
                                appearance: theme.appearance.die.effective)
@@ -646,10 +671,25 @@ extension DiceTableController {
         previewScene.rootNode.addChildNode(die)
         previewDie = die
 
+        // Ground slab under the die — its top face sits at the die's base.
+        let floorMaterial = SCNMaterial()
+        floorMaterial.diffuse.contents = Preview.floorColor
+        floorMaterial.specular.contents = UIColor.black
+        let floor = SCNNode(geometry: SCNBox(
+            width: Preview.floorWidth, height: 0.2, length: Preview.floorDepth,
+            chamferRadius: 0))
+        floor.geometry?.materials = [floorMaterial]
+        floor.position = SCNVector3(x: 0, y: Preview.floorTopY - 0.1,
+                                    z: Preview.floorCenterZ)
+        previewScene.rootNode.addChildNode(floor)
+
         let key = SCNNode()
         key.name = NodeName.keyLight
         key.light = SCNLight()
         key.light?.type = .omni
+        // The preview key casts like the table's — `castsShadow` defaults
+        // false, so the die's shadow only lands once it's asked for.
+        key.light?.castsShadow = true
         key.position = Preview.keyPosition
         previewScene.rootNode.addChildNode(key)
         let fill = SCNNode()
