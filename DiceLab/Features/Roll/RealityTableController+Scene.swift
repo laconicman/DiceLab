@@ -719,7 +719,7 @@ extension RealityTableController {
         /// that the side edges stay out of frame.
         static let floorWidth: Float = 0.8
         static let floorDepth: Float = 0.2
-        static let floorCenter = SIMD3<Float>(0, -0.037, 0.06)
+        static let floorCenter = SIMD3<Float>(0, -0.032, 0.06)
         static let floorColor = UIColor(white: 0.12, alpha: 1)
         /// Inside-out backdrop dome — `applyBackdrop` swaps its material
         /// for the resolved image or leaves it black. Sized for the

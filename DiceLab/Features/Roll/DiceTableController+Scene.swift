@@ -671,7 +671,8 @@ extension DiceTableController {
         previewScene.rootNode.addChildNode(die)
         previewDie = die
 
-        // Ground slab under the die — its top face sits at the die's base.
+        // Ground slab under the die — its top face sits just below the
+        // spinning die's lowest reach, leaving room for the tumble.
         let floorMaterial = SCNMaterial()
         floorMaterial.diffuse.contents = Preview.floorColor
         floorMaterial.specular.contents = UIColor.black
