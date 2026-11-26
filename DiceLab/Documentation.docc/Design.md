@@ -184,7 +184,10 @@ inside `applyLighting` never port, same lesson as physics constants.
   on either engine (TD-17): a 40° camera at matched elevation and die
   angular size, a dark ground slab under the tumble, a shadow-casting key
   light, and the resolved backdrop reaching the preview — SceneKit's
-  `scene.background`, RealityKit's dome + probe.
+  `scene.background`, RealityKit's dome + probe. The slabs aren't
+  luminance-matched — RealityKit's PBR floor answers the preview IBL
+  probe's ambient where SceneKit's diffuse/omni path doesn't, reading
+  ~2× brighter — accepted as engine character, not tuned to a match.
 - **Speech is view-layer feedback.** `SpeechController` wraps
   `AVSpeechSynthesizer`; `RollScreen` feeds it from `DiceTable`'s
   `onRollSettled` — a synchronous publish-path callback, not `onChange`:
