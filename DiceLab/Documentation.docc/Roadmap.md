@@ -139,6 +139,26 @@ Milestone plan. Each milestone ends in a buildable, commit-worthy state.
   `.physicallyBased`). Discharges the emission half of TD-13.
   `MARKETING_VERSION: "1.3"`.
 
+- **M14 — Device-pass polish.** Four open debts discharged in one batch
+  after the PavP device pass. TD-16 — a repeated total that never spoke — was
+  never the synthesizer: SwiftUI deferred `onChange` delivery 141 s on
+  device until an unrelated update committed, so speech moved onto a
+  synchronous `DiceTable.onRollSettled` publish-path callback, the
+  utterance delegate's one-deep `pending` slot kept for settles landing
+  mid-speech (PRs #49, #50). TD-15 — die colors pin alpha to 1 at decode
+  and in the editor (`supportsOpacity: false` plus a pinning binding), so
+  the Translucency dial is the only glass channel (PR #51). TD-5 — both
+  engines publish on a shared `SettleTimeout` elapsed ceiling (15 s at
+  pace 1, pace-scaled and floored; `-settleTimeout` shadows it for smoke
+  runs) when their own rest signal never lands; the pass also grew the
+  DEBUG-only `dicelab://` channel (`roll`/`state`/`pace`/`settleTimeout`/
+  `engine`) the device pass drove (PR #52). TD-17 — the settings die
+  preview stages the same shot on both engines: matched 40° framing, a
+  ground slab under a shadow-casting key, the resolved backdrop reaching
+  the preview world, clipped to a circle (PR #55). Records TD-18 (the
+  silent knock was Bluetooth routing, not a bug) and logs TD-19/TD-20.
+  `MARKETING_VERSION: "1.3"`.
+
 ## Next
 
 Open learning surface: device-time haptic/tuning pass, scripted camera
