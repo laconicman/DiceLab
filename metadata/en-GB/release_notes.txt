@@ -1,5 +1,6 @@
 DiceLab 1.3 adds glass dice.
 
 • Translucency — a new dial in the appearance editor turns the dice to frosted glass, on both engines
+• Fixes — repeated totals speak reliably, a wedged die can't leave a roll hanging, and the die preview matches across engines
 
 Tell us how the throws feel — feedback shapes where the lab goes next.
