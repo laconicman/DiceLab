@@ -49,10 +49,18 @@ struct AppearanceEditor<Table: DiceTable>: View {
     var body: some View {
         // The preview is pinned above the scrollable form — at the sheet's
         // medium detent an in-form row scrolls away, and editing blind
-        // defeats the point of a live preview.
+        // defeats the point of a live preview. The strip stays full-width
+        // (the camera framing is tuned for it) but the rendered die is
+        // clipped to an inscribed circle — a material-swatch badge, not a
+        // letterbox. The scene keeps its wide aspect, so the die's size is
+        // unchanged; only the view is cropped to the circle.
         VStack(spacing: 0) {
             preview
-                .frame(height: 140)
+                .frame(height: 160)
+                .mask(alignment: .center) {
+                    Circle()
+                        .frame(width: 160, height: 160)
+                }
             Form {
                 Section {
                     Picker("Preset", selection: themeKind) {

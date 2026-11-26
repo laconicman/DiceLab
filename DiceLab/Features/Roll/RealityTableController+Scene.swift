@@ -568,9 +568,11 @@ extension RealityTableController {
         appliedBackdrop = backdrop
         backdropGeneration += 1
         let generation = backdropGeneration
-        let dome = root.findEntity(named: EntityName.backdropDome)
-        // The probe lives in both worlds — the preview die must answer to
-        // the same environment the table does.
+        // Dome and probe live in both worlds — the preview die must
+        // answer to the same environment the table does.
+        let domes = [root, previewRoot].compactMap {
+            $0.findEntity(named: EntityName.backdropDome)
+        }
         let probes = [root, previewRoot].compactMap {
             $0.findEntity(named: EntityName.iblProbe)
         }
@@ -579,8 +581,10 @@ extension RealityTableController {
             // No backdrop → plain black dome, still enabled: disabling it
             // would leave the RealityView transparent where the felt
             // doesn't reach — a white screen in light mode.
-            dome?.components[ModelComponent.self]?.materials =
-                [Self.domeMaterial()]
+            for dome in domes {
+                dome.components[ModelComponent.self]?.materials =
+                    [Self.domeMaterial()]
+            }
             for probe in probes {
                 probe.components.remove(VirtualEnvironmentProbeComponent.self)
             }
@@ -591,7 +595,9 @@ extension RealityTableController {
             var material = UnlitMaterial()
             material.color = .init(tint: .white, texture: .init(texture))
             material.faceCulling = .front
-            dome?.components[ModelComponent.self]?.materials = [material]
+            for dome in domes {
+                dome.components[ModelComponent.self]?.materials = [material]
+            }
         }
         Task {
             var environment: EnvironmentResource?
@@ -695,6 +701,8 @@ extension RealityTableController {
     }
 
     /// The preview world's staging — meter-scale like the table (die ≈ 3 cm).
+    /// The camera is the parity reference: SceneKit's preview copies its
+    /// 40° vertical FOV, view elevation, and the die's angular size.
     private enum Preview {
         static let cameraPosition = SIMD3<Float>(0, 0.055, 0.08)
         static let cameraFieldOfView: Float = 40
@@ -703,6 +711,20 @@ extension RealityTableController {
         static let fillPosition = SIMD3<Float>(0, 0.15, 0.1)
         static let fillIntensity: Float = 400
         static let fillAttenuation: Float = 1
+        /// Ground slab under the die — top face below the spinning die's
+        /// lowest reach (the 0.03 m cube's vertex radius ≈ 0.026 about its
+        /// center), so the tumble never clips; the die hovers just above
+        /// and its shadow grounds it. Finite in depth so the far edge
+        /// makes a horizon — SceneKit's preview floor, ÷100. Wide enough
+        /// that the side edges stay out of frame.
+        static let floorWidth: Float = 0.8
+        static let floorDepth: Float = 0.2
+        static let floorCenter = SIMD3<Float>(0, -0.032, 0.06)
+        static let floorColor = UIColor(white: 0.12, alpha: 1)
+        /// Inside-out backdrop dome — `applyBackdrop` swaps its material
+        /// for the resolved image or leaves it black. Sized for the
+        /// preview camera's 2 m far plane.
+        static let domeRadius: Float = 0.6
     }
 
     /// The appearance editor's live preview: one die, a camera, lights —
@@ -714,6 +736,10 @@ extension RealityTableController {
         camera.components.set(PerspectiveCameraComponent(
             near: 0.001, far: 2, fieldOfViewInDegrees: Preview.cameraFieldOfView))
         camera.look(at: .zero, from: Preview.cameraPosition, relativeTo: nil)
+        // `look(at:from:)` leaves this oblique downward view vertically
+        // inverted — the floor lands above the die. Half-turn about the
+        // view axis restores world-up, matching SceneKit's preview.
+        camera.orientation *= simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 0, 1))
         previewRoot.addChild(camera)
 
         let die = ModelEntity(
@@ -723,9 +749,26 @@ extension RealityTableController {
         previewRoot.addChild(die)
         previewDie = die
 
+        // Ground slab under the die — a floating die can't be judged.
+        // Matte dark PBR so it reads as ground, not a mirror.
+        var floorMaterial = PhysicallyBasedMaterial()
+        floorMaterial.baseColor = .init(tint: Preview.floorColor)
+        floorMaterial.roughness = 1.0
+        let floor = ModelEntity(
+            mesh: .generateBox(size: [Preview.floorWidth, 0.01,
+                                      Preview.floorDepth]),
+            materials: [floorMaterial])
+        floor.position = Preview.floorCenter
+        previewRoot.addChild(floor)
+
         let key = DirectionalLight()
         key.name = EntityName.keyLight
         key.light.intensity = Preview.keyIntensity
+        // Directional lights cast by default on the table; the preview's
+        // bare `DirectionalLight` needs the component asked for, same as
+        // `setUpLighting`.
+        key.shadow = DirectionalLightComponent.Shadow(
+            maximumDistance: 1.0, depthBias: 4.0)
         key.look(at: .zero, from: Preview.keyDirection, relativeTo: nil)
         previewRoot.addChild(key)
         let fill = PointLight()
@@ -735,8 +778,17 @@ extension RealityTableController {
         fill.position = Preview.fillPosition
         previewRoot.addChild(fill)
 
+        // Inside-out backdrop dome — `applyBackdrop` swaps its material
+        // for the resolved image or leaves it black, the same answer the
+        // SceneKit preview's `scene.background` gives.
+        let dome = ModelEntity(
+            mesh: .generateSphere(radius: Preview.domeRadius),
+            materials: [Self.domeMaterial()])
+        dome.name = EntityName.backdropDome
+        previewRoot.addChild(dome)
+
         // Same probe host as the table — `applyBackdrop` sets the shared
-        // environment on both, no dome needed in a one-die world.
+        // environment on both.
         let probe = Entity()
         probe.name = EntityName.iblProbe
         previewRoot.addChild(probe)
